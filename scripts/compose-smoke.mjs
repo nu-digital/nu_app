@@ -43,6 +43,13 @@ try {
   check(`web 全${inv.routes.length - 2}ルート200`, bad.length === 0, bad.slice(0, 3).join(','));
   r = await get(web, '/no-such-page/'); check('web 未定義URLは404', r?.status === 404);
 
+  // 初期Owner作成CLI: 1回目は成功してtokenを表示、2回目は別IDでも拒否(終了コード3)でtokenを表示しない
+  const boot = (id) => compose('run', '--rm', '--no-deps', '--entrypoint', '/nuctl', 'api', 'bootstrap-owner', '--login-id', id, '--display-name', 'スモーク(架空)');
+  const b1 = boot('smoke.owner');
+  check('nuctl bootstrap-owner 1回目は成功しtokenを表示', b1.status === 0 && /^[A-Za-z0-9_-]{43}$/m.test(b1.stdout), `exit=${b1.status}`);
+  const b2 = boot('smoke.second');
+  check('nuctl bootstrap-owner 2回目は拒否(終了コード3)', b2.status === 3 && !/^[A-Za-z0-9_-]{43}$/m.test(b2.stdout), `exit=${b2.status}`);
+
   const stopDb = compose('stop', 'db');
   check('db停止', stopDb.status === 0);
   r = await get(api, '/readyz'); check('DB停止後 api /readyz は503', r?.status === 503);
