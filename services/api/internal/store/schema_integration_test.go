@@ -228,3 +228,54 @@ func TestProfileExtrasConstraints(t *testing.T) {
 	wantViolation(t, pool, "personal_devices_visibility_valid", dev, u.ID, "PC", "x", `{}`, "everyone")
 	wantViolation(t, pool, "personal_devices_name_valid", dev, u.ID, "PC", " ", `{}`, "private")
 }
+
+func TestInventoryConstraints(t *testing.T) {
+	pool, _ := pgtest.New(t)
+	ctx := context.Background()
+	u := mustUser(t, pool, "alice.example", "active")
+	v := mustUser(t, pool, "bob.example", "active")
+	var qty, ind string
+	if err := pool.QueryRow(ctx, `INSERT INTO inventory_items (name, mode, total_quantity) VALUES ('ケーブル','quantity',5) RETURNING id::text`).Scan(&qty); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `INSERT INTO inventory_items (name, mode) VALUES ('Pico','individual') RETURNING id::text`).Scan(&ind); err != nil {
+		t.Fatal(err)
+	}
+	wantViolation(t, pool, "inventory_items_total_valid", `INSERT INTO inventory_items (name, mode, total_quantity) VALUES ('x','quantity',-1)`)
+	wantViolation(t, pool, "inventory_items_total_valid", `INSERT INTO inventory_items (name, mode, total_quantity) VALUES ('x','individual',3)`)
+	wantViolation(t, pool, "inventory_items_mode_valid", `INSERT INTO inventory_items (name, mode) VALUES ('x','both')`)
+	wantViolation(t, pool, "inventory_items_name_valid", `INSERT INTO inventory_items (name, mode) VALUES ('  ','quantity')`)
+
+	// 個体: 管理番号は物品内で一意。貸出中は廃止できない。1つの貸出が複数個体を占有しない（=個体は同時に1貸出まで）
+	var u1, u2 string
+	if err := pool.QueryRow(ctx, `INSERT INTO inventory_units (item_id, asset_tag) VALUES ($1,'P1') RETURNING id::text`, ind).Scan(&u1); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `INSERT INTO inventory_units (item_id, asset_tag) VALUES ($1,'P2') RETURNING id::text`, ind).Scan(&u2); err != nil {
+		t.Fatal(err)
+	}
+	wantViolation(t, pool, "inventory_units_tag_unique", `INSERT INTO inventory_units (item_id, asset_tag) VALUES ($1,'P1')`, ind)
+	var l1 string
+	if err := pool.QueryRow(ctx, `INSERT INTO inventory_loans (item_id, unit_id, borrower_user_id, quantity) VALUES ($1,$2,$3,1) RETURNING id::text`, ind, u1, u.ID).Scan(&l1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE inventory_units SET current_loan_id=$2 WHERE id=$1`, u1, l1); err != nil {
+		t.Fatal(err)
+	}
+	wantViolation(t, pool, "inventory_units_current_loan_unique", `UPDATE inventory_units SET current_loan_id=$2 WHERE id=$1`, u2, l1)
+	wantViolation(t, pool, "inventory_units_loaned_not_archived", `UPDATE inventory_units SET state='archived', archived_at=now() WHERE id=$1`, u1)
+	// 貸出: 個体の貸出は数量1、数量は1以上
+	wantViolation(t, pool, "inventory_loans_unit_quantity", `INSERT INTO inventory_loans (item_id, unit_id, borrower_user_id, quantity) VALUES ($1,$2,$3,2)`, ind, u2, v.ID)
+	wantViolation(t, pool, "inventory_loans_quantity_valid", `INSERT INTO inventory_loans (item_id, borrower_user_id, quantity) VALUES ($1,$2,0)`, qty, v.ID)
+	wantViolation(t, pool, "inventory_returns_quantity_valid", `INSERT INTO inventory_returns (loan_id, actor_user_id, quantity) VALUES ($1,$2,0)`, l1, v.ID)
+	// 元記録は追記専用（更新・削除できない）
+	wantViolation(t, pool, "23001", `UPDATE inventory_loans SET quantity = 1`)
+	wantViolation(t, pool, "23001", `DELETE FROM inventory_loans`)
+	if _, err := pool.Exec(ctx, `INSERT INTO inventory_returns (loan_id, actor_user_id, quantity) VALUES ($1,$2,1)`, l1, v.ID); err != nil {
+		t.Fatal(err)
+	}
+	wantViolation(t, pool, "23001", `UPDATE inventory_returns SET quantity = 1`)
+	wantViolation(t, pool, "23001", `DELETE FROM inventory_returns`)
+	wantViolation(t, pool, "inventory_adjustments_changed", `INSERT INTO inventory_adjustments (item_id, actor_user_id, before_quantity, after_quantity, reason) VALUES ($1,$2,3,3,'x')`, qty, u.ID)
+	wantViolation(t, pool, "inventory_adjustments_reason_valid", `INSERT INTO inventory_adjustments (item_id, actor_user_id, before_quantity, after_quantity, reason) VALUES ($1,$2,3,4,' ')`, qty, u.ID)
+}

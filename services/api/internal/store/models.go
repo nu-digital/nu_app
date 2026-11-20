@@ -31,6 +31,58 @@ type EmergencyRecoveryEvent struct {
 	CreatedAt        pgtype.Timestamptz
 }
 
+type InventoryAdjustment struct {
+	ID             pgtype.UUID
+	ItemID         pgtype.UUID
+	ActorUserID    pgtype.UUID
+	BeforeQuantity int32
+	AfterQuantity  int32
+	Reason         string
+	CreatedAt      pgtype.Timestamptz
+}
+
+type InventoryItem struct {
+	ID            pgtype.UUID
+	Name          string
+	Description   string
+	Category      string
+	Location      string
+	CoverMediaID  pgtype.UUID
+	Mode          string
+	TotalQuantity int32
+	ArchivedAt    pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+}
+
+type InventoryLoan struct {
+	ID             pgtype.UUID
+	ItemID         pgtype.UUID
+	UnitID         pgtype.UUID
+	BorrowerUserID pgtype.UUID
+	Quantity       int32
+	BorrowedAt     pgtype.Timestamptz
+}
+
+type InventoryReturn struct {
+	ID          pgtype.UUID
+	LoanID      pgtype.UUID
+	ActorUserID pgtype.UUID
+	Quantity    int32
+	ReturnedAt  pgtype.Timestamptz
+}
+
+type InventoryUnit struct {
+	ID            pgtype.UUID
+	ItemID        pgtype.UUID
+	AssetTag      string
+	SerialNumber  pgtype.Text
+	State         string
+	CurrentLoanID pgtype.UUID
+	ArchivedAt    pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+}
+
 type OneTimeToken struct {
 	ID        pgtype.UUID
 	UserID    pgtype.UUID
