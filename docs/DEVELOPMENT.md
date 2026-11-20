@@ -36,6 +36,8 @@ typeは `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`。
 
 初回pushとCI実行後にSettingsで設定・確認する。ファイルを置くだけでは有効にならない。
 
+**2026-11-20実測:** このリポジトリはprivate。main保護の取得APIが「プランのアップグレードまたはpublic化が必要」と403を返した。現時点では保護を有効化できていない。公開範囲や契約は勝手に変更しない。利用可能になるまではPRとCIを人が確認してマージし、直接push禁止は運用ルールであってサーバーによる強制ではないと理解する。
+
 - デフォルトブランチmain、Squash merge、マージ済みブランチの自動削除。
 - mainのRulesetまたはbranch protection: PR必須、force push・削除禁止、会話解決必須、CI必須。管理者の恒常的bypassも避ける。
 - 現在の必須チェック候補は `harness / repository`、`harness / policy`。初回実行で表示された正確な名前を指定する。P0以降にアプリ検証も必須化する。

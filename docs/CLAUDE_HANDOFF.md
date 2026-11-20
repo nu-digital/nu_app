@@ -4,7 +4,7 @@
 
 ```text
 AGENTS.md / CLAUDE.mdとdocsの必読5文書、DEVELOPMENT、TESTING、DECISIONSを先に読んでください。
-今回はBACKLOGのP0-01だけを完了してください。対象Issueがあれば引き継ぎから確認し、重複作成しないでください。
+今回はBACKLOGのP0-01、GitHub Issue #2だけを完了してください。Issueを重複作成しないでください。
 
 既存サイトは https://github.com/nu-digital/nu_digital 、調査基準はdocs/LEGACY_SITE.mdです。
 まず現在のソース・主要URL・67記事・画像・日付・ギャラリーをローカルで再現し、移設前の比較基準を作成してください。
