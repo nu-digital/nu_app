@@ -39,6 +39,10 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | `PATCH /admin/users/{id}/status` | `{status:"disabled"\|"active"}` | 200 `{id,loginId,status}` | 409 `CANNOT_DISABLE_SELF`・`LAST_OWNER`、403 |
 | `PUT /admin/users/{id}/editor-role` | `{enabled:bool}` | 200 `{id,loginId,roles}`（冪等。Admin/Owner） | 403、404、422 |
 | `PUT /owner/users/{id}/admin-role` | `{enabled:bool}` | 200 `{id,loginId,roles}`（冪等。Ownerのみ。Owner権限は付与できない） | 403、404、422 |
+| `POST /owner/transfers` | `{toUserId}` | 201 `{id,toUserId,status:"pending",expiresAt}`（有効期限24時間） | 403、409 `TRANSFER_PENDING`、422 `INVALID_TARGET`（自分・非active・既にOwner・存在しない） |
+| `POST /owner/transfers/{id}/cancel` | – | 200（申請者のみ。承諾前） | 404（申請者以外）、409 `TRANSFER_NOT_PENDING`（処理済み/期限切れ） |
+| `GET /owner/transfers/incoming` | – | 200 `{items:[{id,fromLoginId,fromDisplayName,expiresAt}]}`（自分宛の未処理・未失効） | 401 |
+| `POST /owner/transfers/{id}/accept` | – | 200 `{roles}`（移譲先本人のみ。1トランザクションで入替、旧Ownerはadmin） | 404（移譲先以外）、409 `TRANSFER_NOT_PENDING`・`TRANSFER_INVALID` |
 
 状態変更は`Origin`（または`Referer`）が許可オリジンと一致し、認証済みの場合は`X-CSRF-Token`（`/auth/me`・ログイン応答の`csrfToken`）が必要。Cookieは`HttpOnly; Secure; SameSite=Lax`（Secure時は`__Host-nu_session`）。
 
