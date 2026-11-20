@@ -5,10 +5,13 @@ WORKDIR /src
 COPY go.mod go.sum* ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server \
+ && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/nuctl ./cmd/nuctl
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 COPY --from=build /out/server /server
+# 管理CLI（運用者がサーバー上で実行する。公開経路からは呼ばれない）
+COPY --from=build /out/nuctl /nuctl
 USER nonroot:nonroot
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=4s --start-period=5s --retries=3 CMD ["/server", "-healthcheck"]

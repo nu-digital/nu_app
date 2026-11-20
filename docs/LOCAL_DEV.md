@@ -41,7 +41,18 @@ scripts/sqlc.sh generate      # クエリ/migration変更後にsqlcの生成コ�
 
 `compose:smoke`は開発用の`nu_app`プロジェクトとvolumeに触れない。
 
-## 4. つまずいたら
+## 4. 初期Ownerの作成（ローカルの動作確認用）
+
+初期Owner（最初の管理者）は、公開APIやWebではなく**管理CLI**でだけ作成できる。1回だけ実行でき、2回目は別のログインIDでも拒否される。
+
+```sh
+docker compose --env-file .env -f infrastructure/compose.yaml run --rm --no-deps --entrypoint /nuctl api \
+  bootstrap-owner --login-id owner.example --display-name "ローカル用オーナー"
+```
+
+招待tokenが**一度だけ**表示される（DBにはSHA-256のみ。ログ・監査に残らない）。パスワード設定とログインはP1-02で提供する。やり直すには`npm run dev:reset`（開発用DBの初期化）。**本番では実行しない**（本番は未構築。実行は運用責任者の手順で別途決める）。
+
+## 5. つまずいたら
 
 - ポート競合: `.env`の`*_PORT`を変更。
 - DBパスワードに記号を使うとDSNが壊れる。英数字と`- _ . ~`だけにする。
