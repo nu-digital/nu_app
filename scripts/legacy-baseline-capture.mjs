@@ -1,5 +1,5 @@
 // 既存サイトの静的build成果物(out)を配信し、全ルートHTTP確認・基準画面撮影・ギャラリー操作確認を行う。
-// 使い方: PLAYWRIGHT_DIR=<playwrightのあるnode_modules親> node scripts/legacy-baseline-capture.mjs <out dir> <出力dir> [basePath]
+// 使い方: PLAYWRIGHT_DIR=<playwrightのあるディレクトリ(例: apps/web)> node scripts/legacy-baseline-capture.mjs <out dir> <出力dir> [basePath]
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, statSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve, extname } from 'node:path';
@@ -126,3 +126,7 @@ writeFileSync(join(shots, 'capture-result.json'), JSON.stringify(result, null, 2
 const bad = result.routes.filter(r => r.status !== 200 || r.brokenImages || r.failures);
 console.log(JSON.stringify({ base: result.base, routes: result.routes.length, nonOk: bad.length, notFoundStatus: result.notFoundStatus, galleryFail: result.gallery.filter(g => !g.ok).map(g => g.name), galleryChecks: result.gallery.length }, null, 1));
 if (bad.length) console.log(JSON.stringify(bad, null, 1).slice(0, 3000));
+// CIで使えるよう、失敗(非200・壊れた画像・ギャラリー不合格・notFoundが404でない・横溢れ)は終了コード1にする。
+const overflow = result.viewports.filter(v => v.horizontalOverflowPx > 0);
+if (overflow.length) console.log('horizontal overflow:', JSON.stringify(overflow));
+if (bad.length || result.gallery.some(g => !g.ok) || result.notFoundStatus !== 404 || overflow.length) process.exitCode = 1;

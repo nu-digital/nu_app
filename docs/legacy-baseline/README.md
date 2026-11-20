@@ -64,8 +64,8 @@ Playwright（1.56.1、Chromium 141 headless）はリポジトリの依存では�
 
 | ID | 内容 | 再現・根拠 | 影響・扱い |
 |---|---|---|---|
-| L1 | `next@16.1.1`（lockfile）に多数のnpm audit指摘。critical 4件（Image Optimization・`use cache`等の認証不要RCE。最新の指摘は`<=16.4.4`が対象）、high多数 | `npm audit`（2026-11-20）：全21件(low2/mod9/high9/crit1。直接依存はnextのみcritical)、`--omit=dev`で7件(mod6/high1)。`next`は `<=16.4.4` 範囲 | 現在は`output:"export"`・`images.unoptimized`の静的配信で、Image Optimization・Server Actions・middleware等のサーバー機能を使わないため直接の悪用経路は限定的と推測（未検証）。P3でVPS動的配信にする前、P0-02の依存固定時に更新方針を決める。ここでは更新せず基準を維持（D11） |
-| L2 | `eslint-config-next@15.3.1` が `next@16.1.1` と主版が不一致 | package.json。`npm ls`は不整合を報告せず、eslint 9.25/lintは成功 | lintは通る。ルール差で将来の誤検知/見逃し可能性あり。更新するとlint結果が変わり得るので移設と混ぜず別PRで回帰確認（D11） |
+| L1（P0-02bで解消） | `next@16.1.1`（lockfile）に多数のnpm audit指摘。critical 4件（Image Optimization・`use cache`等の認証不要RCE。最新の指摘は`<=16.4.4`が対象）、high多数 | `npm audit`（2026-11-20）：全21件(low2/mod9/high9/crit1。直接依存はnextのみcritical)、`--omit=dev`で7件(mod6/high1)。`next`は `<=16.4.4` 範囲 | 現在は`output:"export"`・`images.unoptimized`の静的配信で、Image Optimization・Server Actions・middleware等のサーバー機能を使わないため直接の悪用経路は限定的と推測（未検証）。P3でVPS動的配信にする前、P0-02の依存固定時に更新方針を決める。ここでは更新せず基準を維持（D11） |
+| L2（P0-02bで解消） | `eslint-config-next@15.3.1` が `next@16.1.1` と主版が不一致 | package.json。`npm ls`は不整合を報告せず、eslint 9.25/lintは成功 | lintは通る。ルール差で将来の誤検知/見逃し可能性あり。更新するとlint結果が変わり得るので移設と混ぜず別PRで回帰確認（D11） |
 | L3 | ライトボックス表示時、サイトのロゴ（サイドバー）がdialogより前面に残り、枚数表示「2 / 19」と重なる | `pc-gallery-lightbox-open.png` で目視。ロゴ位置と枚数ラベルが重なる | 見た目の軽微な不具合。基準として記録、移設では直さない |
 | L4 | `.node-version`/engines無し。`@types/node ^20`はNode 22 CIと不一致 | package.json | 型検査・buildは成功。固定はP0-02 |
 | L5 | `npm ci` 時点でnpm警告・audit 21件 | 上記 | L1参照 |
@@ -93,3 +93,27 @@ Playwright（1.56.1、Chromium 141 headless）はリポジトリの依存では�
 | 画面比較 | 撮影17枚（ギャラリー展開含む）が基準画像と**バイト単位で同一**（同じフォント環境・同じ手順）。基準の目視はP0-01の3枚＋人による確認に依存 |
 
 注意: 画像一致は同一環境での比較であり、環境が異なるとフォントでずれる。ブラウザー操作のCI化はPlaywrightを固定するP0-02b。
+
+## 依存更新（P0-02b / Issue #13、2026-11-21）
+
+D11に従い、移設(P0-02)とは別PRで実施。`audit fix --force`・メジャー更新は行っていない。
+
+| 項目 | 更新前（移設時） | 更新後 |
+|---|---|---|
+| `npm audit`（全体） | 21件（low2 / moderate9 / high9 / critical1） | **0件** |
+| next | 16.1.1（`^16.1.1`） | **16.4.6**（固定。npm latest。16系内の更新で、メジャーは同じ） |
+| eslint-config-next | 15.3.1 | **16.4.6**（nextと同版に固定。16はflat configを直接提供するため`eslint.config.mjs`をFlatCompatから`eslint-config-next/core-web-vitals`と`/typescript`のimportへ変更。ルールセットは同じ） |
+| eslint | 9.25.0 | 9.39.5（`audit fix`の範囲内） |
+| react / react-dom / typescript | 19.2.3 / 19.2.3 / 5.8.3 | 変更なし |
+| `playwright`（devDependency、固定） | なし（一時導入1.56.1） | **1.65.1**（exact。Chromium headless shell 159） |
+| 削除した依存 | – | `@eslint/eslintrc`（FlatCompat不要）、`react-syntax-highlighter`（ソース・設定のどこからも参照なし。prismjsの指摘の原因） |
+| 追加したoverride | – | `postcss-selector-parser: 6.1.5`（`@tailwindcss/typography@0.5.20`が6.0.10を固定していて未修正のため。同じ6系の修正版。ビルド時のCSS処理のみ） |
+
+選定理由（一次資料: `npm audit`の指摘と`npm view`のdist-tags/peerDependencies、2026-11-21）: `next`の指摘は`<=16.4.4`が対象で、16.4.6がnpmのlatestかつ現行16系。Nextのpeerは`react ^19`で既存のreact 19.2.3と整合。eslint-config-nextはnextと同版（peerは`eslint>=9`）。`npm audit fix`は`--force`なしで、範囲内のtransitive更新だけ（lockfileの更新は148パッケージ）。
+
+回帰確認:
+- lint（`npm run web:lint`）0、`tsc --noEmit` 0、build 0（74/74ページ）、`test:unit`（harness10・editor1・presentation2）成功。lintが有効なことは、意図的なエラーを含む一時ファイルで確認（検出されることを確認して削除）。
+- `web:verify`: ルート74・記事67・画像532が基準と一致。
+- ブラウザー（`npm run web:e2e`）: 72ルート200、ギャラリー25チェック、横溢れ0。意図的に失敗する条件（誤ったbasePath）で終了コード1になることも確認。
+- 表示: 新しいChromiumでは基準画像（旧Chromium 141）とバイトは異なる。ピクセル比較で、17枚中14枚は差0、`*-home`は最大チャンネル差1/255（約1.3%の画素）、ライトボックス展開は最大38/255（約2.3%の画素。表示は目視で同一、L3のロゴ重なりも同じ）。**旧ビルドと新ビルドを同じ新Chromiumで撮ると17枚すべてバイト同一**なので、差はNextの更新ではなくChromium版の違い。基準画像は更新していない。
+- CI: `web / lint-typecheck-build` にPlaywrightのブラウザー確認を追加。画面画像の一致はChromium・フォント依存のためCIでは判定しない。

@@ -45,5 +45,13 @@ jobs:
       - run: npm run web:typecheck
       - run: npm run test:unit
       - run: npm run web:build
-      # 移設前基準(inventory.json)とのルート・記事・画像の一致。ブラウザー操作(ギャラリー等)はP0-02bでPlaywright固定後にCIへ追加する。
+      # 移設前基準(inventory.json)とのルート・記事・画像の一致
       - run: npm run web:verify
+      # ブラウザー操作: 全ルート200・壊れた画像なし・ギャラリー(クリック/Enter/Space/左右/Esc/フォーカス復帰)・横溢れなし。
+      # 画面画像の一致は、フォント・Chromium版に依存するためCIでは判定せず、ローカルで基準画像と比較する(docs/legacy-baseline)。
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: npm run web:e2e
+        env:
+          PLAYWRIGHT_DIR: ${{ github.workspace }}/apps/web
+          E2E_OUT_DIR: ${{ runner.temp }}/web-e2e
