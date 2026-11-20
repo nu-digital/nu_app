@@ -6,6 +6,8 @@ nu_digitalの公式サイト、内部ポータル、Go API、Discord通知を段
 
 ## まず読む
 
+WSL2で初めて作業する人は [初期セットアップ](docs/WSL_SETUP.md) と [Claude Team運用](docs/CLAUDE_TEAM.md) を先に確認してください。
+
 1. [開発エージェントの共通ルール](AGENTS.md)
 2. [要件](docs/REQUIREMENTS.md) → [構成](docs/ARCHITECTURE.md) → [DB](docs/DATABASE.md) → [API](docs/API.md) → [実装順](docs/TASKS.md)
 3. [Claudeへの依頼文](docs/CLAUDE_HANDOFF.md)と[小さい作業単位の一覧](docs/BACKLOG.md)

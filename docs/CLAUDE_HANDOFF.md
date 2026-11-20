@@ -1,9 +1,12 @@
 # Claudeへの依頼文
 
-準備PRをレビューしてmainへマージした後、Claude Codeをリポジトリ直下で起動して以下を渡す。未マージの準備ブランチから始める場合は、そのブランチを土台にすることを明示する。
+準備PRをレビューしてmainへマージした後、Claude Codeをリポジトリ直下で起動して以下を渡す。未マージの準備ブランチではセットアップと準備チェックだけを確認し、機能実装は始めない。
+
+初回の人の作業は [WSL_SETUP](WSL_SETUP.md)。Team利用・モデル選択・中断再開は [CLAUDE_TEAM](CLAUDE_TEAM.md) に従う。
 
 ```text
 AGENTS.md / CLAUDE.mdとdocsの必読5文書、DEVELOPMENT、TESTING、DECISIONSを先に読んでください。
+CLAUDE_TEAM.mdに従い、Team内包使用量を優先し追加課金を許可しません。通常Sonnet、難しい設計Opus、軽量調査Haikuを優先し、作業の区切りで引き継ぎを保存してください。
 今回はBACKLOGのP0-01、GitHub Issue #2だけを完了してください。Issueを重複作成しないでください。
 
 既存サイトは https://github.com/nu-digital/nu_digital 、調査基準はdocs/LEGACY_SITE.mdです。

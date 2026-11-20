@@ -4,6 +4,7 @@
 
 ## ユーザー指定（2026-11-20）
 
+- 開発はWSL2。Claude Team内包使用量を優先し、追加課金/Fable/API代替呼び出しは明示許可なしに使わない。標準モデル選択・opusplan・subagents・session/compactを優先し、制限時は停止して保存済み進捗から再開する。具体運用はCLAUDE_TEAMとWSL_SETUP。
 - GitHubは `nu-digital/nu_app`。ブランチ・push・Issueを用いて管理。コミット等の説明は日本語。
 - 本番はUbuntu VPS。Claudeへ段階的な実装と内部アプリUIの調査・設計を任せるための準備をする。
 - 既存サイトのソースは `nu-digital/nu_digital`。
