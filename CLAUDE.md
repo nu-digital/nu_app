@@ -8,6 +8,6 @@
 作業方法は [DEVELOPMENT](docs/DEVELOPMENT.md)、検証基準は [TESTING](docs/TESTING.md)。
 最初の依頼文は [CLAUDE_HANDOFF](docs/CLAUDE_HANDOFF.md) にある。
 
-このリポジトリのハーネスは、短い指示・小さいIssue/PR・実行可能なチェック・CI・人によるマージ判断で構成する。
+このリポジトリのハーネスは、短い指示・小さいIssue/PR・実行可能なチェック・CI・自律マージの範囲（DEVELOPMENT参照）とそれ以外の人によるマージ判断で構成する。
 Stop hookは準備用チェックだけを補助実行する。アプリの受け入れテストやサーバー側ブランチ保護を代替しない。
 権限チェックを無効化する起動オプションや、本番secretを渡した無人実行は使用しない。
