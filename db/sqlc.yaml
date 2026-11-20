@@ -1,0 +1,12 @@
+# sqlc v1.31.1（docs/TOOLCHAIN.md）。生成: scripts/sqlc.sh generate / 検査: scripts/sqlc.sh diff
+version: "2"
+sql:
+  - engine: postgresql
+    schema: migrations
+    queries: queries
+    gen:
+      go:
+        package: store
+        out: ../services/api/internal/store
+        sql_package: pgx/v5
+        emit_empty_slices: true

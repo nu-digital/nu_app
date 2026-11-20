@@ -35,6 +35,8 @@ npm run test:unit        # 単体テスト
 npm run web:e2e          # 全ルート・ギャラリーのブラウザー確認（要 playwright install。README参照）
 npm run compose:smoke    # 専用プロジェクト(nu_app_smoke)で起動し、全サービスの健全性・全72ルート・DB停止時の挙動を確認して片付ける
 scripts/go-docker.sh services/api go test -race -count=1 ./...
+scripts/test-integration.sh   # 実PostgreSQLの統合テスト（使い捨てコンテナ）
+scripts/sqlc.sh generate      # クエリ/migration変更後にsqlcの生成コードを更新
 ```
 
 `compose:smoke`は開発用の`nu_app`プロジェクトとvolumeに触れない。
