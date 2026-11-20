@@ -1,6 +1,7 @@
 // Command nuctl はnu_appの管理CLI。公開Web/APIとは別経路で、運用者がサーバー上で実行する。
 //
 //	nuctl bootstrap-owner --login-id <id> --display-name <name> [--token-ttl 24h]
+//	nuctl recover-owner --login-id <id> --confirm-login-id <id> --approver-note "<本人確認と承認の記録>"
 //
 // 初期Ownerの作成は1回だけ。招待tokenは標準出力へ一度だけ表示する（ログに出さない・保存しない）。
 package main
@@ -24,8 +25,11 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, getenv func(string) string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "recover-owner" {
+		return runRecover(ctx, args[1:], getenv, stdout, stderr)
+	}
 	if len(args) == 0 || args[0] != "bootstrap-owner" {
-		fmt.Fprintln(stderr, "使い方: nuctl bootstrap-owner --login-id <id> --display-name <name> [--token-ttl 24h]")
+		fmt.Fprintln(stderr, "使い方:\n  nuctl bootstrap-owner --login-id <id> --display-name <name> [--token-ttl 24h]\n  nuctl recover-owner --login-id <id> --confirm-login-id <id> --approver-note \"<本人確認と承認の記録>\"")
 		return 2
 	}
 	fs := flag.NewFlagSet("bootstrap-owner", flag.ContinueOnError)

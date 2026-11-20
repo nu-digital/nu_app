@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
@@ -20,6 +20,12 @@ export function policyErrors(pr) {
     errors.push('PRタイトルは type(scope任意): 日本語の変更内容 にしてください。');
   }
   return errors;
+}
+
+// Ownerの緊急復旧(recover-owner)は、運用責任者がサーバー上で手動で実行する手順であり、
+// GitHub Actionsのworkflow（デプロイ等）から呼んではならない（D05。docs/OPERATIONS.md）。
+export function workflowPolicyErrors(file, content) {
+  return /recover-owner/.test(content) ? [`${file}: 緊急復旧(recover-owner)をworkflowから実行してはいけません`] : [];
 }
 
 export function forbiddenPath(file) {
@@ -87,6 +93,12 @@ export function repositoryErrors(repositoryRoot = root) {
     if (!settings.hooks?.Stop?.some(group => group.hooks?.some(hook => hook.type === 'command'
       && hook.command === 'node "$CLAUDE_PROJECT_DIR/scripts/claude-stop.mjs"' && hook.timeout === 30))) {
       errors.push('Stop hookの設定を確認してください。');
+    }
+  }
+  const workflowDir = resolve(repositoryRoot, '.github/workflows');
+  if (existsSync(workflowDir)) {
+    for (const name of readdirSync(workflowDir).filter(n => n.endsWith('.yml'))) {
+      errors.push(...workflowPolicyErrors(`.github/workflows/${name}`, readFileSync(resolve(workflowDir, name), 'utf8')));
     }
   }
   const workflow = resolve(repositoryRoot, '.github/workflows/harness.yml');
