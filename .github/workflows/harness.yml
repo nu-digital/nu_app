@@ -1,8 +1,8 @@
 name: harness
 
 on:
+  # baseがmain以外の積み重ねPRでもCIを実行する（docs/DEVELOPMENT.md「マージとレビューの運用」）
   pull_request:
-    branches: [main]
     types: [opened, synchronize, reopened, edited, ready_for_review]
   push:
     branches: [main]
