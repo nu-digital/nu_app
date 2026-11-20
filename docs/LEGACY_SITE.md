@@ -16,7 +16,7 @@ READMEとPages workflowに記載された公開先: [nu-digital.github.io/nu_dig
 
 ## P0の移設で守ること
 
-1. upstreamの参照SHA・履歴取り込み方法・ライセンスを記録。移設前にlockfileのまま再現し、互換性修正と見た目変更を混ぜない。
+1. upstreamの参照SHA・履歴取り込み方法・ライセンスを記録。移設前にlockfileのまま再現し、互換性修正と見た目変更を混ぜない。取り込みは`git subtree add --prefix=apps/web`（squashしない、D13）。履歴は11コミット・pack 126.19MiB・最大blob約4.05MiBで、GitHubのファイル制限に抵触せず書き換え不要（2026-11-21実測）。素材全体にMITを新たに付与する意味ではなく、既存の著作権表示・出典・第三者素材の条件を保持する。依存更新は移設の直後の独立PR（D11）。
 2. 全ルートと記事slug、本文・画像数/ハッシュ、frontmatterを記録。公開先のbasePath除去とドメイン変更を分けて検証する。
 3. Nextバージョンとeslint-config-next等の整合性を確認し、修正が必要なら理由と回帰テストを添える。
 4. 原文の期間・月のみの日付、Blog/Productと保存フォルダーの違い、sourceIdを保持する。
