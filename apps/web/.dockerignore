@@ -1,0 +1,10 @@
+node_modules
+.next
+out
+.e2e-out
+Dockerfile
+.dockerignore
+*.md
+docs
+.env
+.env.*

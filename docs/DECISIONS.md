@@ -24,6 +24,8 @@
 | 移設PRのマージ方式 | **mergeコミット（squash・rebase不可）。** squashするとupstreamの11コミットが失われD13に反する | 他のPRはSquash mergeのまま |
 | Go/DB/migrationの版固定（P0-03a） | Go 1.27.4、PostgreSQL 18.7、pgx v5.11.0、goose v3.30.1、sqlc v1.31.1（採用予定）。理由と確認元は[TOOLCHAIN](TOOLCHAIN.md) | PostgreSQL 19はリリース直後のため見送り。golang-migrateも候補だったが差が小さくgooseを採用 |
 | `/healthz`・`/readyz`の扱い（P0-03a） | `/healthz`はDBに依存しないliveness、`/readyz`はDB接続を含みタイムアウト付き。失敗時は内部情報を返さず503 | readinessにDBを入れるとDB停止時にLBから外れる。livenessに含めるとDB障害でコンテナが再起動し続けるため分離 |
+| npm構成の再評価（P0-03b） | apps/web・apps/adminは**独立したpackage.json/lockfile**のまま。npm workspacesは共有パッケージ(`packages/`)が必要になった時点で導入する。理由: Dockerビルドがアプリ単位の小さなcontextで済み、移設時に確認した依存の同一性を保てる。adminはwebと同じNext/React/eslint系の版を固定 | 今workspacesにするとlockfileが1つになり再解決のリスクと、Dockerのcontext/キャッシュ設計が増える。共有コードが現れた時に再検討 |
+| 配信イメージの固定（P0-03b） | node `22.23.5-alpine`(digest固定)、web配信は`nginxinc/nginx-unprivileged:1.30.6-alpine`(digest固定、nginx stable 1.30系。1.30.7は同イメージ未公開のため1.30.6)、adminはNext standalone・非root | 本番のNginx(D03)はP4で別に設計する。webコンテナのnginxはローカル/検証用の静的配信 |
 | Pages workflow | 取り込み後に`apps/web/.github`を削除。移設リポジトリで有効化しない | upstream側は変更しない |
 
 Node参照: [公式配布一覧](https://nodejs.org/dist/index.json)。確認日: 2026-11-20。アプリのGo/PostgreSQL/Next.jsやテストライブラリの固定版はP0の調査対象であり、今回決定していない。

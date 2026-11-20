@@ -1,0 +1,44 @@
+name: admin
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/admin/**'
+      - 'package.json'
+      - '.github/workflows/admin.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/admin/**'
+      - 'package.json'
+      - '.github/workflows/admin.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  admin:
+    name: admin / lint-typecheck-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm run admin:ci
+      - run: npm run admin:lint
+      - run: npm run admin:typecheck
+      - run: npm run admin:build
+      - run: npm audit --prefix apps/admin
+      - run: docker build -t nu_app-admin:ci apps/admin

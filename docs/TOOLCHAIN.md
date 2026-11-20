@@ -12,6 +12,8 @@
 | migration tool | goose v3.30.1（`db/Dockerfile`でbuild） | [pressly/goose](https://github.com/pressly/goose/releases)の最新。SQLファイルでup/down、CLIのみで運用でき、アプリ側にmigration実行コードを持たなくてよい。golang-migrate(v4.20.1)も候補だったが、同等で差が小さく、SQLのトランザクション単位の扱いが明快なgooseを採用 |
 | sqlc | v1.31.1（採用予定。`db/sqlc.yaml`は最初のクエリを書くP1-01で追加） | [sqlc-dev/sqlc](https://github.com/sqlc-dev/sqlc/releases)の最新。クエリが無い段階では生成物が空になるため設定を先に置かない |
 | 実行イメージ | `gcr.io/distroless/static-debian12:nonroot`（digest固定） | 静的バイナリのみを非rootで実行。シェル・パッケージ管理を持たず攻撃面が小さい |
+| 配信イメージ（web） | `nginxinc/nginx-unprivileged:1.30.6-alpine`（digest固定） | nginx stable 1.30系（[endoflife.date](https://endoflife.date/nginx)でサポート中）。1.30.7は同イメージ未公開のため1.30.6 |
+| Nodeイメージ | `node:22.23.5-alpine`（digest固定） | `.node-version`と同版 |
 | Playwright | 1.65.1（`apps/web`のdevDependency） | P0-02b。ブラウザー確認用 |
 | Next.js / eslint-config-next | 16.4.6 | P0-02b。[legacy-baseline](legacy-baseline/README.md) |
 

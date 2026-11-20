@@ -8,9 +8,13 @@
     "web:typecheck": "npm exec --prefix apps/web -- tsc --noEmit -p apps/web/tsconfig.json",
     "web:build": "npm run build --prefix apps/web",
     "web:verify": "node scripts/web-verify.mjs",
-    "check": "node scripts/check.mjs && npm run web:lint && npm run web:typecheck",
+    "check": "node scripts/check.mjs && npm run web:lint && npm run web:typecheck && npm run admin:lint && npm run admin:typecheck",
     "test:unit": "node --test scripts/harness.test.mjs && npm run test:editor --prefix apps/web && node --test apps/web/scripts/content-presentation.test.mjs",
-    "build": "npm run web:build",
-    "web:e2e": "PLAYWRIGHT_DIR=${PLAYWRIGHT_DIR:-apps/web} node scripts/legacy-baseline-capture.mjs apps/web/out \"${E2E_OUT_DIR:-apps/web/.e2e-out}\""
+    "build": "npm run web:build && npm run admin:build",
+    "web:e2e": "PLAYWRIGHT_DIR=${PLAYWRIGHT_DIR:-apps/web} node scripts/legacy-baseline-capture.mjs apps/web/out \"${E2E_OUT_DIR:-apps/web/.e2e-out}\"",
+    "admin:ci": "npm ci --prefix apps/admin",
+    "admin:lint": "npm run lint --prefix apps/admin",
+    "admin:typecheck": "npm run typecheck --prefix apps/admin",
+    "admin:build": "npm run build --prefix apps/admin"
   }
 }
