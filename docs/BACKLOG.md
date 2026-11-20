@@ -2,7 +2,7 @@
 
 [TASKS](TASKS.md) のPhaseは維持する。以下のIDは分割案でありGitHub Issue番号ではない。Issue作成後は実番号を併記し、完了は実PRと検証結果に基づいて更新する。
 
-作成済み: [準備PR #1](https://github.com/nu-digital/nu_app/pull/1)、[P0-01 / Issue #2](https://github.com/nu-digital/nu_app/issues/2)。P0-01は未着手。実装ブランチ例は `chore/2-legacy-baseline`。
+作成済み: [準備PR #1](https://github.com/nu-digital/nu_app/pull/1)、[P0-01 / Issue #2](https://github.com/nu-digital/nu_app/issues/2)。P0-01はDraft PRで実施中（調査結果は[legacy-baseline](legacy-baseline/README.md)）。実装ブランチ例は `chore/2-legacy-baseline`。
 
 | ID | 作業と完了条件 | 依存 |
 |---|---|---|

@@ -1,7 +1,7 @@
 # 既存サイト調査（2026-11-20）
 
 ソース: [nu-digital/nu_digital](https://github.com/nu-digital/nu_digital)。参照HEAD: `e1c031389c6cb621742caf4b270316da93b85168`。
-READMEとPages workflowに記載された公開先: [nu-digital.github.io/nu_digital](https://nu-digital.github.io/nu_digital/)。今回の確認はコードと設定の調査であり、ローカルbuild・画面操作・表示同等性は未検証。
+READMEとPages workflowに記載された公開先: [nu-digital.github.io/nu_digital](https://nu-digital.github.io/nu_digital/)。2026-11-20のP0-01でローカルbuild・lint・全ルート・ギャラリー操作を実測した（結果は[legacy-baseline](legacy-baseline/README.md)）。公開サイトとの実画面比較、全記事の目視は未了。
 
 ## 観測した構成
 
@@ -25,3 +25,7 @@ READMEとPages workflowに記載された公開先: [nu-digital.github.io/nu_dig
 7. VPSでの動的配信とCMS接続はP3。P0で認証やCMSを先回りしない。
 
 参照cloneはローカルの無視対象 `.local/legacy-site/` にあり、nu_appへコードを移設したものではない。Claudeは自分の環境で元リポジトリと参照SHAを取得する。
+
+## P0-01の実測基準（2026-11-20）
+
+[docs/legacy-baseline/README.md](legacy-baseline/README.md)に再現手順、lint/tsc/build結果、67記事・画像の`inventory.json`、PC/スマホ基準画像、ギャラリー検証、既存不具合（L1〜L6）、履歴・ライセンス方針を記録した。
