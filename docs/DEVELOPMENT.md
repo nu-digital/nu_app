@@ -52,13 +52,15 @@ PRごとの人の確認・マージ待ちを減らすため、**確定仕様の�
 
 初回pushとCI実行後にSettingsで設定・確認する。ファイルを置くだけでは有効にならない。
 
-**2026-11-20実測:** このリポジトリはprivate。main保護の取得APIが「プランのアップグレードまたはpublic化が必要」と403を返した。現時点では保護を有効化できていない。公開範囲や契約は勝手に変更しない。利用可能になるまではPRとCIを人が確認してマージし、直接push禁止は運用ルールであってサーバーによる強制ではないと理解する。
+**2026-11-20実測:** このときはprivateで、main保護の取得APIが「プランのアップグレードまたはpublic化が必要」と403を返し、保護を有効化できなかった。公開範囲や契約は勝手に変更しない。
+
+**2026-11-21実測:** リポジトリはpublic（運用責任者の変更）になり、保護を設定できる状態になった。P0-04でmainのbranch protectionを有効化した（強化であり緩和ではない）: PR必須（承認数0。一人運用）、必須チェック（下記）、force push・削除禁止、会話解決必須、管理者にも適用。解除や緩和は運用責任者の判断。確認: `gh api repos/nu-digital/nu_app/branches/main/protection`。
 
 - デフォルトブランチmain、Squash merge、マージ済みブランチの自動削除。
 - mainのRulesetまたはbranch protection: PR必須、force push・削除禁止、会話解決必須、CI必須。管理者の恒常的bypassも避ける。
-- 現在の必須チェック候補は `harness / repository`、`harness / policy`。初回実行で表示された正確な名前を指定する。P0以降にアプリ検証も必須化する。
+- 必須チェック（実際のチェック名）: `harness / repository`、`harness / policy`、`web / lint-typecheck-build`、`admin / lint-typecheck-build`、`go / services/api`、`go / services/bot`、`go / docker build`、`compose / smoke`。必須チェックが未実行のままpendingにならないよう、各workflowは`paths`絞り込みを持たず全PRで実行する（約8分）。新しいチェックを追加したら、名前を保護ルールの必須チェックへ追加する。
 - 複数のレビュー担当者がいる場合は承認1件・最新差分で承認失効を設定。一人運用では自分のPRを自分で承認できないため、承認数必須は無理に設定せず手動レビューとCIで運用し、体制を記録する。
-- privateリポジトリの保護機能はGitHubプランを確認する。設定不可なら制限を明記し、保護済みと呼ばない。
+- 保護機能が使えない状態（privateでプラン不足等）に戻った場合は、保護済みと呼ばず、制限を明記する。
 - Actionsは最小権限。PRのコードに本番secretを渡さない。`pull_request_target`でPRコードを実行しない。
 - レビュー担当のGitHub IDが確定したらCODEOWNERSを追加。存在しないチーム名を仮登録しない。
 

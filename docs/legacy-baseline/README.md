@@ -23,7 +23,7 @@ Playwright（1.56.1、Chromium 141 headless）はリポジトリの依存では�
 - Node v22.23.5 / npm 10.9.9（`.node-version`と同じ）、WSL2 Ubuntu。
 - Chromium起動に必要なOSライブラリ（nspr/nss/alsa）が無く、sudo無しで.debを展開して `LD_LIBRARY_PATH` で供給した。日本語フォントも無かったため `fonts-noto-cjk` を展開し `FONTCONFIG_FILE` で指定。サイトCSSは `Inter, "Noto Sans JP", ...` を指定し**Webフォントを配信しない**ので、画面の字形は実行環境のフォント依存。**画像比較は同じフォント環境でのみ有効**。ピクセル自動比較の基準にする場合はフォントを固定すること。
 - 撮影は reduced-motion、アニメ/transition無効、ja-JP / Asia/Tokyo、スクロール位置は先頭（viewport分のみ。フルページではない）。ヒーローは1枚目のスライド。
-- 画面は撮影者(Claude)が `Read` で目視した（pc-home、sp-blog-gallery-surugadai、pc-gallery-lightbox-open の3枚）。**他15枚は撮影・横溢れ測定のみで目視未了**。人による基準確認が必要（TESTING: 見ていない画像を基準にしない）。
+- 画面は撮影者(Claude)が `Read` で目視した（PNG17枚中15枚。目視していないのは `sp-news` と `sp-blog-dot-slug-nu.metasou`。2026-11-21のP0-04時点）。表示崩れ・文字化けは見つからなかった。**人による基準確認は引き続き推奨**（TESTING: 見ていない画像を基準にしない）。撮影の総数は17枚（`capture-result.json`は別）。
 
 ## 結果（実測）
 
@@ -117,3 +117,10 @@ D11に従い、移設(P0-02)とは別PRで実施。`audit fix --force`・メジ�
 - ブラウザー（`npm run web:e2e`）: 72ルート200、ギャラリー25チェック、横溢れ0。意図的に失敗する条件（誤ったbasePath）で終了コード1になることも確認。
 - 表示: 新しいChromiumでは基準画像（旧Chromium 141）とバイトは異なる。ピクセル比較で、17枚中14枚は差0、`*-home`は最大チャンネル差1/255（約1.3%の画素）、ライトボックス展開は最大38/255（約2.3%の画素。表示は目視で同一、L3のロゴ重なりも同じ）。**旧ビルドと新ビルドを同じ新Chromiumで撮ると17枚すべてバイト同一**なので、差はNextの更新ではなくChromium版の違い。基準画像は更新していない。
 - CI: `web / lint-typecheck-build` にPlaywrightのブラウザー確認を追加。画面画像の一致はChromium・フォント依存のためCIでは判定しない。
+
+## 目視で気づいた既存の挙動（移設による差分ではない。維持対象）
+
+- `/news/` は独立した一覧ではなく、`/blog/`と同じ「BLOG」一覧を表示する（`pc-news.png`は`pc-blog.png`と同じ見た目）。記事詳細は`/news/<slug>/`で存在する。
+- `/project/` の見出しは「CONTENTS」、記事カテゴリ表示は「Product」。
+- `nu_bar`（`/project/nu-bar/`）は本文にカバーと同じ画像が2回並ぶ（本文が画像のみのため）。
+- L3（ライトボックスでロゴと枚数表示が重なる）は`pc-gallery-lightbox-open.png`で確認。

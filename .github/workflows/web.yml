@@ -3,20 +3,8 @@ name: web
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'apps/web/**'
-      - 'scripts/web-verify.mjs'
-      - 'docs/legacy-baseline/inventory.json'
-      - 'package.json'
-      - '.github/workflows/web.yml'
   push:
     branches: [main]
-    paths:
-      - 'apps/web/**'
-      - 'scripts/web-verify.mjs'
-      - 'docs/legacy-baseline/inventory.json'
-      - 'package.json'
-      - '.github/workflows/web.yml'
 
 permissions:
   contents: read

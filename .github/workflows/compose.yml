@@ -3,28 +3,8 @@ name: compose
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'infrastructure/**'
-      - 'services/**'
-      - 'db/**'
-      - 'apps/**'
-      - 'scripts/compose-smoke.mjs'
-      - 'docs/legacy-baseline/inventory.json'
-      - 'package.json'
-      - '.env.example'
-      - '.github/workflows/compose.yml'
   push:
     branches: [main]
-    paths:
-      - 'infrastructure/**'
-      - 'services/**'
-      - 'db/**'
-      - 'apps/**'
-      - 'scripts/compose-smoke.mjs'
-      - 'docs/legacy-baseline/inventory.json'
-      - 'package.json'
-      - '.env.example'
-      - '.github/workflows/compose.yml'
 
 permissions:
   contents: read

@@ -9,15 +9,15 @@
 
 ## P0: モノレポ初期化・既存サイト整理
 
-- [ ] 新規モノレポを作成し、`apps/web`に現行公式サイトをGit履歴をなるべく維持して取り込む。
-- [ ] 今のソース・表示・記事・画像をローカルで再現し、スクリーンショット/スナップショットを比較基準として保存。
-- [ ] `apps/admin`, `services/api`, `services/bot`, `db`, `infrastructure`, `docs`を用意。
-- [ ] Go toolchain, Node/npm workspace, sqlc/pgx, migration toolのバージョンを固定。
-- [ ] 移設は`git subtree add`で履歴を維持（squashしない）。P0-01と同じlockfileで移設後、依存更新（next/eslint-config-next/Playwright等の固定、audit対応）を直後の独立PRでP0中に実施（D11/D13）。
-- [ ] Docker ComposeでローカルNext.js/Go/PostgreSQLを起動可能にする。
-- [ ] `.env.example`, `.gitignore`, 開発手順、CIワークフローを追加。
+- [x] 新規モノレポを作成し、`apps/web`に現行公式サイトをGit履歴をなるべく維持して取り込む。
+- [x] 今のソース・表示・記事・画像をローカルで再現し、スクリーンショット/スナップショットを比較基準として保存。
+- [x] `apps/admin`, `services/api`, `services/bot`, `db`, `infrastructure`, `docs`を用意。
+- [x] Go toolchain, Node/npm workspace, sqlc/pgx, migration toolのバージョンを固定。
+- [x] 移設は`git subtree add`で履歴を維持（squashしない）。P0-01と同じlockfileで移設後、依存更新（next/eslint-config-next/Playwright等の固定、audit対応）を直後の独立PRでP0中に実施（D11/D13）。
+- [x] Docker ComposeでローカルNext.js/Go/PostgreSQLを起動可能にする。
+- [x] `.env.example`, `.gitignore`, 開発手順、CIワークフローを追加。
 
-**受け入れ:** 新規PC上でREADMEに沿って起動できる。既存サイトの主要ページが移行前と同等に表示される。秘密情報がGitに含まれない。
+**受け入れ（2026-11-21、証拠は[P0完了報告](handoffs/P0-complete.md)）:** 新規PC上でREADMEに沿って起動できる。既存サイトの主要ページが移行前と同等に表示される。秘密情報がGitに含まれない。
 
 ## P1: 認証・権限・ランチャー
 

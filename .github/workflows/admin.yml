@@ -3,16 +3,8 @@ name: admin
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'apps/admin/**'
-      - 'package.json'
-      - '.github/workflows/admin.yml'
   push:
     branches: [main]
-    paths:
-      - 'apps/admin/**'
-      - 'package.json'
-      - '.github/workflows/admin.yml'
 
 permissions:
   contents: read
