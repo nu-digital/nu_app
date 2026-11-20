@@ -1,0 +1,17 @@
+{
+  "model": "sonnet",
+  "availableModels": ["sonnet", "opus", "haiku"],
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/claude-stop.mjs\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
