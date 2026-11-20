@@ -1,0 +1,17 @@
+---
+title: "メンバー募集ポスター"
+image: "/images/imported/img-56598ce58df08757456e.webp"
+author: "yurarara"
+date: "2025-03-20"
+category: "Product"
+excerpt: "学生プロジェクトの申請準備として、メンバー募集用のポスターを制作しました。"
+sourceId: "works/recruitment-poster"
+---
+
+学生プロジェクトの申請準備として、メンバー募集用のポスターを制作しました。
+
+他学部の学生にも活動を知ってもらえるよう、目に留まるデザインを考えました。
+
+![ポスター制作の記録画像 1](/images/imported/img-56598ce58df08757456e.webp)
+
+![ポスター制作の記録画像 2](/images/imported/img-e2051a5ea886021afa69.webp)

@@ -32,6 +32,10 @@ export function forbiddenPath(file) {
     || normalized === '.claude/settings.local.json' || name === 'CLAUDE.local.md';
 }
 
+// サイト本文(Markdown)の「/blog/..」「/images/..」はリポジトリ内ファイルへのリンクではなく、公開URLを指す。
+// 検証は scripts/web-verify.mjs（記事・画像・ルートの照合）が担当する。
+export const siteContentPattern = /^apps\/web\/content\//;
+
 export function linkErrors(file, content, repositoryRoot = root) {
   const errors = [];
   // Check local inline Markdown links, including images. External URLs/anchors and fenced samples are excluded.
@@ -72,7 +76,7 @@ export function repositoryErrors(repositoryRoot = root) {
       errors.push(`削除をGitへ反映してください: ${file}`);
       continue;
     }
-    if (file.endsWith('.md')) errors.push(...linkErrors(file, readFileSync(resolve(repositoryRoot, file), 'utf8'), repositoryRoot));
+    if (file.endsWith('.md') && !siteContentPattern.test(file.replaceAll('\\', '/'))) errors.push(...linkErrors(file, readFileSync(resolve(repositoryRoot, file), 'utf8'), repositoryRoot));
   }
   if (existsSync(resolve(repositoryRoot, 'CLAUDE.md')) && !readFileSync(resolve(repositoryRoot, 'CLAUDE.md'), 'utf8').includes('@AGENTS.md')) {
     errors.push('CLAUDE.mdからAGENTS.mdをimportしてください。');
