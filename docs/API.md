@@ -19,10 +19,12 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | PATCH | `/admin/users/{id}/status` | Admin | 停止・再有効化 |
 | PUT | `/admin/users/{id}/editor-role` | Admin | Editorの付与/解除 |
 | PUT | `/owner/users/{id}/admin-role` | Owner | Adminの付与/解除。最後のOwnerを消せない |
-| POST | `/owner/transfers` | Owner | Owner移譲を申し出る（案） |
-| POST | `/owner/transfers/{id}/accept` | 対象ユーザー | Owner移譲の承諾（案） |
+| POST | `/owner/transfers` | Owner | Owner移譲を申請（移譲先は有効ユーザー。有効期限24時間。pendingは申請者につき1件） |
+| POST | `/owner/transfers/{id}/cancel` | 申請したOwner | 承諾前の取消 |
+| GET | `/owner/transfers/incoming` | Member | 自分宛のpending申請の確認 |
+| POST | `/owner/transfers/{id}/accept` | 移譲先ユーザー本人 | 承諾。単一トランザクションでOwner付与・旧OwnerをAdminへ。期限切れ/取消済みは409 |
 
-**注意:** リセット申請そのものを匿名APIで受け付ける必要はない。本人は運営者へ連絡し、AdminがURLを発行する。初期Ownerの作成は通常公開APIに設けずCLIで行う。
+**注意:** リセット申請そのものを匿名APIで受け付ける必要はない。本人は運営者へ連絡し、AdminがURLを発行する。初期Ownerの作成と**緊急復旧（D05）は公開APIに設けず管理CLIのみ**。CLIは運用責任者の本人確認と明示承認の下でVPS上で実行し、GitHub Actionsのデプロイ手順から呼べない。実行時に対象のセッションを全失効し監査に残す。最後のOwnerを失う操作は、API・CLIとも拒否する。
 
 ## 2. メンバー・プロフィール
 
@@ -31,8 +33,9 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | GET | `/members` | Member | 公開設定済み項目のみ返すメンバー一覧 |
 | GET | `/members/{id}` | Member | 公開設定済みプロフィール、作品参加実績 |
 | GET | `/me/profile` | Member | 自分の全登録プロフィール |
-| PATCH | `/me/profile` | Member | 表示名、自己紹介、学部等の編集 |
-| PUT | `/me/profile/visibility` | Member | 項目ごとの公開範囲を変更 |
+| PATCH | `/me/profile` | Member | 表示名（必須。空にできない）、自己紹介、学部等（任意）の編集 |
+| PUT | `/me/profile/visibility` | Member | 項目ごとのメンバー内公開(private/members)を変更。初期値private。個人情報4項目は対象外 |
+| GET/PUT | `/me/profile/public-credit-consent` | Member | インターネット向け公開クレジットの同意の確認・付与・撤回（メンバー内公開とは別）。撤回で公開表示を匿名化 |
 | POST | `/me/profile/links` | Member | 任意URL追加 |
 | PATCH | `/me/profile/links/{id}` | Member | URL・名称・表示順・公開設定変更 |
 | DELETE | `/me/profile/links/{id}` | Member | リンク削除 |
@@ -57,7 +60,7 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | POST | `/inventory/loans/{id}/returns` | Member | 貸出レコードに返却数量を記録。代理返却可 |
 | GET | `/inventory/loans` | Member | 貸出中の一覧・経過日数、検索 |
 | GET | `/inventory/history` | Member | 物品の貸出・返却履歴 |
-| POST | `/admin/inventory/corrections` | Admin | 誤操作修正と監査イベント |
+| POST | `/admin/inventory/corrections` | Admin / Owner | 貸出・返却数量の訂正、誤登録の取消。`reason`必須、`Idempotency-Key`ヘッダー必須。訂正イベントを追加（元記録は不変）。在庫が負・返却数>貸出数になる訂正は409。同じキーの再送は同じ結果を返し二重適用しない |
 
 `POST /inventory/loans` (数量管理の例):
 
@@ -84,12 +87,12 @@ actor/borrower はクライアント入力を信用せず、セッションの�
 |---|---|---|---|
 | GET | `/contents` | Member | 下書き・公開済み一覧（閲覧できるもののみ） |
 | POST | `/contents` | Member | 記事/作品の下書き作成 |
-| GET | `/contents/{id}` | 作者 / 共同編集者 / Editor/Admin | 下書き・編集履歴取得 |
-| POST | `/contents/{id}/revisions` | 作者 / 共同編集者 / Editor/Admin | baseRevision指定で新しい版を保存 |
-| PUT | `/contents/{id}/collaborators` | 作者 / Editor/Admin | 共同編集者を更新 |
-| PUT | `/contents/{id}/contributors` | 作者 / Editor/Admin（暫定） | 作品の制作メンバーと担当役割を更新 |
-| POST | `/contents/{id}/publish` | Editor/Admin | working revisionを公開版にする |
-| POST | `/contents/{id}/unpublish` | Editor/Admin | 公開停止 |
+| GET | `/contents/{id}` | 作者 / 共同編集者 / Editor/Admin/Owner | 下書き・編集履歴取得 |
+| POST | `/contents/{id}/revisions` | 作者 / 共同編集者 / Editor/Admin/Owner | baseRevision指定で新しい版を保存 |
+| PUT | `/contents/{id}/collaborators` | 作者 / Editor/Admin/Owner | 共同編集者を更新 |
+| PUT | `/contents/{id}/contributors` | 作者 / 共同編集者 / Editor/Admin/Owner | 作品の制作メンバーと担当役割の登録（公開クレジット同意は変更不可・別API） |
+| POST | `/contents/{id}/publish` | Editor/Admin/Owner | working revisionを公開版にする |
+| POST | `/contents/{id}/unpublish` | Editor/Admin/Owner | 公開停止 |
 | GET | `/public/contents` | Public | 公開記事・作品一覧（下書きは除外） |
 | GET | `/public/contents/{section}/{slug}` | Public | 公開済みの版だけ返す |
 
@@ -101,19 +104,22 @@ actor/borrower はクライアント入力を信用せず、セッションの�
   "title": "展示会に参加しました",
   "summary": "活動の紹介",
   "markdown": "## 展示内容\n...",
-  "metadata": { "dateLabel": "2026.11", "category": "Blog" }
+  "metadata": { "category": "Blog" },
+  "date": { "label": "2026年11月", "kind": "month", "sortDate": "2026-11-01" }
 }
 ```
 
 保存時点で公開サイトの内容は変わらない。公開操作はDBのpublished revision pointerを切り替え、画像公開処理と表示キャッシュ更新を実行。競合時は `409 Conflict` と現在のrevisionを返す。公開権限を持たないMemberがAPIを直接呼んでも `403 Forbidden`。
 
-作品の下書き・公開権限は記事と同一にすることを暫定提案。ユーザーの最終確認前に強制確定しない。
+作品の下書き・公開権限は記事と同一（D01確定）。`date.kind`はday/month/range/unknown。`sortDate`は並び替え用で、`kind`がday以外のときは実際の日付として表示しない（`label`の原文を表示する）。
+
+Markdownは許可リスト方式でサニタイズする。生のiframe/script/video HTMLは保存時に拒否または除去。埋め込みはYouTube URL（許可ホストと11桁動画ID）だけをアプリ側が動画IDからiframeを生成して表示し、他の動画サービスは通常の外部リンクとする（D10）。公開APIは公開クレジットを配信時に同意状態と結合し、撤回後は匿名表示にする（D08）。
 
 ## 5. メディア・通知・ダッシュボード
 
 | Method | Path | 権限 | 動作 |
 |---|---|---|---|
-| POST | `/media` | Member | 指定用途の画像アップロード、非公開で保存 |
+| POST | `/media` | Member | 指定用途(`purpose`=avatar/inventory/cms)の画像アップロード、非公開で保存。JPEG/PNG/WebPのみ。avatar≤5MiB、他≤10MiB。デコード前に寸法を検査（≤2,000万画素・各辺≤10,000px）。実体検査・アニメーション/SVG拒否・向き補正・縮小(avatar長辺≤512px、他≤2,560px、拡大しない)・再エンコード・EXIF除去。同時処理数を制限し超過は429/503で再試行を案内。不正入力は400/413/415/422（TESTING参照） |
 | GET | `/media/{id}` | 画像所有者・必要権限 | 非公開画像の認可付き配信 |
 | GET | `/public/media/{opaqueId}` | Public | 公開されている画像のみ |
 | GET | `/dashboard/feed` | Member | CMS公開・アプリ更新等のイベント |

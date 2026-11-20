@@ -11,7 +11,7 @@
 - 完了内容 / 未コミット変更: `docs/legacy-baseline/`（README、inventory.json、画面18枚+capture-result.json）、`scripts/legacy-inventory.mjs`、`scripts/legacy-baseline-capture.mjs`、LEGACY_SITE/DECISIONS(D10追記、D11〜D13)/BACKLOG更新
 - 実行コマンド・結果: 詳細は `docs/legacy-baseline/README.md`。要点: upstream `npm ci` 0、`npm run lint` 0、`npx tsc --noEmit` 0、`npm run build` 0（root/basePath）、test:editor 1件成功、content-presentation 2件成功、全72ルート200、ギャラリー25チェック成功、横溢れ0。nu_app: `node scripts/check.mjs` 成功、`node --test scripts/harness.test.mjs` 9件成功
 - 未実施検証と理由: 公開Pagesとの実画面比較、目視は18枚中3枚のみ、全記事目視、Firefox/WebKit、320px/200%ズーム、画像ピクセル差分（フォント非固定）、外部リンク/YouTube再生
-- 既知の問題 / 判断待ち: 既存不具合L1〜L6（next 16.1.1のaudit指摘が最大）。DECISIONS D10追記、D11、D12、D13
+- 既知の問題 / 判断待ち: 既存不具合L1〜L6（next 16.1.1のaudit指摘が最大）。D10〜D13は2026-11-21にユーザー確定（Issue #6 / docs/6-confirm-decisions）
 - DB / API / 切り戻しへの影響: なし。このPRのdocs/scripts/画像をrevertすれば戻る。upstreamと本番は変更なし
 - GitHubのCI・main保護・レビュー状態: main保護は未設定（privateのため403、DEVELOPMENT参照）。CI結果はPRで確認
 - 次に実行する最小の作業: 人が基準画像18枚を確認→D13（権利・履歴方針）を決定→P0-02（apps/webへ移設）。Playwrightはリポジトリ依存に未追加
