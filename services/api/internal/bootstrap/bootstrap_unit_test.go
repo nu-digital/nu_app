@@ -1,13 +1,17 @@
 package bootstrap
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/nu-digital/nu_app/services/api/internal/auth/token"
+)
 
 func TestTokenIsRandomAndOnlyItsHashIsDerivable(t *testing.T) {
-	a, ha, err := newToken()
+	a, ha, err := token.New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, hb, _ := newToken()
+	b, hb, _ := token.New()
 	if a == b || string(ha) == string(hb) {
 		t.Fatal("tokenが重複した")
 	}

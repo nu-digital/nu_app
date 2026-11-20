@@ -9,9 +9,6 @@ package bootstrap
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/nu-digital/nu_app/services/api/internal/auth/token"
 	"github.com/nu-digital/nu_app/services/api/internal/store"
 )
 
@@ -63,7 +61,7 @@ func owner(ctx context.Context, pool *pgxpool.Pool, p Params, now func() time.Ti
 	if ttl <= 0 {
 		ttl = DefaultTokenTTL
 	}
-	token, hash, err := newToken()
+	tok, hash, err := token.New()
 	if err != nil {
 		return Result{}, err
 	}
@@ -118,28 +116,11 @@ func owner(ctx context.Context, pool *pgxpool.Pool, p Params, now func() time.Ti
 	if err := tx.Commit(ctx); err != nil {
 		return Result{}, err
 	}
-	return Result{UserID: user.ID, InviteToken: token, ExpiresAt: expires}, nil
-}
-
-// newToken は32バイトの乱数からtoken(URL安全なbase64)とSHA-256を作る。
-func newToken() (string, []byte, error) {
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
-		return "", nil, err
-	}
-	sum := sha256.Sum256(raw)
-	return base64.RawURLEncoding.EncodeToString(raw), sum[:], nil
+	return Result{UserID: user.ID, InviteToken: tok, ExpiresAt: expires}, nil
 }
 
 // HashToken は受け取ったtoken文字列のSHA-256を返す（検証側で使う）。不正な形式ならfalse。
-func HashToken(token string) ([]byte, bool) {
-	raw, err := base64.RawURLEncoding.DecodeString(token)
-	if err != nil || len(raw) != 32 {
-		return nil, false
-	}
-	sum := sha256.Sum256(raw)
-	return sum[:], true
-}
+func HashToken(tok string) ([]byte, bool) { return token.Hash(tok) }
 
 func uuidString(u pgtype.UUID) string {
 	b := u.Bytes
