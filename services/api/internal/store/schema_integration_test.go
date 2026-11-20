@@ -206,3 +206,25 @@ func TestAppendOnlyTablesAndBootstrapOnce(t *testing.T) {
 	wantViolation(t, pool, "bootstrap_state_pkey", `INSERT INTO bootstrap_state DEFAULT VALUES`)
 	_ = time.Now
 }
+
+func TestProfileExtrasConstraints(t *testing.T) {
+	pool, _ := pgtest.New(t)
+	u := mustUser(t, pool, "alice.example", "active")
+	ins := `INSERT INTO profile_links (user_id, label, url, visibility) VALUES ($1, $2, $3, $4)`
+	if _, err := pool.Exec(context.Background(), ins, u.ID, "GitHub", "https://github.com/example", "members"); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []string{"javascript:alert(1)", "data:text/html,x", "ftp://example.invalid", "/relative", "https://with space", "https://" + strings.Repeat("a", 2100)} {
+		wantViolation(t, pool, "profile_links_url_valid", ins, u.ID, "x", bad, "private")
+	}
+	wantViolation(t, pool, "profile_links_visibility_valid", ins, u.ID, "x", "https://example.invalid", "public")
+	wantViolation(t, pool, "profile_links_label_valid", ins, u.ID, "  ", "https://example.invalid", "private")
+	dev := `INSERT INTO personal_devices (user_id, category, name, specs_json, visibility) VALUES ($1, $2, $3, $4::jsonb, $5)`
+	if _, err := pool.Exec(context.Background(), dev, u.ID, "PC", "自作PC", `{"text":"RTX"}`, "private"); err != nil {
+		t.Fatal(err)
+	}
+	wantViolation(t, pool, "personal_devices_specs_object", dev, u.ID, "PC", "x", `[1,2]`, "private")
+	wantViolation(t, pool, "personal_devices_specs_object", dev, u.ID, "PC", "x", `{"text":"`+strings.Repeat("a", 3000)+`"}`, "private")
+	wantViolation(t, pool, "personal_devices_visibility_valid", dev, u.ID, "PC", "x", `{}`, "everyone")
+	wantViolation(t, pool, "personal_devices_name_valid", dev, u.ID, "PC", " ", `{}`, "private")
+}
