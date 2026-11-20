@@ -2,7 +2,7 @@
 
 nu_digitalの公式サイト、内部ポータル、Go API、Discord通知を段階的に構築するモノレポ。
 
-**現在はP0（モノレポ初期化）の途中です。公式サイトは `apps/web` へ履歴付きで移設済み（P0-02）。内部アプリ、Go API、DB、Docker Compose、本番デプロイはまだ実装していません。**
+**現在はP0（モノレポ初期化）の最終段階です。公式サイトは `apps/web` へ履歴付きで移設済み、内部アプリ・Go API・Bot・DB migration基盤・ローカルComposeの骨組みがあります。認証・業務機能・本番デプロイはまだ実装していません。**
 
 ## まず読む
 
@@ -38,6 +38,14 @@ npm run test:unit     # 既存の単体テスト
 `npm run web:e2e`は全ルート・ギャラリー操作のブラウザー確認（Playwrightはapps/webの固定devDependency。初回は`npx playwright install chromium`が必要で、Linuxでは依存ライブラリも要る）。
 
 比較基準・画面確認の手順は [docs/legacy-baseline](docs/legacy-baseline/README.md)。素材の権利については [apps/web/ASSETS.md](apps/web/ASSETS.md)。
+
+## ローカル起動
+
+Docker Composeでweb・admin・api・bot・PostgreSQLを起動できます（手順は [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md)）。
+
+```sh
+cp .env.example .env && npm run dev:up
+```
 
 ## 運用文書
 

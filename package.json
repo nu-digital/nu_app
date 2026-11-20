@@ -15,6 +15,10 @@
     "admin:ci": "npm ci --prefix apps/admin",
     "admin:lint": "npm run lint --prefix apps/admin",
     "admin:typecheck": "npm run typecheck --prefix apps/admin",
-    "admin:build": "npm run build --prefix apps/admin"
+    "admin:build": "npm run build --prefix apps/admin",
+    "dev:up": "docker compose --env-file .env -f infrastructure/compose.yaml up --build -d --wait",
+    "dev:down": "docker compose --env-file .env -f infrastructure/compose.yaml down",
+    "dev:reset": "docker compose --env-file .env -f infrastructure/compose.yaml down -v",
+    "compose:smoke": "node scripts/compose-smoke.mjs"
   }
 }
