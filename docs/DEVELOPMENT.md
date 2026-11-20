@@ -58,7 +58,7 @@ PRごとの人の確認・マージ待ちを減らすため、**確定仕様の�
 
 - デフォルトブランチmain、Squash merge、マージ済みブランチの自動削除。
 - mainのRulesetまたはbranch protection: PR必須、force push・削除禁止、会話解決必須、CI必須。管理者の恒常的bypassも避ける。
-- 必須チェック（実際のチェック名）: `harness / repository`、`harness / policy`、`web / lint-typecheck-build`、`admin / lint-typecheck-build`、`go / services/api`、`go / services/bot`、`go / docker build`、`compose / smoke`。必須チェックが未実行のままpendingにならないよう、各workflowは`paths`絞り込みを持たず全PRで実行する（約8分）。新しいチェックを追加したら、名前を保護ルールの必須チェックへ追加する。
+- 必須チェック（実際のチェック名）: `harness / repository`、`harness / policy`、`web / lint-typecheck-build`、`admin / lint-typecheck-build`、`go / services/api`、`go / services/bot`、`go / docker build`、`go / sqlc`、`go / integration`、`compose / smoke`。必須チェックが未実行のままpendingにならないよう、各workflowは`paths`絞り込みを持たず全PRで実行する（約8分）。新しいチェックを追加したら、名前を保護ルールの必須チェックへ追加する。
 - 複数のレビュー担当者がいる場合は承認1件・最新差分で承認失効を設定。一人運用では自分のPRを自分で承認できないため、承認数必須は無理に設定せず手動レビューとCIで運用し、体制を記録する。
 - 保護機能が使えない状態（privateでプラン不足等）に戻った場合は、保護済みと呼ばず、制限を明記する。
 - Actionsは最小権限。PRのコードに本番secretを渡さない。`pull_request_target`でPRコードを実行しない。

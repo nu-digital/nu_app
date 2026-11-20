@@ -28,6 +28,7 @@
 | 配信イメージの固定（P0-03b） | node `22.23.5-alpine`(digest固定)、web配信は`nginxinc/nginx-unprivileged:1.30.6-alpine`(digest固定、nginx stable 1.30系。1.30.7は同イメージ未公開のため1.30.6)、adminはNext standalone・非root | 本番のNginx(D03)はP4で別に設計する。webコンテナのnginxはローカル/検証用の静的配信 |
 | ローカルCompose方針（P0-03c） | 本番相当のイメージ(各Dockerfile)をそのままビルドして起動。公開ポートは127.0.0.1のみ、`cap_drop: ALL`・`no-new-privileges`・`read_only`（DBを除く）。`.env`必須値は`:?`で欠落時に起動拒否。検証用の`nu_app_smoke`プロジェクトは開発用`nu_app`と分離 | ホットリロード用の開発モードComposeは未提供（`npm run dev`を各アプリで使う）。必要になればP1で追加 |
 | 認証schemaの具体値（P1-01a） | ログインIDは小文字英数字と`. _ -`の2〜63文字（先頭は英数字）／表示名は空白のみ不可・64文字以内／学年は1〜10／pending のOwner移譲は申請者ごとに1件／有効なトークンは(user,purpose)ごとに1件／監査ログと緊急復旧イベントはDBのtriggerで追記専用／セッション・トークンはSHA-256(32バイト)のhashのみ保存／ユーザー行は削除しない | ログインIDの形式は業務上の希望があれば変更可能（migrationのCHECKとテストを同時に変える）。D02の範囲内の技術的な具体化 |
+| 認可表と権限昇格の防止（P1-01b。**運用責任者が承認 2026-11-21**） | 認可は`services/api/internal/authz`に集約し、docs/API.mdの全エンドポイントと1対1で対応（テストで検査、表は[AUTHZ](AUTHZ.md)）。**管理者権限（Admin/Owner）を持つユーザーを対象にした停止・招待URL発行・再設定URL発行はOwnerのみ**。停止・招待中のアカウントは公開以外を全拒否。OwnerはAdminを内包、AdminはEditorを内包しない | 要件「Adminはメンバーの発行・停止を担当」を一般メンバー対象と解釈した。Adminに管理者対象の再設定URL発行を許すとアカウント乗っ取りで権限昇格できるため。業務上Adminどうしの再設定を許したい場合は、`notPrivilegedTarget`の適用範囲を変える（認可の重要設計のため、変更時は運用責任者の確認を求める） |
 | Pages workflow | 取り込み後に`apps/web/.github`を削除。移設リポジトリで有効化しない | upstream側は変更しない |
 
 Node参照: [公式配布一覧](https://nodejs.org/dist/index.json)。確認日: 2026-11-20。アプリのGo/PostgreSQL/Next.jsやテストライブラリの固定版はP0の調査対象であり、今回決定していない。
