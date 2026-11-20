@@ -8,7 +8,7 @@
 - 未認証は401相当、**停止（disabled）・招待中（invited）のアカウントは、ロールを持っていても公開アクション以外すべて拒否**する。
 - Memberはactiveなユーザーの基本権限で、ロール行を持たない。Ownerは Admin の権限を内包する。AdminはEditorを内包しない（CMSの編集・公開は規則にAdmin/Ownerを明記）。
 - 他人のリソース（作者でも共同編集者でもないコンテンツ、他人宛のOwner移譲など）は、関係が無ければEditor以上の権限が無い限り拒否する。
-- **採用方針（権限昇格の防止）**: 管理者権限を持つユーザー（Admin/Owner）を対象にした停止・招待URL発行・再設定URL発行は**Ownerのみ**。AdminがOwnerやAdminの再設定URLを発行できると、アカウント乗っ取りによる権限昇格になるため。要件の「Adminはメンバーの発行・停止を担当」を、一般メンバー対象と解釈している（[DECISIONS](DECISIONS.md)）。
+- **採用方針（権限昇格の防止）**: 管理者権限を持つユーザー（Admin/Owner）を対象にした停止・招待URL発行・再設定URL発行は**Ownerのみ**。AdminがOwnerやAdminの再設定URLを発行できると、アカウント乗っ取りによる権限昇格になるため。要件の「Adminはメンバーの発行・停止を担当」を、一般メンバー対象と解釈している（運用責任者が2026-11-21に承認。[DECISIONS](DECISIONS.md)）。
 - `GET /members/{id}`・`GET /me/profile`などの**応答に含める項目の制限**（公開設定・個人情報）は認可表ではなくAPIのDTO組み立てで行う（`docs/ARCHITECTURE.md`）。
 
 ## アクション一覧（API.mdと同じ順）
