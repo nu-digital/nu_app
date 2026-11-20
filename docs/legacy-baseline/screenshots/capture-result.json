@@ -1,0 +1,868 @@
+{
+  "base": "(root)",
+  "routes": [
+    {
+      "route": "/blog/activity-2025-12-22-6db7c7/",
+      "status": 200,
+      "h1": "ゆるゆるゲーム制作会",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-01-20-2f9241/",
+      "status": 200,
+      "h1": "GCI 2025 Winter 修了",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-01-29-24a47f/",
+      "status": 200,
+      "h1": "次年度プロジェクト要綱提出",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-04-11-fe646c/",
+      "status": 200,
+      "h1": "ポスター表紙撮影会",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-05-28-f690fa/",
+      "status": 200,
+      "h1": "IVRCメタバース部門の初期企画",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-06-05-099b2b/",
+      "status": 200,
+      "h1": "ゲームエフェクト会1",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-06-06-71597c/",
+      "status": 200,
+      "h1": "Shaderどですか会＆ゲームエフェクト会2",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-06-08-a26f47/",
+      "status": 200,
+      "h1": "Udon会",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-06-08-d62351/",
+      "status": 200,
+      "h1": "ゲームサウンド会",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-06-12-d3e961/",
+      "status": 200,
+      "h1": "ゲームエフェクト会3",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-06-19-a9bc7b/",
+      "status": 200,
+      "h1": "ゲームエフェクト会4",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-07-20-8c34f0/",
+      "status": 200,
+      "h1": "第1回 ワールド制作ハッカソンを開催しました",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-07-24-50e440/",
+      "status": 200,
+      "h1": "トラストランク上げ会を開催しました",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-08-01-1cc8bf/",
+      "status": 200,
+      "h1": "船橋オープンキャンパスで制作物を展示しました！",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-08-03-cf9870/",
+      "status": 200,
+      "h1": "第2回 Udon勉強会を開催しました！",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-08-10-c49474/",
+      "status": 200,
+      "h1": "Unityライティング勉強会を開催しました！",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/activity-2026-08-13-9d5dc3/",
+      "status": 200,
+      "h1": "第5回 ゲームエフェクト会",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/another/",
+      "status": 200,
+      "h1": "YUVR,KAIT,nu交流会",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/bennkyou/",
+      "status": 200,
+      "h1": "カテゴリ別勉強会2026",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/booth/",
+      "status": 200,
+      "h1": "公式Booth開設",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/busitu/",
+      "status": 200,
+      "h1": "部室制作！",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/cedec-2026-scholarship/",
+      "status": 200,
+      "h1": "CEDEC 2026 スカラーシップ採択",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/dg/",
+      "status": 200,
+      "h1": "VRChatワールド『Dimensions Gate』 公開！",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/gamedan/",
+      "status": 200,
+      "h1": "ゲームダンジョン11に行ってきた",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/houkoku/",
+      "status": 200,
+      "h1": "プロジェクト報告会",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/ibunya/",
+      "status": 200,
+      "h1": "異分野学会",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/",
+      "status": 200,
+      "h1": "Blog",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/ivrc_dg/",
+      "status": 200,
+      "h1": "IVRC審査員賞受賞",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/iwakenlab-5th-mini-exhibit/",
+      "status": 200,
+      "h1": "IwakenLab 5周年記念イベントでプチ展示しました",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/kouryuu/",
+      "status": 200,
+      "h1": "新年交流会",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/kouryuu2026/",
+      "status": 200,
+      "h1": "新年度交流会",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/metacms_article/",
+      "status": 200,
+      "h1": "メタ創専用CMSができました",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/newDocument/",
+      "status": 200,
+      "h1": "ドキュメントを更新しました",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/new_digital/",
+      "status": 200,
+      "h1": "自主創造プロジェクト採択",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/nu.metasou/",
+      "status": 200,
+      "h1": "公式ページ開設",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/numa_koushuu/",
+      "status": 200,
+      "h1": "NUMA合同講習会 — VRChatワールド制作講師",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/opencampus-surugadai-2026/",
+      "status": 200,
+      "h1": "オープンキャンパス駿河台 — 展示・ミニ講演",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/science/",
+      "status": 200,
+      "h1": "サイエンスアゴラに参加",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/sousaku/",
+      "status": 200,
+      "h1": "創作体験会",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/student-vr-meetup-2026/",
+      "status": 200,
+      "h1": "全国学生VRサークル活動報告大会 — 活動報告登壇・Webサイト制作",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/surugadai-ourisai-2026/",
+      "status": 200,
+      "h1": "駿河台桜理祭2026に出展しました！",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/svrc/",
+      "status": 200,
+      "h1": "SVRCサークル対談",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/vkasai/",
+      "status": 200,
+      "h1": "V化祭に出展しました！",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/vket/",
+      "status": 200,
+      "h1": "VketWinter出展",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/vketReal/",
+      "status": 200,
+      "h1": "VketRealに参加しました",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/blog/xr/",
+      "status": 200,
+      "h1": "XR会議",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/",
+      "status": 200,
+      "h1": "nu_digital",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/news/",
+      "status": 200,
+      "h1": "Blog",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/news/site-redesign/",
+      "status": 200,
+      "h1": "ホームページをリニューアルしました",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/demo-yura/",
+      "status": 200,
+      "h1": "demo_yura",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/dimensions-gate/",
+      "status": 200,
+      "h1": "DimensionsGate",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/exhibition-game-launcher/",
+      "status": 200,
+      "h1": "展示用ゲームランチャー",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/fogland/",
+      "status": 200,
+      "h1": "FogLand",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/",
+      "status": 200,
+      "h1": "Contents",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/lbe-restaurant-simulator/",
+      "status": 200,
+      "h1": "LBE Restaurant Simulator",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/nu-bar/",
+      "status": 200,
+      "h1": "nu_bar",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/nu-room/",
+      "status": 200,
+      "h1": "nu_room",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/organization-website/",
+      "status": 200,
+      "h1": "団体ホームページ",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/quick/",
+      "status": 200,
+      "h1": "くいっく！",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/recall/",
+      "status": 200,
+      "h1": "ReCall",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/recruitment-poster/",
+      "status": 200,
+      "h1": "メンバー募集ポスター",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/shadow-interaction/",
+      "status": 200,
+      "h1": "影インタラクション / MediaPipe検証",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/tokyo-open-data-guide/",
+      "status": 200,
+      "h1": "TokyoOpenDataGuide",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/uchatclient-1/",
+      "status": 200,
+      "h1": "UChatClient1",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/uchatclient-2/",
+      "status": 200,
+      "h1": "UChatClient2",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/vkasai-booth/",
+      "status": 200,
+      "h1": "V化祭ブース",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/vrc-airsoft/",
+      "status": 200,
+      "h1": "VRC_Airsoft",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/vrc-prototypes-2025/",
+      "status": 200,
+      "h1": "プロトタイプワールド制作（2025）",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/vrc-prototypes-2026/",
+      "status": 200,
+      "h1": "プロトタイプワールド（2026）",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/web-prototypes/",
+      "status": 200,
+      "h1": "Web制作（ToDo・シラバス検索の試作）",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/project/world-hackathon-2-prototype/",
+      "status": 200,
+      "h1": "第2回 ワールド制作ハッカソンを開催しました！",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    },
+    {
+      "route": "/terms/",
+      "status": 200,
+      "h1": "利用規約",
+      "brokenImages": 0,
+      "failures": 0,
+      "failureUrls": [],
+      "consoleErrors": []
+    }
+  ],
+  "gallery": [
+    {
+      "name": "ギャラリー画像数>0",
+      "ok": true,
+      "detail": ".article-gallery img = 18"
+    },
+    {
+      "name": "クリックで開く",
+      "ok": true,
+      "detail": "4 / 19"
+    },
+    {
+      "name": "クリック: 開いた時の背景スクロール抑止",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "クリック: 閉じるボタンにフォーカス",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "→/←で移動",
+      "ok": true,
+      "detail": "4 / 19 → 5 / 19 → 4 / 19"
+    },
+    {
+      "name": "次へボタン",
+      "ok": true,
+      "detail": "5 / 19"
+    },
+    {
+      "name": "前へボタン",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "クリック: Escで閉じる",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "クリック: 開いた画像へフォーカス復帰",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "クリック: 背景スクロール復帰",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Enterで開く",
+      "ok": true,
+      "detail": "4 / 19"
+    },
+    {
+      "name": "Enter: 開いた時の背景スクロール抑止",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Enter: 閉じるボタンにフォーカス",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Enter: Escで閉じる",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Enter: 開いた画像へフォーカス復帰",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Enter: 背景スクロール復帰",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Spaceで開く",
+      "ok": true,
+      "detail": "4 / 19"
+    },
+    {
+      "name": "Space: 開いた時の背景スクロール抑止",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Space: 閉じるボタンにフォーカス",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Space: Escで閉じる",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Space: 開いた画像へフォーカス復帰",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Space: 背景スクロール復帰",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "閉じるボタンで閉じ、フォーカス復帰",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "背景クリックで閉じる",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "先頭(1枚目)から←で末尾へ循環",
+      "ok": true,
+      "detail": "1 / 19 → 19 / 19"
+    }
+  ],
+  "viewports": [
+    {
+      "file": "pc-home.png",
+      "viewport": "1440x900",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "pc-blog.png",
+      "viewport": "1440x900",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "pc-news.png",
+      "viewport": "1440x900",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "pc-project.png",
+      "viewport": "1440x900",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "pc-terms.png",
+      "viewport": "1440x900",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "pc-blog-gallery-surugadai.png",
+      "viewport": "1440x900",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "pc-blog-dot-slug-nu.metasou.png",
+      "viewport": "1440x900",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "pc-project-nu-bar.png",
+      "viewport": "1440x900",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "sp-home.png",
+      "viewport": "390x844",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "sp-blog.png",
+      "viewport": "390x844",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "sp-news.png",
+      "viewport": "390x844",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "sp-project.png",
+      "viewport": "390x844",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "sp-terms.png",
+      "viewport": "390x844",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "sp-blog-gallery-surugadai.png",
+      "viewport": "390x844",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "sp-blog-dot-slug-nu.metasou.png",
+      "viewport": "390x844",
+      "horizontalOverflowPx": 0
+    },
+    {
+      "file": "sp-project-nu-bar.png",
+      "viewport": "390x844",
+      "horizontalOverflowPx": 0
+    }
+  ],
+  "notes": [],
+  "externalFailedHosts": [
+    "yt3.ggpht.com",
+    "www.youtube.com"
+  ],
+  "notFoundStatus": 404
+}
