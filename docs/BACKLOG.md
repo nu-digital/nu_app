@@ -2,7 +2,7 @@
 
 [TASKS](TASKS.md) のPhaseは維持する。以下のIDは分割案でありGitHub Issue番号ではない。Issue作成後は実番号を併記し、完了は実PRと検証結果に基づいて更新する。
 
-作成済み: [準備PR #1](https://github.com/nu-digital/nu_app/pull/1)、[P0-01 / Issue #2](https://github.com/nu-digital/nu_app/issues/2)。P0-01は完了（PR #5。調査結果は[legacy-baseline](legacy-baseline/README.md)）。P0-02〜P0-04は完了（PR #10・#14・#16・#18・#20と P0-04。[P0完了報告](handoffs/P0-complete.md)）。次はP1。実装ブランチ例は `chore/2-legacy-baseline`。
+作成済み: [準備PR #1](https://github.com/nu-digital/nu_app/pull/1)、[P0-01 / Issue #2](https://github.com/nu-digital/nu_app/issues/2)。P0-01は完了（PR #5。調査結果は[legacy-baseline](legacy-baseline/README.md)）。P0-02〜P0-04は完了（PR #10・#14・#16・#18・#20と P0-04。[P0完了報告](handoffs/P0-complete.md)）。P1は進行中: P1-01（#26・#30・#28）はmainにマージ済み。P1-02（認証・招待・再設定・セッション・CSRF・レート制限・停止）は積み重ねDraft PR（#32 → #34 → #36 → #38 → #40 → #42）でレビュー待ち。次はP1-03（Admin/Editor管理・Owner移譲・緊急復旧CLI）、P1-04（UI）。実装ブランチ例は `chore/2-legacy-baseline`。
 
 | ID | 作業と完了条件 | 依存 |
 |---|---|---|
