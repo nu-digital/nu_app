@@ -126,3 +126,61 @@ export async function setRole(userId: string, role: "editor" | "admin", enabled:
   const r = await call("PUT", path, { enabled });
   if (r.status !== 200) throw toError(r);
 }
+
+// ---- プロフィール・メンバー ----
+
+export type Visibility = "private" | "members";
+
+export type MyProfile = {
+  displayName: string;
+  bio: string | null;
+  faculty: string | null;
+  department: string | null;
+  schoolYear: number | null;
+  visibility: Record<"bio" | "faculty" | "department" | "schoolYear", Visibility>;
+  private: { legalName: string | null; studentNumber: string | null; universityEmail: string | null; nearestStation: string | null };
+  links: { id: string; label: string; url: string; sortOrder: number; visibility: Visibility }[];
+  devices: { id: string; category: string; name: string; spec: string; sortOrder: number; visibility: Visibility }[];
+  publicCreditConsent: { granted: boolean; grantedAt: string | null; withdrawnAt: string | null };
+};
+
+export type Member = {
+  id: string;
+  displayName: string;
+  bio: string | null;
+  faculty: string | null;
+  department: string | null;
+  schoolYear: number | null;
+  links?: { id: string; label: string; url: string }[];
+  devices?: { id: string; category: string; name: string; spec: string }[];
+};
+
+async function ok<T>(r: { status: number; json: unknown; retryAfter?: number }, ...good: number[]): Promise<T> {
+  if (!good.includes(r.status)) throw toError(r);
+  return r.json as T;
+}
+
+export const getMyProfile = async () => ok<MyProfile>(await call("GET", "/me/profile"), 200);
+export const patchMyProfile = async (body: Record<string, unknown>) => ok<MyProfile>(await call("PATCH", "/me/profile", body), 200);
+export const putVisibility = async (body: Record<string, Visibility>) => ok<MyProfile>(await call("PUT", "/me/profile/visibility", body), 200);
+export const putConsent = async (granted: boolean) => ok<MyProfile["publicCreditConsent"]>(await call("PUT", "/me/profile/public-credit-consent", { granted }), 200);
+export const addLink = async (body: { label: string; url: string; visibility: Visibility }) => ok<unknown>(await call("POST", "/me/profile/links", body), 201);
+export const patchLink = async (id: string, body: Record<string, unknown>) => ok<unknown>(await call("PATCH", `/me/profile/links/${id}`, body), 200);
+export const deleteLink = async (id: string) => ok<unknown>(await call("DELETE", `/me/profile/links/${id}`), 204);
+export const addDevice = async (body: { category: string; name: string; spec: string; visibility: Visibility }) => ok<unknown>(await call("POST", "/me/devices", body), 201);
+export const patchDevice = async (id: string, body: Record<string, unknown>) => ok<unknown>(await call("PATCH", `/me/devices/${id}`, body), 200);
+export const deleteDevice = async (id: string) => ok<unknown>(await call("DELETE", `/me/devices/${id}`), 204);
+
+export async function listMembers(q: string, cursor?: string) {
+  const p = new URLSearchParams({ limit: "50" });
+  if (q) p.set("q", q);
+  if (cursor) p.set("cursor", cursor);
+  return ok<{ items: Member[]; nextCursor: string | null }>(await call("GET", `/members?${p.toString()}`), 200);
+}
+export const getMember = async (id: string) => ok<Member>(await call("GET", `/members/${id}`), 200);
+
+export type PrivateProfile = { id: string; loginId: string; displayName: string; private: MyProfile["private"] };
+export const getPrivateProfile = async (id: string) => ok<PrivateProfile>(await call("GET", `/admin/users/${id}/private-profile`), 200);
+export const deletePrivateProfile = async (id: string, reason: string, anonymizeDisplayName: boolean) =>
+  ok<{ consentWithdrawn: boolean; displayNameAnonymized: boolean; linksDeleted: number; devicesDeleted: number }>(
+    await call("DELETE", `/admin/users/${id}/private-profile`, { reason, anonymizeDisplayName }), 200);
