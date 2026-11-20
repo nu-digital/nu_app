@@ -2,7 +2,7 @@
 
 Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワーク経由で公開コンテンツAPIを呼び出す。リクエスト/レスポンスは原則JSON。DBやAPIモデルを直接返さず、用途別にレスポンスを整形。
 
-認可表記: `Public`=匿名, `Member`=認証済み有効ユーザー, `Editor`, `Admin`, `Owner` は各ロールを有するユーザー。権限はサーバーで毎回検証。OwnerはAdminの機能を実行可能。
+認可の正本は[AUTHZ](AUTHZ.md)（`services/api/internal/authz`。全エンドポイントとの対応をテストで検査）。認可表記: `Public`=匿名, `Member`=認証済み有効ユーザー, `Editor`, `Admin`, `Owner` は各ロールを有するユーザー。権限はサーバーで毎回検証。OwnerはAdminの機能を実行可能。
 
 ## 1. 認証・アカウント
 
