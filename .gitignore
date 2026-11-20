@@ -18,3 +18,4 @@ CLAUDE.local.md
 *.sql.gz
 .DS_Store
 Thumbs.db
+.e2e-out/

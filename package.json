@@ -10,6 +10,7 @@
     "web:verify": "node scripts/web-verify.mjs",
     "check": "node scripts/check.mjs && npm run web:lint && npm run web:typecheck",
     "test:unit": "node --test scripts/harness.test.mjs && npm run test:editor --prefix apps/web && node --test apps/web/scripts/content-presentation.test.mjs",
-    "build": "npm run web:build"
+    "build": "npm run web:build",
+    "web:e2e": "PLAYWRIGHT_DIR=${PLAYWRIGHT_DIR:-apps/web} node scripts/legacy-baseline-capture.mjs apps/web/out \"${E2E_OUT_DIR:-apps/web/.e2e-out}\""
   }
 }

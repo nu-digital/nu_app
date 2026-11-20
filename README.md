@@ -35,6 +35,8 @@ npm run web:verify    # 出力が移設前基準（docs/legacy-baseline）と一
 npm run test:unit     # 既存の単体テスト
 ```
 
+`npm run web:e2e`は全ルート・ギャラリー操作のブラウザー確認（Playwrightはapps/webの固定devDependency。初回は`npx playwright install chromium`が必要で、Linuxでは依存ライブラリも要る）。
+
 比較基準・画面確認の手順は [docs/legacy-baseline](docs/legacy-baseline/README.md)。素材の権利については [apps/web/ASSETS.md](apps/web/ASSETS.md)。
 
 ## 運用文書

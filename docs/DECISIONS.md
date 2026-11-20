@@ -95,6 +95,7 @@ Node参照: [公式配布一覧](https://nodejs.org/dist/index.json)。確認日
 
 - **確定:** 移設PRはP0-01と同じlockfileを基準にして移設差分を分離。依存更新はその直後の独立PRで**P0中**に実施。`npm audit`と公式アドバイザリーを再確認し、対象の脆弱性を解消するサポート中の固定版を選ぶ。Nextとeslint-config-nextの互換性を揃え、Playwright等のテスト依存も固定。無条件に最新メジャーへ更新せず`audit fix --force`で一括変更しない。lint・型検査・build・主要操作・表示回帰を確認。対応をP3まで先送りせず、本番公開前に対応状況を確認。
 - **P0-01の観測:** `next@16.1.1`に多数のaudit指摘（critical含む。詳細は`docs/legacy-baseline/README.md` L1）、`eslint-config-next@15.3.1`の主版不一致(L2)。実際の固定版は更新PR時点の一次資料で決める（ここでは決めない）。
+- **実施(2026-11-21、P0-02b / Issue #13):** next・eslint-config-next 16.4.6に固定、`npm audit` 21件→0件、playwright 1.65.1を固定。詳細と選定理由は`docs/legacy-baseline/README.md`。本番公開前の再確認は引き続き必要（新しい指摘は随時出る）。
 - **契約後確認:** なし。
 
 ### D12 部分日付
