@@ -79,3 +79,10 @@ UPDATE users SET status = $2, disabled_at = NULL WHERE id = $1;
 
 -- name: HasPassword :one
 SELECT EXISTS (SELECT 1 FROM password_credentials WHERE user_id = $1);
+
+-- name: GrantRoleIfMissing :execrows
+INSERT INTO user_roles (user_id, role, assigned_by) VALUES ($1, $2, $3)
+ON CONFLICT (user_id, role) DO NOTHING;
+
+-- name: RevokeRole :execrows
+DELETE FROM user_roles WHERE user_id = $1 AND role = $2;

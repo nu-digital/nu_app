@@ -37,6 +37,8 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | `POST /admin/users/{id}/invite-link` | – | 200 `{url,expiresAt}`（invitedのみ） | 409 `INVALID_STATE`・`CONFLICT` |
 | `POST /admin/users/{id}/reset-link` | – | 200 `{url,expiresAt}`（activeのみ。管理者対象はOwnerのみ） | 403、409 |
 | `PATCH /admin/users/{id}/status` | `{status:"disabled"\|"active"}` | 200 `{id,loginId,status}` | 409 `CANNOT_DISABLE_SELF`・`LAST_OWNER`、403 |
+| `PUT /admin/users/{id}/editor-role` | `{enabled:bool}` | 200 `{id,loginId,roles}`（冪等。Admin/Owner） | 403、404、422 |
+| `PUT /owner/users/{id}/admin-role` | `{enabled:bool}` | 200 `{id,loginId,roles}`（冪等。Ownerのみ。Owner権限は付与できない） | 403、404、422 |
 
 状態変更は`Origin`（または`Referer`）が許可オリジンと一致し、認証済みの場合は`X-CSRF-Token`（`/auth/me`・ログイン応答の`csrfToken`）が必要。Cookieは`HttpOnly; Secure; SameSite=Lax`（Secure時は`__Host-nu_session`）。
 

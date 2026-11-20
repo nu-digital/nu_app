@@ -183,6 +183,25 @@ func (q *Queries) GetUserForUpdate(ctx context.Context, id pgtype.UUID) (User, e
 	return i, err
 }
 
+const grantRoleIfMissing = `-- name: GrantRoleIfMissing :execrows
+INSERT INTO user_roles (user_id, role, assigned_by) VALUES ($1, $2, $3)
+ON CONFLICT (user_id, role) DO NOTHING
+`
+
+type GrantRoleIfMissingParams struct {
+	UserID     pgtype.UUID
+	Role       string
+	AssignedBy pgtype.UUID
+}
+
+func (q *Queries) GrantRoleIfMissing(ctx context.Context, arg GrantRoleIfMissingParams) (int64, error) {
+	result, err := q.db.Exec(ctx, grantRoleIfMissing, arg.UserID, arg.Role, arg.AssignedBy)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const hasPassword = `-- name: HasPassword :one
 SELECT EXISTS (SELECT 1 FROM password_credentials WHERE user_id = $1)
 `
@@ -295,6 +314,23 @@ UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL
 
 func (q *Queries) RevokeAllUserSessions(ctx context.Context, userID pgtype.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, revokeAllUserSessions, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const revokeRole = `-- name: RevokeRole :execrows
+DELETE FROM user_roles WHERE user_id = $1 AND role = $2
+`
+
+type RevokeRoleParams struct {
+	UserID pgtype.UUID
+	Role   string
+}
+
+func (q *Queries) RevokeRole(ctx context.Context, arg RevokeRoleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeRole, arg.UserID, arg.Role)
 	if err != nil {
 		return 0, err
 	}
