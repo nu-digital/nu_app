@@ -37,6 +37,9 @@ try {
 
   let r = await get(api, '/healthz'); check('api /healthz 200', r?.status === 200);
   r = await get(api, '/readyz'); check('api /readyz 200（DB到達）', r?.status === 200, JSON.stringify(await r?.json().catch(() => null)));
+  r = await get(api, '/api/v1/auth/me'); check('api /api/v1/auth/me は未認証で401（JSONエラー）', r?.status === 401 && (await r.json().catch(() => ({})))?.error?.code === 'UNAUTHENTICATED');
+  r = await fetch(`http://127.0.0.1:${api}/api/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"loginId":"x","password":"y"}' }).catch(() => null);
+  check('api ログインはOrigin無しだと403', r?.status === 403);
   r = await get(admin, '/healthz'); check('admin /healthz 200', r?.status === 200);
   const bad = [];
   for (const route of inv.routes.filter(x => !['/404/', '/_not-found/'].includes(x))) { const x = await get(web, route); if (x?.status !== 200) bad.push(`${route}:${x?.status}`); }

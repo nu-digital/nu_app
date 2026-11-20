@@ -80,6 +80,17 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 	return i, err
 }
 
+const getDisplayName = `-- name: GetDisplayName :one
+SELECT display_name FROM profiles WHERE user_id = $1
+`
+
+func (q *Queries) GetDisplayName(ctx context.Context, userID pgtype.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, getDisplayName, userID)
+	var display_name string
+	err := row.Scan(&display_name)
+	return display_name, err
+}
+
 const getPasswordHash = `-- name: GetPasswordHash :one
 SELECT password_hash FROM password_credentials WHERE user_id = $1
 `
