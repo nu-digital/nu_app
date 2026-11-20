@@ -1,0 +1,15 @@
+{
+  "name": "nu_app",
+  "private": true,
+  "description": "nu_digitalの公式サイト・内部ポータル・Go API・Discord Botのモノレポ。依存は各アプリ(apps/*)のlockfileで管理する。",
+  "scripts": {
+    "web:ci": "npm ci --prefix apps/web",
+    "web:lint": "npm run lint --prefix apps/web",
+    "web:typecheck": "npm exec --prefix apps/web -- tsc --noEmit -p apps/web/tsconfig.json",
+    "web:build": "npm run build --prefix apps/web",
+    "web:verify": "node scripts/web-verify.mjs",
+    "check": "node scripts/check.mjs && npm run web:lint && npm run web:typecheck",
+    "test:unit": "node --test scripts/harness.test.mjs && npm run test:editor --prefix apps/web && node --test apps/web/scripts/content-presentation.test.mjs",
+    "build": "npm run web:build"
+  }
+}

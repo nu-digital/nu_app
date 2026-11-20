@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { policyErrors, forbiddenPath, linkErrors, repositoryErrors, root } from './check.mjs';
+import { policyErrors, forbiddenPath, linkErrors, repositoryErrors, root, siteContentPattern } from './check.mjs';
 import { stopResult } from './claude-stop.mjs';
 
 test('Issue番号付きブランチと日本語タイトルを受け入れる', () => {
@@ -88,4 +88,12 @@ test('CIの実イベントファイルを使い不正PRを非0で終了する（
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
+});
+
+test('サイト本文の公開URLリンクだけをリンク検査から除外する', () => {
+  assert.ok(siteContentPattern.test('apps/web/content/blog/nu.metasou.md'));
+  assert.ok(siteContentPattern.test('apps/web/content/project/nu-bar.md'));
+  assert.ok(!siteContentPattern.test('apps/web/README.md'));
+  assert.ok(!siteContentPattern.test('docs/content/x.md'));
+  assert.ok(!siteContentPattern.test('apps/web/docs/x.md'));
 });

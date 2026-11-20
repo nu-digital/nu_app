@@ -20,6 +20,9 @@
 | Node | 準備CIは22.23.5。既存サイトのNode 22系に合わせ、公式配布一覧のLTSパッチを固定 | アプリ移設時にサポート期間と互換性を再評価。ローカル既存22.12.0での実測はCI版と区別 |
 | Actions | checkout / setup-nodeは公式v6の参照SHAを固定。更新はDependabot PRでレビュー | floating tagだけでは再現性を欠く |
 | UI | 新内部アプリは現行の日本語UIを調査して自律設計、公式サイトは維持 | 全面リニューアルは既存維持要件と競合 |
+| npm構成（P0-02） | ルートは依存を持たない`package.json`で`--prefix apps/web`に委譲し、**npm workspacesはapps/admin追加(P0-03)まで導入しない**。lockfileを`apps/web`に置いたまま移設し、D11の「移設差分を分離」を依存ツリー一致（548件）で確認するため | workspacesにするとlockfileがルートへ移り再解決のリスクが生じる。P0-03で2アプリになった時点で、版一致を検証して移行する |
+| 移設PRのマージ方式 | **mergeコミット（squash・rebase不可）。** squashするとupstreamの11コミットが失われD13に反する | 他のPRはSquash mergeのまま |
+| Pages workflow | 取り込み後に`apps/web/.github`を削除。移設リポジトリで有効化しない | upstream側は変更しない |
 
 Node参照: [公式配布一覧](https://nodejs.org/dist/index.json)。確認日: 2026-11-20。アプリのGo/PostgreSQL/Next.jsやテストライブラリの固定版はP0の調査対象であり、今回決定していない。
 

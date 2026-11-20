@@ -78,3 +78,18 @@ Playwright（1.56.1、Chromium 141 headless）はリポジトリの依存では�
 - 全67記事の目視、他ブラウザー（Firefox/WebKit）、幅320px・200%ズーム、実機タッチは未確認。
 - `/_not-found/`・`/404/` は出力に存在するが画面確認なし。
 - 外部リンクの生存確認、YouTube埋め込み再生は未実施。
+
+## 移設後の再検証（P0-02 / Issue #9、2026-11-21）
+
+`apps/web`（subtree、tree hashが e1c0313 と同一）で、同じ手順を再実行した。
+
+| 項目 | 結果 |
+|---|---|
+| 履歴 | `git merge-base --is-ancestor e1c0313 HEAD` 成功。元の11コミットが祖先。`git rev-parse HEAD:apps/web` が e1c0313 のtreeと一致（subtree直後） |
+| 依存 | lockfile無変更。`npm ls --all` の548件が移設前と完全一致 |
+| `npm ci` / lint / `tsc --noEmit` / build | すべて成功（`npm run web:ci` 等） |
+| 出力検証（`npm run web:verify`） | ルート74、記事67（ファイルsha256）、画像532（sha256）が基準と一致 |
+| ブラウザー再検証 | 全72ルート200、ギャラリー25チェック成功、横溢れ0 |
+| 画面比較 | 撮影17枚（ギャラリー展開含む）が基準画像と**バイト単位で同一**（同じフォント環境・同じ手順）。基準の目視はP0-01の3枚＋人による確認に依存 |
+
+注意: 画像一致は同一環境での比較であり、環境が異なるとフォントでずれる。ブラウザー操作のCI化はPlaywrightを固定するP0-02b。

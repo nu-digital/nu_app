@@ -2,7 +2,7 @@
 
 nu_digitalの公式サイト、内部ポータル、Go API、Discord通知を段階的に構築するモノレポ。
 
-**現在はClaudeに実装を引き継ぐための準備段階です。アプリ、DB、Docker Compose、本番デプロイはまだ実装していません。**
+**現在はP0（モノレポ初期化）の途中です。公式サイトは `apps/web` へ履歴付きで移設済み（P0-02）。内部アプリ、Go API、DB、Docker Compose、本番デプロイはまだ実装していません。**
 
 ## まず読む
 
@@ -22,6 +22,20 @@ node --test scripts/harness.test.mjs
 ```
 
 チェック対象は必須文書・ローカルリンク・設定・禁止ファイル名・PR命名です。秘密値の完全検出、アプリの安全性、DB整合性、UI表示は保証しません。P0で実際のアプリ検証を追加します。
+
+## 公式サイト（apps/web）
+
+既存サイト `nu-digital/nu_digital`（参照SHA `e1c0313`）を `git subtree` で移設しました（履歴維持・squashなし）。依存は移設前と同じlockfileで、更新は別PR（P0-02b）です。Node.jsは[.node-version](.node-version)。
+
+```sh
+npm run web:ci        # npm ci（apps/web）
+npm run web:lint && npm run web:typecheck
+npm run build         # 静的出力: apps/web/out
+npm run web:verify    # 出力が移設前基準（docs/legacy-baseline）と一致するか
+npm run test:unit     # 既存の単体テスト
+```
+
+比較基準・画面確認の手順は [docs/legacy-baseline](docs/legacy-baseline/README.md)。素材の権利については [apps/web/ASSETS.md](apps/web/ASSETS.md)。
 
 ## 運用文書
 
