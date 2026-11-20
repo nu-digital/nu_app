@@ -33,4 +33,10 @@ jobs:
           if docker compose --env-file /dev/null -f infrastructure/compose.yaml config -q 2>/dev/null; then
             echo "必須値なしでもComposeが通ってしまいました"; exit 1
           fi
+      # 画面E2E（Playwright）のため、adminの依存とChromiumを用意する
+      - run: npm run admin:ci
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/admin
       - run: npm run compose:smoke
+        env:
+          UI_SHOTS_DIR: ${{ runner.temp }}/ui-shots

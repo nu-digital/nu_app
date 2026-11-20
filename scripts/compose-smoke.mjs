@@ -55,7 +55,7 @@ try {
 
   // 認証のE2E: 初期OwnerのtokenでパスワードURL受諾→ログイン→ユーザー作成→その招待を受諾→ログイン→停止→ログイン不可
   {
-    const origin = 'http://127.0.0.1:3000'; // composeの既定APP_BASE_URL（許可Origin）
+    const origin = `http://127.0.0.1:${admin}`; // composeの既定APP_BASE_URL（=adminのURL。許可Origin）
     const call = async (method, path, { body, cookie, csrf, headers = {} } = {}) => {
       const res = await fetch(`http://127.0.0.1:${api}/api/v1${path}`, {
         method, redirect: 'manual',
@@ -94,6 +94,22 @@ try {
     check('E2E 停止後はログインできない', x.status === 401, `status=${x.status}`);
     x = await call('POST', '/auth/login', { body: { loginId: 'smoke.owner', password: pw }, headers: { origin: 'https://evil.example' } });
     check('E2E 他のOriginからのログインは403', x.status === 403, `status=${x.status}`);
+
+    // 画面E2E（Playwright）: ブラウザーからadminの画面を操作する。PLAYWRIGHT_SKIP=1で省略できる（ブラウザー未導入の環境用。CIでは実行する）
+    if (process.env.PLAYWRIGHT_SKIP === '1') {
+      console.log('SKIP 画面E2E（PLAYWRIGHT_SKIP=1。実行していない）');
+    } else {
+      // 一般メンバー(smoke.member)はすでに停止したため、画面確認用に新しいユーザーを作り直す
+      const created = await call('POST', '/admin/users', { body: { loginId: 'ui.login.member', displayName: 'UI会員(架空)' }, cookie, csrf });
+      const t2 = created.json?.url?.split('#token=')[1];
+      await call('POST', '/auth/accept-invite', { body: { token: t2, password: 'ui-login-passphrase-1' } });
+      const { runAdminUiE2E } = await import('./admin-ui-e2e.mjs');
+      await runAdminUiE2E({
+        adminUrl: `http://127.0.0.1:${admin}`, apiCall: call, ownerCookie: cookie, ownerCsrf: csrf,
+        memberLogin: 'ui.login.member', memberPass: 'ui-login-passphrase-1', memberName: 'UI会員(架空)',
+        shotsDir: process.env.UI_SHOTS_DIR ?? join(root, '.local/ui-shots'), check,
+      });
+    }
   }
 
   const stopDb = compose('stop', 'db');
