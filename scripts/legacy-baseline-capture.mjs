@@ -26,6 +26,18 @@ const base = `http://127.0.0.1:${server.address().port}${basePath}`;
 const inv = JSON.parse(readFileSync(new URL('../docs/legacy-baseline/inventory.json', import.meta.url)));
 const result = { base: basePath || '(root)', routes: [], gallery: [], viewports: [], notes: [] };
 const browser = await chromium.launch();
+
+// networkidle はNext.jsのリンクprefetch等で通信が止まらずCIで不安定なため使わない(Playwrightも非推奨)。
+// ページの load 後に、ビューポート内の画像の読込完了とWebフォントの準備を待つ。
+async function open(page, url) {
+  const resp = await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    const inView = [...document.images].filter(i => { const r = i.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; });
+    await Promise.all(inView.map(i => i.complete ? null : new Promise(res => { i.addEventListener('load', res, { once: true }); i.addEventListener('error', res, { once: true }); })));
+  });
+  return resp;
+}
 const log = [];
 
 // 1. 全ルートのHTTPステータスと、画像・ネットワーク失敗の検出
@@ -45,7 +57,7 @@ const log = [];
   page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 200)); });
   for (const route of inv.routes.filter(r => !['/404/', '/_not-found/'].includes(r))) {
     failures = []; consoleErrors.length = 0;
-    const resp = await page.goto(base + route, { waitUntil: 'networkidle' });
+    const resp = await open(page, base + route);
     const broken = await page.$$eval('img', imgs => imgs.filter(i => i.complete && i.naturalWidth === 0 && i.currentSrc).map(i => i.currentSrc));
     result.routes.push({ route, status: resp.status(), h1: (await page.textContent('h1').catch(() => null))?.trim().slice(0, 60) ?? null, brokenImages: broken.length, failures: failures.length, failureUrls: failures.slice(0, 10), consoleErrors: [...consoleErrors] });
   }
@@ -62,7 +74,7 @@ for (const [vn, width, height] of viewports) {
   const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', deviceScaleFactor: 1, locale: 'ja-JP', timezoneId: 'Asia/Tokyo' });
   const page = await ctx.newPage();
   for (const [name, route] of shotRoutes) {
-    await page.goto(base + route, { waitUntil: 'networkidle' });
+    await open(page, base + route);
     await page.addStyleTag({ content: '*{animation:none!important;transition:none!important}' });
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(300);
@@ -77,7 +89,7 @@ for (const [vn, width, height] of viewports) {
 // 3. ギャラリー操作
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
 const page = await ctx.newPage();
-await page.goto(base + '/blog/surugadai-ourisai-2026/', { waitUntil: 'networkidle' });
+await open(page, base + '/blog/surugadai-ourisai-2026/');
 const imgs = page.locator('.article-gallery img');
 const total = await page.locator('article img, main img').count();
 const check = (name, ok, detail = '') => result.gallery.push({ name, ok: !!ok, detail });
