@@ -1,0 +1,63 @@
+name: go
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'services/**'
+      - 'db/**'
+      - 'scripts/go-docker.sh'
+      - '.github/workflows/go.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/**'
+      - 'db/**'
+      - 'scripts/go-docker.sh'
+      - '.github/workflows/go.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: go / ${{ matrix.module }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [services/api, services/bot]
+    defaults:
+      run:
+        working-directory: ${{ matrix.module }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: ${{ matrix.module }}/go.mod
+          cache-dependency-path: ${{ matrix.module }}/go.sum
+      - name: gofmt（差分があれば失敗）
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...
+      - run: go build ./...
+
+  images:
+    name: go / docker build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - run: docker build -t nu_app-api:ci services/api
+      - run: docker build -t nu_app-bot:ci services/bot
+      - run: docker build -t nu_app-migrate:ci db
