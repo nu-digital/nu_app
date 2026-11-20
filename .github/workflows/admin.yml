@@ -1,8 +1,8 @@
 name: admin
 
 on:
+  # baseがmain以外の積み重ねPRでもCIを実行する（docs/DEVELOPMENT.md「マージとレビューの運用」）
   pull_request:
-    branches: [main]
   push:
     branches: [main]
 
