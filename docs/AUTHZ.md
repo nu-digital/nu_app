@@ -20,6 +20,7 @@
 | `auth.me` | GET | `/auth/me` | 有効なユーザー（Member以上） |
 | `auth.accept_invite` | POST | `/auth/accept-invite` | 誰でも（匿名可）。トークン検証はハンドラー側 |
 | `auth.reset_password` | POST | `/auth/reset-password` | 誰でも（匿名可）。トークン検証はハンドラー側 |
+| `admin.users.list` | GET | `/admin/users` | Admin / Owner（個人情報・秘密値は返さない） |
 | `admin.users.create` | POST | `/admin/users` | Admin / Owner |
 | `admin.users.invite_link` | POST | `/admin/users/{id}/invite-link` | Admin / Owner。**対象が管理者権限（Admin/Owner）のときはOwnerのみ** |
 | `admin.users.reset_link` | POST | `/admin/users/{id}/reset-link` | Admin / Owner。**対象が管理者権限（Admin/Owner）のときはOwnerのみ** |

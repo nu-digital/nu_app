@@ -79,3 +79,50 @@ export function describe(e: unknown): string {
   if (err?.message) return err.message;
   return "通信に失敗しました。もう一度お試しください。";
 }
+
+// ---- 管理（ユーザー管理）。権限はAPIが強制する。画面側の出し分けは案内のためだけ。 ----
+
+export type AdminUser = {
+  id: string;
+  loginId: string;
+  displayName: string;
+  status: "invited" | "active" | "disabled";
+  roles: string[];
+  createdAt: string;
+  activatedAt: string | null;
+};
+
+export type LinkResult = { url: string; expiresAt: string; user?: { id: string; loginId: string; displayName: string; status: string } };
+
+export async function listUsers(q: string, cursor?: string): Promise<{ items: AdminUser[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (cursor) params.set("cursor", cursor);
+  params.set("limit", "50");
+  const r = await call("GET", `/admin/users?${params.toString()}`);
+  if (r.status !== 200) throw toError(r);
+  return r.json as { items: AdminUser[]; nextCursor: string | null };
+}
+
+export async function createUser(loginId: string, displayName: string): Promise<LinkResult> {
+  const r = await call("POST", "/admin/users", { loginId, displayName });
+  if (r.status !== 201) throw toError(r);
+  return r.json as LinkResult;
+}
+
+export async function issueLink(userId: string, kind: "invite-link" | "reset-link"): Promise<LinkResult> {
+  const r = await call("POST", `/admin/users/${userId}/${kind}`);
+  if (r.status !== 200) throw toError(r);
+  return r.json as LinkResult;
+}
+
+export async function setUserStatus(userId: string, status: "disabled" | "active"): Promise<void> {
+  const r = await call("PATCH", `/admin/users/${userId}/status`, { status });
+  if (r.status !== 200) throw toError(r);
+}
+
+export async function setRole(userId: string, role: "editor" | "admin", enabled: boolean): Promise<void> {
+  const path = role === "editor" ? `/admin/users/${userId}/editor-role` : `/owner/users/${userId}/admin-role`;
+  const r = await call("PUT", path, { enabled });
+  if (r.status !== 200) throw toError(r);
+}

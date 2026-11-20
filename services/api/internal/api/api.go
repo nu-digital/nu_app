@@ -79,6 +79,7 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("GET /auth/me", s.me)
 	mux.HandleFunc("POST /auth/accept-invite", s.acceptInvite)
 	mux.HandleFunc("POST /auth/reset-password", s.resetPassword)
+	mux.HandleFunc("GET /admin/users", s.listUsers)
 	mux.HandleFunc("POST /admin/users", s.createUser)
 	mux.HandleFunc("POST /admin/users/{id}/invite-link", s.inviteLink)
 	mux.HandleFunc("POST /admin/users/{id}/reset-link", s.resetLink)

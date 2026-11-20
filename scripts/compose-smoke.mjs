@@ -105,7 +105,7 @@ try {
       await call('POST', '/auth/accept-invite', { body: { token: t2, password: 'ui-login-passphrase-1' } });
       const { runAdminUiE2E } = await import('./admin-ui-e2e.mjs');
       await runAdminUiE2E({
-        adminUrl: `http://127.0.0.1:${admin}`, apiCall: call, ownerCookie: cookie, ownerCsrf: csrf,
+        adminUrl: `http://127.0.0.1:${admin}`, apiCall: call, ownerLogin: 'smoke.owner', ownerPass: pw, ownerCookie: cookie, ownerCsrf: csrf,
         memberLogin: 'ui.login.member', memberPass: 'ui-login-passphrase-1', memberName: 'UI会員(架空)',
         shotsDir: process.env.UI_SHOTS_DIR ?? join(root, '.local/ui-shots'), check,
       });

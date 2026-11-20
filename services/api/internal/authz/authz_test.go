@@ -63,6 +63,7 @@ var wantNoRelation = map[string][]string{
 	"media.upload":                     memberUp,
 	"dashboard.feed":                   memberUp,
 
+	"admin.users.list":                    adminUp,
 	"admin.users.create":                  adminUp,
 	"admin.users.editor_role":             adminUp,
 	"admin.users.private_profile.get":     adminUp,

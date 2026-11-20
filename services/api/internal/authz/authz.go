@@ -184,6 +184,7 @@ var table = []Action{
 	{"auth.me", "GET", "/auth/me", anyMember},
 	{"auth.accept_invite", "POST", "/auth/accept-invite", pub},
 	{"auth.reset_password", "POST", "/auth/reset-password", pub},
+	{"admin.users.list", "GET", "/admin/users", adminOnly},
 	{"admin.users.create", "POST", "/admin/users", adminOnly},
 	{"admin.users.invite_link", "POST", "/admin/users/{id}/invite-link", rule{roles: []Role{RoleAdmin}, notPrivilegedTarget: true}},
 	{"admin.users.reset_link", "POST", "/admin/users/{id}/reset-link", rule{roles: []Role{RoleAdmin}, notPrivilegedTarget: true}},
