@@ -41,6 +41,10 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | `GET/PUT /me/profile/public-credit-consent` | PUT `{granted:bool}`（**メンバー内公開とは別の、インターネット公開の同意**） | 200 `{granted,grantedAt,withdrawnAt}` | 422 |
 | `POST/PATCH/DELETE /me/profile/links` | `{label,url(http/https),sortOrder?,visibility?}`（最大10件） | 201/200/204 | 409 `LIMIT_REACHED`、422、404（他人の項目） |
 | `POST/PATCH/DELETE /me/devices` | `{category,name,spec?,sortOrder?,visibility?}`（最大20件） | 201/200/204 | 同上 |
+| `GET /members` | `q`（表示名の部分一致）, `limit`, `cursor` | 200 `{items:[{id,displayName,bio,faculty,department,schoolYear}],nextCursor}`（**有効なメンバーだけ**。本人が「メンバー内公開」にした項目だけ値が入り、他はnull。ログインID・個人情報・同意状態は返さない） | 401、400 |
+| `GET /members/{id}` | – | 200 上記＋`links`・`devices`（メンバー内公開のみ） | 404（無効・招待中・存在しない・不正なID） |
+| `GET /admin/users/{id}/private-profile` | – | 200 `{id,loginId,displayName,private:{legalName,studentNumber,universityEmail,nearestStation}}`（Admin/Owner。**閲覧を監査に記録**、値は記録しない） | 403、404 |
+| `DELETE /admin/users/{id}/private-profile` | `{reason(必須・200字以内),anonymizeDisplayName?}` | 200 `{consentWithdrawn,displayNameAnonymized,linksDeleted,devicesDeleted}`（個人情報・プロフィール項目・リンク・機材・公開設定を削除、公開クレジット同意を撤回） | 409 `NOT_DISABLED`（**停止中のユーザーだけ**）、422、404 |
 | `POST /admin/users` | `{loginId,displayName}` | 201 `{user,url,expiresAt}`（`url`=`<APP_BASE_URL>/invite#token=…`、一度だけ） | 409 `LOGIN_ID_TAKEN`、422 |
 | `POST /admin/users/{id}/invite-link` | – | 200 `{url,expiresAt}`（invitedのみ） | 409 `INVALID_STATE`・`CONFLICT` |
 | `POST /admin/users/{id}/reset-link` | – | 200 `{url,expiresAt}`（activeのみ。管理者対象はOwnerのみ） | 403、409 |

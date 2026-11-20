@@ -78,3 +78,65 @@ ON CONFLICT (user_id) DO UPDATE SET granted_at = EXCLUDED.granted_at, withdrawn_
 -- name: WithdrawPublicCreditConsent :execrows
 UPDATE public_credit_consents SET withdrawn_at = $2, updated_by = $1
 WHERE user_id = $1 AND withdrawn_at IS NULL;
+
+-- name: ListMembers :many
+-- 有効(active)なユーザーだけ。メンバー内公開(members)にした項目だけを返す（それ以外はNULL）。ログインID・個人情報は返さない。
+SELECT u.id, p.display_name,
+       p.bio AS bio, (vb.field_key IS NOT NULL)::bool AS bio_public,
+       p.faculty AS faculty, (vf.field_key IS NOT NULL)::bool AS faculty_public,
+       p.department AS department, (vd.field_key IS NOT NULL)::bool AS department_public,
+       p.school_year AS school_year, (vy.field_key IS NOT NULL)::bool AS school_year_public
+FROM users u
+JOIN profiles p ON p.user_id = u.id
+LEFT JOIN profile_field_visibility vb ON vb.user_id = u.id AND vb.field_key = 'bio' AND vb.visibility = 'members'
+LEFT JOIN profile_field_visibility vf ON vf.user_id = u.id AND vf.field_key = 'faculty' AND vf.visibility = 'members'
+LEFT JOIN profile_field_visibility vd ON vd.user_id = u.id AND vd.field_key = 'department' AND vd.visibility = 'members'
+LEFT JOIN profile_field_visibility vy ON vy.user_id = u.id AND vy.field_key = 'school_year' AND vy.visibility = 'members'
+WHERE u.status = 'active'
+  AND ($1::text = '' OR p.display_name ILIKE '%' || $1 || '%' ESCAPE '\')
+  AND (NOT $5::bool OR (p.display_name, u.id) > ($2::text, $3::uuid))
+ORDER BY p.display_name, u.id
+LIMIT $4;
+
+-- name: GetMember :one
+SELECT u.id, p.display_name,
+       p.bio AS bio, (vb.field_key IS NOT NULL)::bool AS bio_public,
+       p.faculty AS faculty, (vf.field_key IS NOT NULL)::bool AS faculty_public,
+       p.department AS department, (vd.field_key IS NOT NULL)::bool AS department_public,
+       p.school_year AS school_year, (vy.field_key IS NOT NULL)::bool AS school_year_public
+FROM users u
+JOIN profiles p ON p.user_id = u.id
+LEFT JOIN profile_field_visibility vb ON vb.user_id = u.id AND vb.field_key = 'bio' AND vb.visibility = 'members'
+LEFT JOIN profile_field_visibility vf ON vf.user_id = u.id AND vf.field_key = 'faculty' AND vf.visibility = 'members'
+LEFT JOIN profile_field_visibility vd ON vd.user_id = u.id AND vd.field_key = 'department' AND vd.visibility = 'members'
+LEFT JOIN profile_field_visibility vy ON vy.user_id = u.id AND vy.field_key = 'school_year' AND vy.visibility = 'members'
+WHERE u.id = $1 AND u.status = 'active';
+
+-- name: ListMemberLinks :many
+SELECT id, label, url, sort_order FROM profile_links WHERE user_id = $1 AND visibility = 'members' ORDER BY sort_order, id;
+
+-- name: ListMemberDevices :many
+SELECT id, category, name, specs_json, sort_order FROM personal_devices WHERE user_id = $1 AND visibility = 'members' ORDER BY sort_order, id;
+
+-- name: ClearPersonalProfile :execrows
+UPDATE personal_profiles SET legal_name = NULL, student_number = NULL, university_email = NULL, nearest_station = NULL, updated_at = now() WHERE user_id = $1;
+
+-- name: ClearProfileExtras :exec
+UPDATE profiles SET bio = NULL, faculty = NULL, department = NULL, school_year = NULL, updated_at = now() WHERE user_id = $1;
+
+-- name: DeleteAllProfileLinks :execrows
+DELETE FROM profile_links WHERE user_id = $1;
+
+-- name: DeleteAllPersonalDevices :execrows
+DELETE FROM personal_devices WHERE user_id = $1;
+
+-- name: DeleteAllFieldVisibility :execrows
+DELETE FROM profile_field_visibility WHERE user_id = $1;
+
+-- name: SetDisplayName :exec
+UPDATE profiles SET display_name = $2, updated_at = now() WHERE user_id = $1;
+
+-- name: WithdrawPublicCreditConsentByAdmin :execrows
+-- 管理者による個人情報削除に伴う撤回（対象と操作者が別）。
+UPDATE public_credit_consents SET withdrawn_at = $3, updated_by = $2
+WHERE user_id = $1 AND withdrawn_at IS NULL;
