@@ -1,0 +1,72 @@
+# ローカル開発用Compose（本番ではない。本番のNginx・TLS・secret管理はP4）。
+# 使い方: docs/LOCAL_DEV.md
+name: nu_app
+
+x-hardened: &hardened
+  restart: "no"
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  db:
+    image: postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc443676fc6c0fa90b9002d01537841e1a
+    <<: *hardened
+    # postgresイメージは初期化でユーザー切替を行うため、cap_dropは付けずno-new-privilegesのみ適用する。
+    cap_drop: []
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER を .env に設定してください}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB を .env に設定してください}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD を .env に設定してください}
+    volumes:
+      - db-data:/var/lib/postgresql
+    ports:
+      - "127.0.0.1:${DB_PORT:-15432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build: ../db
+    <<: *hardened
+    depends_on:
+      db: { condition: service_healthy }
+    command: ["postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:?}?sslmode=disable", "up"]
+
+  api:
+    build: ../services/api
+    <<: *hardened
+    read_only: true
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:?}?sslmode=disable
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+
+  bot:
+    build: ../services/bot
+    <<: *hardened
+    read_only: true
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  web:
+    build: ../apps/web
+    <<: *hardened
+    read_only: true
+    tmpfs: ["/tmp", "/var/cache/nginx"]
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8081}:8080"
+
+  admin:
+    build: ../apps/admin
+    <<: *hardened
+    read_only: true
+    tmpfs: ["/tmp"]
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-3000}:3000"
+
+volumes:
+  db-data:

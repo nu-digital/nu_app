@@ -1,0 +1,56 @@
+name: compose
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infrastructure/**'
+      - 'services/**'
+      - 'db/**'
+      - 'apps/**'
+      - 'scripts/compose-smoke.mjs'
+      - 'docs/legacy-baseline/inventory.json'
+      - 'package.json'
+      - '.env.example'
+      - '.github/workflows/compose.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'infrastructure/**'
+      - 'services/**'
+      - 'db/**'
+      - 'apps/**'
+      - 'scripts/compose-smoke.mjs'
+      - 'docs/legacy-baseline/inventory.json'
+      - 'package.json'
+      - '.env.example'
+      - '.github/workflows/compose.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compose-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: compose / smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      # .env.example が有効な設定であること（必須値が揃っている）
+      - run: docker compose --env-file .env.example -f infrastructure/compose.yaml config -q
+      # 必須値が無ければ起動を拒否すること
+      - run: |
+          if docker compose --env-file /dev/null -f infrastructure/compose.yaml config -q 2>/dev/null; then
+            echo "必須値なしでもComposeが通ってしまいました"; exit 1
+          fi
+      - run: npm run compose:smoke
