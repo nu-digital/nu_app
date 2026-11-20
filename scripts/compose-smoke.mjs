@@ -53,6 +53,49 @@ try {
   const b2 = boot('smoke.second');
   check('nuctl bootstrap-owner 2回目は拒否(終了コード3)', b2.status === 3 && !/^[A-Za-z0-9_-]{43}$/m.test(b2.stdout), `exit=${b2.status}`);
 
+  // 認証のE2E: 初期OwnerのtokenでパスワードURL受諾→ログイン→ユーザー作成→その招待を受諾→ログイン→停止→ログイン不可
+  {
+    const origin = 'http://127.0.0.1:3000'; // composeの既定APP_BASE_URL（許可Origin）
+    const call = async (method, path, { body, cookie, csrf, headers = {} } = {}) => {
+      const res = await fetch(`http://127.0.0.1:${api}/api/v1${path}`, {
+        method, redirect: 'manual',
+        headers: { 'content-type': 'application/json', origin, ...(cookie ? { cookie } : {}), ...(csrf ? { 'x-csrf-token': csrf } : {}), ...headers },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const text = await res.text();
+      return { status: res.status, json: text ? JSON.parse(text) : null, setCookie: res.headers.getSetCookie?.() ?? [] };
+    };
+    const ownerTok = b1.stdout.split('\n').map(l => l.trim()).find(l => /^[A-Za-z0-9_-]{43}$/.test(l));
+    const pw = 'smoke-passphrase-owner-1', pw2 = 'smoke-passphrase-member-2';
+    let x = await call('POST', '/auth/accept-invite', { body: { token: ownerTok, password: pw } });
+    check('E2E 初期Ownerが招待tokenでパスワードを設定', x.status === 204, `status=${x.status}`);
+    x = await call('POST', '/auth/login', { body: { loginId: 'smoke.owner', password: pw } });
+    const cookie = (x.setCookie[0] ?? '').split(';')[0];
+    check('E2E Ownerがログインでき、セッションCookieとcsrfTokenを得る', x.status === 200 && cookie.startsWith('nu_session=') && !!x.json?.csrfToken, `status=${x.status}`);
+    const csrf = x.json?.csrfToken;
+    x = await call('POST', '/admin/users', { body: { loginId: 'smoke.member', displayName: 'スモーク会員(架空)' }, cookie, csrf });
+    const invite = x.json?.url?.split('#token=')[1];
+    check('E2E Ownerがユーザーを作成し招待URL（フラグメント）を得る', x.status === 201 && !!invite && x.json.url.includes('/invite#token='), `status=${x.status}`);
+    x = await call('POST', '/admin/users', { body: { loginId: 'smoke.member2', displayName: 'x' }, cookie });
+    check('E2E CSRFトークン無しの管理操作は403', x.status === 403, `status=${x.status}`);
+    x = await call('POST', '/auth/accept-invite', { body: { token: invite, password: pw2 } });
+    check('E2E 作成したユーザーが招待を受諾', x.status === 204, `status=${x.status}`);
+    x = await call('POST', '/auth/login', { body: { loginId: 'smoke.member', password: pw2 } });
+    const mcookie = (x.setCookie[0] ?? '').split(';')[0];
+    check('E2E 作成したユーザーがログインできる', x.status === 200 && !!mcookie, `status=${x.status}`);
+    x = await call('POST', '/admin/users', { body: { loginId: 'smoke.nope', displayName: 'x' }, cookie: mcookie, csrf: x.json?.csrfToken });
+    check('E2E 一般メンバーの管理操作は403', x.status === 403, `status=${x.status}`);
+    const memberId = (await call('GET', '/auth/me', { cookie: mcookie })).json?.user?.id;
+    x = await call('PATCH', `/admin/users/${memberId}/status`, { body: { status: 'disabled' }, cookie, csrf });
+    check('E2E Ownerがユーザーを停止', x.status === 200 && x.json?.status === 'disabled', `status=${x.status}`);
+    x = await call('GET', '/auth/me', { cookie: mcookie });
+    check('E2E 停止後、既存セッションは使えない', x.status === 401, `status=${x.status}`);
+    x = await call('POST', '/auth/login', { body: { loginId: 'smoke.member', password: pw2 } });
+    check('E2E 停止後はログインできない', x.status === 401, `status=${x.status}`);
+    x = await call('POST', '/auth/login', { body: { loginId: 'smoke.owner', password: pw }, headers: { origin: 'https://evil.example' } });
+    check('E2E 他のOriginからのログインは403', x.status === 403, `status=${x.status}`);
+  }
+
   const stopDb = compose('stop', 'db');
   check('db停止', stopDb.status === 0);
   r = await get(api, '/readyz'); check('DB停止後 api /readyz は503', r?.status === 503);

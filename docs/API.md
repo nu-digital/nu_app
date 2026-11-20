@@ -24,6 +24,22 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | GET | `/owner/transfers/incoming` | Member | 自分宛のpending申請の確認 |
 | POST | `/owner/transfers/{id}/accept` | 移譲先ユーザー本人 | 承諾。単一トランザクションでOwner付与・旧OwnerをAdminへ。期限切れ/取消済みは409 |
 
+**P1-02で実装済みの契約（暫定仕様を含む。[認証設計](design/p1-02-auth.md)）**
+
+| エンドポイント | 要求 | 成功応答 | 主なエラー |
+|---|---|---|---|
+| `POST /auth/login` | `{loginId,password}` | 200 `{user:{id,loginId,displayName,roles},csrfToken,sessionExpiresAt}` + Cookie | 401 `INVALID_CREDENTIALS`（理由を区別しない）、429 `RATE_LIMITED`（`Retry-After`）、503 `SERVICE_BUSY` |
+| `POST /auth/logout` | – | 204（Cookie削除） | 401、403 `CSRF_FAILED` |
+| `GET /auth/me` | – | 200（loginと同形式） | 401 |
+| `POST /auth/accept-invite` | `{token,password}` | 204（自動ログインしない） | 400 `INVALID_LINK`（無効/期限切れ/使用済み/失効を区別しない）、422 `WEAK_PASSWORD` |
+| `POST /auth/reset-password` | `{token,password}` | 204（全セッション失効） | 同上 |
+| `POST /admin/users` | `{loginId,displayName}` | 201 `{user,url,expiresAt}`（`url`=`<APP_BASE_URL>/invite#token=…`、一度だけ） | 409 `LOGIN_ID_TAKEN`、422 |
+| `POST /admin/users/{id}/invite-link` | – | 200 `{url,expiresAt}`（invitedのみ） | 409 `INVALID_STATE`・`CONFLICT` |
+| `POST /admin/users/{id}/reset-link` | – | 200 `{url,expiresAt}`（activeのみ。管理者対象はOwnerのみ） | 403、409 |
+| `PATCH /admin/users/{id}/status` | `{status:"disabled"\|"active"}` | 200 `{id,loginId,status}` | 409 `CANNOT_DISABLE_SELF`・`LAST_OWNER`、403 |
+
+状態変更は`Origin`（または`Referer`）が許可オリジンと一致し、認証済みの場合は`X-CSRF-Token`（`/auth/me`・ログイン応答の`csrfToken`）が必要。Cookieは`HttpOnly; Secure; SameSite=Lax`（Secure時は`__Host-nu_session`）。
+
 **注意:** リセット申請そのものを匿名APIで受け付ける必要はない。本人は運営者へ連絡し、AdminがURLを発行する。初期Ownerの作成と**緊急復旧（D05）は公開APIに設けず管理CLIのみ**。CLIは運用責任者の本人確認と明示承認の下でVPS上で実行し、GitHub Actionsのデプロイ手順から呼べない。実行時に対象のセッションを全失効し監査に残す。最後のOwnerを失う操作は、API・CLIとも拒否する。
 
 ## 2. メンバー・プロフィール
