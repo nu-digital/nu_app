@@ -1,0 +1,32 @@
+name: 実装・調査タスク
+description: 一つのPRで受け入れ可能な作業
+title: ""
+body:
+  - type: textarea
+    id: scope
+    attributes:
+      label: 目的・対象要件・非対象
+      description: docsのPhaseと要件、今回やらない範囲を記載
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 影響範囲・DB変更・API変更
+      description: 変更なしも明記。依存Issueと未決定事項のIDを記載
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 受け入れ条件と必要なテスト
+      description: 操作・期待結果・失敗系・実行コマンド。UIはPCとスマホも
+    validations:
+      required: true
+  - type: textarea
+    id: rollback
+    attributes:
+      label: 切り戻しの考え方
+      description: イメージ復帰とDB復元を区別
+    validations:
+      required: true

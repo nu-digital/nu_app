@@ -1,0 +1,23 @@
+name: 不具合
+description: 架空データで再現できる不具合報告
+body:
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 再現手順・期待結果・実際の結果
+      description: token・招待URL・実ユーザー情報を貼らない
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 環境・影響範囲
+      description: バージョン、端末、影響する機能。公開Issueへ脆弱性の悪用手順を投稿しない
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: 修正確認に必要なテスト
+    validations:
+      required: true
