@@ -74,6 +74,8 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("POST /auth/login", s.login)
 	mux.HandleFunc("POST /auth/logout", s.logout)
 	mux.HandleFunc("GET /auth/me", s.me)
+	mux.HandleFunc("POST /auth/accept-invite", s.acceptInvite)
+	mux.HandleFunc("POST /auth/reset-password", s.resetPassword)
 	// 未定義のパス・メソッドはJSONの404/405
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, http.StatusNotFound, "NOT_FOUND", "見つかりません")
