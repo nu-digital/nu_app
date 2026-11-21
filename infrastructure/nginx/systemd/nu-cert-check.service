@@ -1,0 +1,9 @@
+[Unit]
+Description=nu_app TLS証明書の期限確認（D03）
+After=network-online.target nginx.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/nu_app/backup.env
+Environment=PROBE_HOSTS=nu-digital.jp:443 app.nu-digital.jp:443
+ExecStart=/srv/nu_app/infrastructure/nginx/cert-check.sh

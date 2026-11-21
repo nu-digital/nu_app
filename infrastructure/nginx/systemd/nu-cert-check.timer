@@ -1,0 +1,9 @@
+[Unit]
+Description=nu_app TLS証明書の期限確認を毎日実行する
+
+[Timer]
+OnCalendar=*-*-* 09:00:00 Asia/Tokyo
+Persistent=true
+
+[Install]
+WantedBy=timers.target
