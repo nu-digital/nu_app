@@ -53,6 +53,18 @@ func (q *Queries) ConsumeToken(ctx context.Context, arg ConsumeTokenParams) (Con
 	return i, err
 }
 
+const countActiveOwnersExcept = `-- name: CountActiveOwnersExcept :one
+SELECT count(*) FROM user_roles r JOIN users u ON u.id = r.user_id
+WHERE r.role = 'owner' AND u.status = 'active' AND u.id <> $1
+`
+
+func (q *Queries) CountActiveOwnersExcept(ctx context.Context, id pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveOwnersExcept, id)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createSession = `-- name: CreateSession :one
 INSERT INTO sessions (user_id, token_hash, expires_at)
 VALUES ($1, $2, $3)
@@ -153,6 +165,35 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	return i, err
 }
 
+const getUserForUpdate = `-- name: GetUserForUpdate :one
+SELECT id, login_id, status, created_at, activated_at, disabled_at FROM users WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) GetUserForUpdate(ctx context.Context, id pgtype.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, getUserForUpdate, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.LoginID,
+		&i.Status,
+		&i.CreatedAt,
+		&i.ActivatedAt,
+		&i.DisabledAt,
+	)
+	return i, err
+}
+
+const hasPassword = `-- name: HasPassword :one
+SELECT EXISTS (SELECT 1 FROM password_credentials WHERE user_id = $1)
+`
+
+func (q *Queries) HasPassword(ctx context.Context, userID pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, hasPassword, userID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const listUserRoles = `-- name: ListUserRoles :many
 SELECT role FROM user_roles WHERE user_id = $1 ORDER BY role
 `
@@ -170,6 +211,31 @@ func (q *Queries) ListUserRoles(ctx context.Context, userID pgtype.UUID) ([]stri
 			return nil, err
 		}
 		items = append(items, role)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockOwnerRows = `-- name: LockOwnerRows :many
+SELECT user_id FROM user_roles WHERE role = 'owner' ORDER BY user_id FOR UPDATE
+`
+
+// Owner行をロックする。Ownerの停止・降格を直列化し、「最後のOwner」の判定を競合から守る。
+func (q *Queries) LockOwnerRows(ctx context.Context) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, lockOwnerRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var user_id pgtype.UUID
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -250,6 +316,29 @@ UPDATE sessions SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS N
 
 func (q *Queries) RevokeSessionByTokenHash(ctx context.Context, tokenHash []byte) error {
 	_, err := q.db.Exec(ctx, revokeSessionByTokenHash, tokenHash)
+	return err
+}
+
+const setUserDisabled = `-- name: SetUserDisabled :exec
+UPDATE users SET status = 'disabled', disabled_at = now() WHERE id = $1
+`
+
+func (q *Queries) SetUserDisabled(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, setUserDisabled, id)
+	return err
+}
+
+const setUserEnabled = `-- name: SetUserEnabled :exec
+UPDATE users SET status = $2, disabled_at = NULL WHERE id = $1
+`
+
+type SetUserEnabledParams struct {
+	ID     pgtype.UUID
+	Status string
+}
+
+func (q *Queries) SetUserEnabled(ctx context.Context, arg SetUserEnabledParams) error {
+	_, err := q.db.Exec(ctx, setUserEnabled, arg.ID, arg.Status)
 	return err
 }
 

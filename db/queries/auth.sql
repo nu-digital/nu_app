@@ -59,3 +59,23 @@ SELECT t.user_id, u.login_id, u.status
 FROM one_time_tokens t
 JOIN users u ON u.id = t.user_id
 WHERE t.token_hash = $1 AND t.purpose = $2 AND t.used_at IS NULL AND t.revoked_at IS NULL AND t.expires_at > $3;
+
+-- name: LockOwnerRows :many
+-- Owner行をロックする。Ownerの停止・降格を直列化し、「最後のOwner」の判定を競合から守る。
+SELECT user_id FROM user_roles WHERE role = 'owner' ORDER BY user_id FOR UPDATE;
+
+-- name: GetUserForUpdate :one
+SELECT * FROM users WHERE id = $1 FOR UPDATE;
+
+-- name: CountActiveOwnersExcept :one
+SELECT count(*) FROM user_roles r JOIN users u ON u.id = r.user_id
+WHERE r.role = 'owner' AND u.status = 'active' AND u.id <> $1;
+
+-- name: SetUserDisabled :exec
+UPDATE users SET status = 'disabled', disabled_at = now() WHERE id = $1;
+
+-- name: SetUserEnabled :exec
+UPDATE users SET status = $2, disabled_at = NULL WHERE id = $1;
+
+-- name: HasPassword :one
+SELECT EXISTS (SELECT 1 FROM password_credentials WHERE user_id = $1);

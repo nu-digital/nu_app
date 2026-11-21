@@ -35,6 +35,9 @@ type Deps struct {
 	Limiter  *ratelimit.Limiter
 	Log      *slog.Logger
 	Now      func() time.Time
+
+	// BeforeOwnerCount はテスト専用のフック（本番ではnil）。最後のOwnerの判定の直前に呼ばれ、競合を再現するために使う。
+	BeforeOwnerCount func()
 }
 
 type server struct {
@@ -76,6 +79,10 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("GET /auth/me", s.me)
 	mux.HandleFunc("POST /auth/accept-invite", s.acceptInvite)
 	mux.HandleFunc("POST /auth/reset-password", s.resetPassword)
+	mux.HandleFunc("POST /admin/users", s.createUser)
+	mux.HandleFunc("POST /admin/users/{id}/invite-link", s.inviteLink)
+	mux.HandleFunc("POST /admin/users/{id}/reset-link", s.resetLink)
+	mux.HandleFunc("PATCH /admin/users/{id}/status", s.setStatus)
 	// 未定義のパス・メソッドはJSONの404/405
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, http.StatusNotFound, "NOT_FOUND", "見つかりません")

@@ -35,6 +35,8 @@ const (
 var fastParams = password.Params{MemoryKiB: 64, Time: 1, Threads: 1, SaltLen: 16, KeyLen: 32}
 
 type env struct {
+	hook    func()
+	cfg     config.Config
 	t       *testing.T
 	pool    *pgxpool.Pool
 	h       http.Handler
@@ -60,15 +62,20 @@ func newEnv(t *testing.T, o opts) *env {
 	if o.secure != nil {
 		secure = *o.secure
 	}
-	cfg := config.Config{AppBaseURL: origin, AllowedOrigin: origin, SecureCookies: secure, TrustedProxies: o.trusted}
-	e.h = api.New(api.Deps{
-		Pool: pool, Cfg: cfg,
-		Sessions: session.New(pool, session.DefaultConfig).WithClock(func() time.Time { return *e.clock }),
-		Hasher:   e.hasher, Limiter: e.limiter,
-		Log: slog.New(slog.NewTextHandler(e.logs, nil)),
-		Now: func() time.Time { return *e.clock },
-	})
+	e.cfg = config.Config{AppBaseURL: origin, AllowedOrigin: origin, SecureCookies: secure, TrustedProxies: o.trusted}
+	e.h = e.build()
 	return e
+}
+
+func (e *env) build() http.Handler {
+	return api.New(api.Deps{
+		Pool: e.pool, Cfg: e.cfg,
+		Sessions: session.New(e.pool, session.DefaultConfig).WithClock(func() time.Time { return *e.clock }),
+		Hasher:   e.hasher, Limiter: e.limiter,
+		Log:              slog.New(slog.NewTextHandler(e.logs, nil)),
+		Now:              func() time.Time { return *e.clock },
+		BeforeOwnerCount: e.hook,
+	})
 }
 
 func (e *env) addUser(loginID, status, pass string, roles ...string) {
