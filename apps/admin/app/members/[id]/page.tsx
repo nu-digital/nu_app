@@ -38,7 +38,10 @@ function Detail() {
           {m.devices && m.devices.length > 0 && (
             <section><h2>機材</h2><ul className="plain">{m.devices.map((d) => (<li key={d.id}><strong>{d.name}</strong>（{d.category}）{d.spec && <span className="user-id"> {d.spec}</span>}</li>))}</ul></section>
           )}
-          {!m.bio && !m.faculty && !m.department && !m.schoolYear && !(m.links?.length) && !(m.devices?.length) && <p className="hint">公開されている情報はまだありません。</p>}
+          {m.works && m.works.length > 0 && (
+            <section><h2>制作実績</h2><ul className="plain" data-testid="works">{m.works.map((w) => (<li key={`${w.section}/${w.slug}`}><strong>{w.title}</strong> <span className="user-id">{w.roles.join("・")}</span></li>))}</ul></section>
+          )}
+          {!m.bio && !m.faculty && !m.department && !m.schoolYear && !(m.links?.length) && !(m.devices?.length) && !(m.works?.length) && <p className="hint">公開されている情報はまだありません。</p>}
         </>
       )}
     </main>

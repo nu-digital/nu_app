@@ -745,6 +745,151 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] 無関係なメンバーの一覧に、他人の下書きが出ない`, (await xp.locator(`li.item[data-slug="${slug}"]`).count()) === 0);
       await wctx.close(); await ectx.close(); await xctx.close();
     }
+    // 記事・作品（CMS）その2: 画像・共同編集者・制作メンバーと公開同意による匿名化（PC・スマホ・320px）
+    for (const [label, width, height] of [['pc', 1440, 900], ['sp', 390, 844], ['narrow', 320, 640]]) {
+      const { randomBytes } = await import('node:crypto');
+      const zlib = await import('node:zlib');
+      const chunk = (type, data) => {
+        const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+        const crc = Buffer.alloc(4); crc.writeUInt32BE(zlib.crc32(Buffer.concat([Buffer.from(type), data])) >>> 0);
+        return Buffer.concat([len, Buffer.from(type), data, crc]);
+      };
+      const png = (w, h) => {
+        const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+        const raw = Buffer.alloc((w * 3 + 1) * h);
+        for (let y = 0; y < h; y++) randomBytes(w * 3).copy(raw, y * (w * 3 + 1) + 1);
+        return Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+      };
+      const own = { cookie: o.ownerCookie, csrf: o.ownerCsrf };
+      const pw = 'ui-cms2-passphrase-1';
+      const ids = {};
+      const mk = async (key, name, role) => {
+        const loginId = `ui.${label}.c2${key}`;
+        const c = await o.apiCall('POST', '/admin/users', { body: { loginId, displayName: name }, ...own });
+        await o.apiCall('POST', '/auth/accept-invite', { body: { token: c.json.url.split('#token=')[1], password: pw } });
+        if (role) await o.apiCall('PUT', `/admin/users/${c.json.user.id}/editor-role`, { body: { enabled: true }, ...own });
+        const x = await o.apiCall('POST', '/auth/login', { body: { loginId, password: pw } });
+        ids[key] = { loginId, name, userId: c.json.user.id, cookie: (x.setCookie[0] ?? '').split(';')[0], csrf: x.json.csrfToken };
+      };
+      await mk('w', `執筆者2(${label})`);
+      await mk('e', `編集者2(${label})`, true);
+      await mk('k', `共同候補(${label})`);
+      await mk('a', `制作者A(${label})`);
+      await mk('b', `制作者B(${label})`);
+      const asUser = (u) => ({ cookie: u.cookie, csrf: u.csrf });
+      const mkContent = async (body) => (await o.apiCall('POST', '/contents', { body, ...asUser(ids.w) })).json.id;
+      const newCtx = async (u) => { const c = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' }); const p = await c.newPage(); await login(p, u.loginId, pw); return [c, p]; };
+      const anon = (path) => fetch(`${adminUrl}${path}`);
+
+      // --- 画像 ---
+      const aid = await mkContent({ type: 'article', section: 'blog', slug: `ui-img-${label}`, title: `画像の記事(${label})`, markdown: '' });
+      const [wc, wp] = await newCtx(ids.w);
+      const [ec, ep] = await newCtx(ids.e);
+      await wp.goto(`${adminUrl}/contents/${aid}`);
+      await wp.getByRole('heading', { level: 1, name: `画像の記事(${label})` }).waitFor();
+      await wp.locator('#e-file').setInputFiles({ name: 'fake.png', mimeType: 'image/png', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>') });
+      await wp.locator('.notice.error').filter({ hasText: 'JPEG・PNG・WebP' }).waitFor();
+      check(`[${label}] 画像でないファイル（SVG）は、拒否の案内が出て、アップロード一覧に出ない`, (await wp.locator('[data-testid="uploads"]').count()) === 0);
+      await wp.locator('#e-file').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: png(40, 30) });
+      await wp.locator('.notice.success').filter({ hasText: '画像をアップロードしました（40×30）' }).waitFor();
+      await wp.getByRole('button', { name: '本文に挿入' }).click();
+      const mdVal = await wp.getByLabel('本文（Markdown）').inputValue();
+      const inlineUrl = (mdVal.match(/\(\/api\/v1\/public\/media\/([A-Za-z0-9_-]{22})\)/) ?? [])[1];
+      check(`[${label}] アップロードした画像を本文に挿入できる（画像のURLが入る）`, !!inlineUrl);
+      await wp.getByRole('button', { name: 'カバーにする' }).click();
+      await wp.locator('[data-testid="cover"] img').waitFor();
+      const cover = await wp.locator('[data-testid="cover"] img').evaluate((el) => new Promise((r) => { if (el.complete) r(el.naturalWidth); else el.onload = () => r(el.naturalWidth); }));
+      check(`[${label}] カバー画像が（認証つきの経路で）表示される`, cover === 40, `naturalWidth=${cover}`);
+      if (width < 1100) await wp.getByRole('tab', { name: 'プレビュー' }).click();
+      await wp.locator('[data-testid="preview"] img').first().waitFor();
+      const pv = await wp.locator('[data-testid="preview"] img').first().evaluate((el) => new Promise((r) => { const done = () => r({ w: el.naturalWidth, src: el.getAttribute('src') }); if (el.complete) done(); else el.onload = done; }));
+      check(`[${label}] プレビューに、下書きの画像が認証つきの経路で表示される（公開URLのままでは匿名に出ない）`, pv.w === 40 && pv.src === `/api/v1/media/by-public/${inlineUrl}`, JSON.stringify(pv));
+      if (width < 1100) await wp.getByRole('tab', { name: '編集' }).click();
+      check(`[${label}] 画像の欄に横溢れがない・操作対象が44px以上`, (await overflowOf(wp)) <= 0 && (await smallOf(wp)) === 0, `overflow=${await overflowOf(wp)} small=${await smallOf(wp)}`);
+      if (o.shotsDir) await wp.screenshot({ path: join(o.shotsDir, `${label}-cms-images.png`), fullPage: true });
+      await wp.getByRole('button', { name: '保存する' }).click();
+      await wp.locator('.notice.success').filter({ hasText: '保存しました' }).waitFor();
+      await wp.reload();
+      await wp.locator('[data-testid="cover"] img').waitFor();
+      check(`[${label}] 保存して読み込み直しても、カバー画像と本文の画像が保たれる`, (await wp.getByLabel('本文（Markdown）').inputValue()).includes(inlineUrl));
+      check(`[${label}] 公開前は、画像は匿名に配信されない`, (await anon(`/api/v1/public/media/${inlineUrl}`)).status === 404);
+      await ep.goto(`${adminUrl}/contents/${aid}`);
+      await ep.getByRole('button', { name: /を公開する/ }).waitFor();
+      ep.once('dialog', (d) => d.accept());
+      await ep.getByRole('button', { name: /を公開する/ }).click();
+      await ep.locator('.notice.success').filter({ hasText: '公開しました' }).waitFor();
+      const detail = await (await anon(`/api/v1/public/contents/blog/ui-img-${label}`)).json();
+      const coverId = detail.coverUrl?.split('/').pop();
+      check(`[${label}] 公開後は、本文の画像とカバー画像が匿名に配信される（公開APIにはカバーのURLだけが出る）`, (await anon(`/api/v1/public/media/${inlineUrl}`)).status === 200 && !!coverId && (await anon(detail.coverUrl)).status === 200 && !JSON.stringify(detail).includes('"id"'));
+      ep.once('dialog', (d) => d.accept());
+      await ep.reload();
+      await ep.getByRole('button', { name: '公開を止める' }).click();
+      await ep.locator('.notice.success').filter({ hasText: '公開を止めました' }).waitFor();
+      check(`[${label}] 公開を止めると、画像もすぐ匿名に配信されなくなる`, (await anon(`/api/v1/public/media/${inlineUrl}`)).status === 404);
+
+      // --- 共同編集者 ---
+      await wp.getByLabel('共同編集者を追加する').fill(`共同候補(${label})`);
+      await wp.getByRole('button', { name: '探す' }).first().click();
+      await wp.getByRole('button', { name: `共同候補(${label})さんを追加` }).click();
+      await wp.locator('.notice.success').filter({ hasText: '共同編集者に追加しました' }).waitFor();
+      check(`[${label}] 共同編集者を追加すると一覧に出る`, (await wp.locator('[data-testid="collaborators"] [data-person]').count()) === 1);
+      const [kc, kp] = await newCtx(ids.k);
+      await kp.goto(`${adminUrl}/contents/${aid}`);
+      await kp.getByRole('heading', { level: 1, name: `画像の記事(${label})` }).waitFor();
+      check(`[${label}] 共同編集者は編集画面を開けるが、共同編集者の変更欄と公開ボタンは出ない`, (await kp.getByLabel('共同編集者を追加する').count()) === 0 && (await kp.getByRole('button', { name: /を公開する/ }).count()) === 0 && /変更できるのは作者と編集者/.test(await kp.locator('main').innerText()));
+      await kp.getByLabel('タイトル（必須）').fill(`画像の記事(${label})・共同編集`);
+      await kp.getByRole('button', { name: '保存する' }).click();
+      await kp.locator('.notice.success').filter({ hasText: '保存しました' }).waitFor();
+      check(`[${label}] 共同編集者は本文を保存できる`, true);
+      await wp.getByRole('button', { name: `共同候補(${label})さんを外す` }).click();
+      await wp.locator('.notice.success').filter({ hasText: '外しました' }).waitFor();
+      await kp.reload();
+      await kp.locator('.notice.error').waitFor();
+      check(`[${label}] 外された共同編集者には、編集画面が開かない`, /見つからない/.test(await kp.locator('.notice.error').innerText()));
+      await kc.close();
+
+      // --- 制作メンバーと公開同意による匿名化 ---
+      const pid = await mkContent({ type: 'project', section: 'project', slug: `ui-work-${label}`, title: `作品の記事(${label})`, markdown: '作品の本文' });
+      await wp.goto(`${adminUrl}/contents/${pid}`);
+      await wp.getByRole('heading', { level: 1, name: `作品の記事(${label})` }).waitFor();
+      check(`[${label}] 作品の編集画面に制作メンバーの欄があり、公開同意の説明（匿名のメンバー）が出る`, /匿名のメンバー/.test(await wp.locator('#contrib-title').locator('xpath=..').innerText()) && (await wp.getByRole('button', { name: '制作メンバーを保存する' }).isDisabled()));
+      for (const [key, role] of [['a', '企画'], ['b', '音楽']]) {
+        await wp.getByLabel('制作メンバーを追加する').fill(ids[key].name);
+        await wp.locator('.picker').last().getByRole('button', { name: '探す' }).click();
+        await wp.getByRole('button', { name: `${ids[key].name}さんを追加` }).click();
+        await wp.getByLabel(`${ids[key].name}さんの役割`).fill(role);
+      }
+      await wp.getByRole('button', { name: '制作メンバーを保存する' }).click();
+      await wp.locator('.notice.success').filter({ hasText: '制作メンバーを保存しました（版2）' }).waitFor();
+      check(`[${label}] 制作メンバーを保存すると新しい版（版2）になる`, (await wp.locator('[data-testid="contributors"] [data-person]').count()) === 2);
+      if (o.shotsDir) await wp.screenshot({ path: join(o.shotsDir, `${label}-cms-contributors.png`), fullPage: true });
+      await ep.goto(`${adminUrl}/contents/${pid}`);
+      await ep.getByRole('button', { name: '版2を公開する' }).waitFor();
+      ep.once('dialog', (d) => d.accept());
+      await ep.getByRole('button', { name: '版2を公開する' }).click();
+      await ep.locator('.notice.success').filter({ hasText: '版2を公開しました' }).waitFor();
+      const credits = async () => (await (await anon(`/api/v1/public/contents/project/ui-work-${label}`)).json()).contributors.map((c) => `${c.displayName}:${c.roleLabel}`).join(',');
+      check(`[${label}] 同意していない制作メンバーは、公開サイトで「匿名のメンバー」と出る（役割は出る）`, (await credits()) === '匿名のメンバー:企画,匿名のメンバー:音楽', await credits());
+      await o.apiCall('PUT', '/me/profile/public-credit-consent', { body: { granted: true }, ...asUser(ids.a) });
+      check(`[${label}] 本人が公開に同意すると、再公開しなくても公開サイトに名前が出る（同意していない人は匿名のまま）`, (await credits()) === `${ids.a.name}:企画,匿名のメンバー:音楽`, await credits());
+      // プロフィールの制作実績: 本人には常に、他のメンバーには同意が続く間だけ
+      const [ac, ap] = await newCtx(ids.a);
+      await ap.goto(`${adminUrl}/profile`);
+      await ap.locator('[data-testid="works"] li').first().waitFor();
+      check(`[${label}] 本人のプロフィールに、公開された作品が制作実績として出る（役割つき）`, /作品の記事/.test(await ap.locator('[data-testid="works"]').innerText()) && /企画/.test(await ap.locator('[data-testid="works"]').innerText()));
+      await wp.goto(`${adminUrl}/members/${ids.a.userId}`);
+      await wp.locator('[data-testid="works"] li').first().waitFor();
+      check(`[${label}] 同意が続いている間は、他のメンバーにも制作実績が見える`, /作品の記事/.test(await wp.locator('[data-testid="works"]').innerText()));
+      await o.apiCall('PUT', '/me/profile/public-credit-consent', { body: { granted: false }, ...asUser(ids.a) });
+      check(`[${label}] 同意を取り消すと、公開サイトの名前はすぐ匿名に戻る`, (await credits()) === '匿名のメンバー:企画,匿名のメンバー:音楽', await credits());
+      await wp.reload();
+      await wp.getByRole('heading', { level: 1 }).waitFor();
+      check(`[${label}] 同意を取り消すと、他のメンバーからは制作実績が見えなくなる（本人には見える）`, (await wp.locator('[data-testid="works"]').count()) === 0);
+      await ap.reload();
+      await ap.locator('[data-testid="works"] li').first().waitFor();
+      check(`[${label}] 制作実績の表示に横溢れがない`, (await overflowOf(ap)) <= 0, `overflow=${await overflowOf(ap)}`);
+      await ac.close(); await wc.close(); await ec.close();
+    }
     // 権限が無い人（一般メンバー）にはAPIが拒否し、画面は案内を表示する
     {
       const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });

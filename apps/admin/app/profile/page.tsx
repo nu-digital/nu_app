@@ -77,10 +77,26 @@ function Profile() {
       <LinksSection p={p} busy={busy} run={run} />
       <DevicesSection p={p} busy={busy} run={run} />
 
+      <section className="panel" aria-labelledby="works-title">
+        <h2 id="works-title">制作実績</h2>
+        {p.works.length === 0 ? (
+          <p className="hint">公開された作品で、制作メンバーとして登録されたものがここに出ます。まだありません。</p>
+        ) : (
+          <ul className="plain" data-testid="works">
+            {p.works.map((w) => (
+              <li key={`${w.section}/${w.slug}`}>
+                <strong>{w.title}</strong> <span className="user-id">{w.roles.join("・")}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="hint">他のメンバーには、上の「インターネットへの公開」に同意している間だけ、この一覧が見えます。</p>
+      </section>
+
       <section className="panel" aria-labelledby="consent-title">
         <h2 id="consent-title">インターネットへの公開（公開クレジット）</h2>
         <p>
-          作品などの制作メンバーとして、あなたの名前を<strong>インターネット上の公式サイトに載せてよいか</strong>を決めます。上の「メンバーに公開」とは別の設定です。いつでも取り消せます。取り消すと、公式サイトでの表示は「退会メンバー」などに置き換わります。
+          作品などの制作メンバーとして、あなたの名前を<strong>インターネット上の公式サイトに載せてよいか</strong>を決めます。上の「メンバーに公開」とは別の設定です。いつでも取り消せます。取り消すと、公式サイトでの表示は「匿名のメンバー」に置き換わります（役割だけが残ります）。同意していない間も、同じく「匿名のメンバー」と表示されます。
         </p>
         <p>
           現在: <strong>{p.publicCreditConsent.granted ? "同意しています" : "同意していません"}</strong>

@@ -188,3 +188,12 @@ select.input { padding: 0 var(--space-3); }
 .preview details { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-2) var(--space-3); margin: var(--space-3) 0; }
 .preview .embed { position: relative; aspect-ratio: 16 / 9; margin: var(--space-4) 0; }
 .preview .embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+/* 画像・共同編集者・制作メンバー */
+.cover { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; margin: var(--space-3) 0; }
+.cover img, .preview-cover { max-width: 100%; height: auto; max-height: 240px; object-fit: contain; border: 1px solid var(--color-border); border-radius: var(--radius); }
+.thumb-sm { width: 64px; height: 64px; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--color-border); }
+.picker .actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: stretch; }
+.picker .actions .input { flex: 1 1 200px; }
+.items .grow { flex: 1 1 auto; min-width: 0; }
+.editor input[type="file"] { display: block; width: 100%; min-height: var(--tap); box-sizing: border-box; padding: var(--space-2) 0; font: inherit; }
