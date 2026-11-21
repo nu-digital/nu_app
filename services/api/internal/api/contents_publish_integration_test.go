@@ -24,9 +24,9 @@ func (e *env) events(id, typ string) int {
 }
 
 type pubItem struct {
-	Type, Section, Slug, Title, Summary string
-	Metadata                            map[string]string
-	Date                                struct {
+	Type, Section, Slug, Title, Summary, Author string
+	Metadata                                    map[string]string
+	Date                                        struct {
 		Label               string
 		Kind                string
 		SortDate            *string
@@ -218,7 +218,7 @@ func TestPublishRechecksMarkdownAndUnpublish(t *testing.T) {
 func TestPublicAPIServesOnlyThePublishedRevision(t *testing.T) {
 	e, as := cmsSetup(t)
 	// 公開前は一覧にも詳細にも出ない。存在しないものと同じ404
-	_, v := e.createContent(as.editor, `{"type":"article","section":"blog","slug":"My.Post_v1","title":"公開する記事","summary":"要約","markdown":"## 本文\n\n![x](/images/a.webp)","metadata":{"category":"Blog","author":"yurarara","sourceId":"blog/x","sourceUrl":"https://example.com/src"},"date":{"label":"2025年12月","kind":"month","sortDate":"2025-12-01"}}`)
+	_, v := e.createContent(as.editor, `{"type":"article","section":"blog","slug":"My.Post_v1","title":"公開する記事","summary":"要約","markdown":"## 本文\n\n![x](/images/a.webp)","metadata":{"category":"Blog","sourceId":"blog/x","sourceUrl":"https://example.com/src"},"date":{"label":"2025年12月","kind":"month","sortDate":"2025-12-01"}}`)
 	_, draft := e.createContent(as.author, article("only-draft"))
 	if rec := e.pub(""); rec.Code != 200 || strings.Contains(rec.Body.String(), "公開する記事") {
 		t.Errorf("公開前の一覧: %d %s", rec.Code, rec.Body.String())
@@ -234,7 +234,7 @@ func TestPublicAPIServesOnlyThePublishedRevision(t *testing.T) {
 		t.Fatal(code)
 	}
 	code, d, body := e.pubDetail("blog", "My.Post_v1") // 大文字・ドットを含むslugも、そのまま
-	if code != 200 || d.Title != "公開する記事" || d.Slug != "My.Post_v1" || d.Metadata["category"] != "Blog" || d.Metadata["author"] != "yurarara" || d.Date.Label != "2025年12月" || d.Date.Kind != "month" || !d.Date.SortDateIsEstimated {
+	if code != 200 || d.Title != "公開する記事" || d.Slug != "My.Post_v1" || d.Metadata["category"] != "Blog" || d.Author != "nu_digital" || d.Metadata["author"] != "" || d.Date.Label != "2025年12月" || d.Date.Kind != "month" || !d.Date.SortDateIsEstimated {
 		t.Fatalf("公開版: %d %s", code, body)
 	}
 	// 内部の情報を出さない

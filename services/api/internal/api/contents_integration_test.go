@@ -165,18 +165,18 @@ func TestContentCreate(t *testing.T) {
 	}
 }
 
-// 制限項目（author等）はEditor以上だけが書ける。Memberが他人の名前を載せられない。
+// 制限項目（image・sourceId・sourceUrl）はEditor以上だけが書ける。**authorはD14で許可キーから外れた**（名前は版に保存しない）。
 func TestContentRestrictedMetadata(t *testing.T) {
 	e, as := cmsSetup(t)
-	withAuthor := func(slug string) string {
-		return fmt.Sprintf(`{"type":"article","section":"blog","slug":%q,"title":"t","markdown":"x","metadata":{"author":"なりすまし"}}`, slug)
+	withRestricted := func(slug string) string {
+		return fmt.Sprintf(`{"type":"article","section":"blog","slug":%q,"title":"t","markdown":"x","metadata":{"sourceId":"blog/forged"}}`, slug)
 	}
-	if rec := e.as(as.author, "POST", "/contents", withAuthor("a1")); rec.Code != 403 {
-		t.Errorf("Memberがauthorを指定: %d", rec.Code)
+	if rec := e.as(as.author, "POST", "/contents", withRestricted("a1")); rec.Code != 403 {
+		t.Errorf("Memberが制限項目を指定: %d", rec.Code)
 	}
-	code, v := e.createContent(as.editor, withAuthor("a2"))
-	if code != 201 || v.WorkingRevision.Metadata["author"] != "なりすまし" {
-		t.Fatalf("Editorはauthorを指定できる: %d %+v", code, v)
+	code, v := e.createContent(as.editor, withRestricted("a2"))
+	if code != 201 || v.WorkingRevision.Metadata["sourceId"] != "blog/forged" {
+		t.Fatalf("Editorは制限項目を指定できる: %d %+v", code, v)
 	}
 	// 作者がEditorのコンテンツをMemberが保存する: 制限項目は引き継がれ、違う値は403、同じ値の再送は可
 	if rec := e.as(as.editor, "PUT", "/contents/"+v.ID+"/collaborators", fmt.Sprintf(`{"userIds":[%q]}`, e.userID("author.example").String())); rec.Code != 200 {
@@ -190,25 +190,34 @@ func TestContentRestrictedMetadata(t *testing.T) {
 		t.Errorf("制限項目を送らない保存: %d", c)
 	}
 	_, got := e.getContent(as.author, v.ID)
-	if got.WorkingRevision.Metadata["author"] != "なりすまし" {
+	if got.WorkingRevision.Metadata["sourceId"] != "blog/forged" {
 		t.Errorf("制限項目が引き継がれていない: %+v", got.WorkingRevision.Metadata)
 	}
-	if c := save(`{"author":"別の名前"}`); c != 403 {
-		t.Errorf("Memberが違うauthorを指定: %d", c)
+	if c := save(`{"sourceId":"blog/other"}`); c != 403 {
+		t.Errorf("Memberが違う制限項目を指定: %d", c)
 	}
-	if c := save(`{"author":null}`); c != 403 {
-		t.Errorf("Memberがauthorを消そうとした: %d", c)
+	if c := save(`{"sourceId":null}`); c != 403 {
+		t.Errorf("Memberが制限項目を消そうとした: %d", c)
 	}
-	if c := save(`{"author":"なりすまし","category":"News"}`); c != 201 {
+	if c := save(`{"sourceId":"blog/forged","category":"News"}`); c != 201 {
 		t.Errorf("同じ値の再送は可: %d", c)
 	}
 	// Editorは変更・削除できる
-	rec := e.as(as.editor, "POST", "/contents/"+v.ID+"/revisions", fmt.Sprintf(`{"baseRevision":%d,"title":"t3","markdown":"x","metadata":{"author":null}}`, e.curRev(v.ID)))
+	rec := e.as(as.editor, "POST", "/contents/"+v.ID+"/revisions", fmt.Sprintf(`{"baseRevision":%d,"title":"t3","markdown":"x","metadata":{"sourceId":null}}`, e.curRev(v.ID)))
 	if rec.Code != 201 {
-		t.Fatalf("Editorがauthorを消す: %d", rec.Code)
+		t.Fatalf("Editorが制限項目を消す: %d", rec.Code)
 	}
-	if _, got := e.getContent(as.editor, v.ID); got.WorkingRevision.Metadata["author"] != "" {
-		t.Errorf("authorが消えていない")
+	if _, got := e.getContent(as.editor, v.ID); got.WorkingRevision.Metadata["sourceId"] != "" {
+		t.Errorf("制限項目が消えていない")
+	}
+	// D14: 投稿者名（author）は版に保存しない。Editor以上でも、作成・保存のどちらでもauthorキーは受け付けない
+	for _, a := range []actor{as.author, as.editor} {
+		if rec := e.as(a, "POST", "/contents", `{"type":"article","section":"blog","slug":"no-author","title":"t","markdown":"x","metadata":{"author":"誰か"}}`); rec.Code != 422 {
+			t.Errorf("authorを指定した作成: %d", rec.Code)
+		}
+	}
+	if code := save(`{"author":"誰か"}`); code != 422 {
+		t.Errorf("authorを指定した保存: %d", code)
 	}
 }
 

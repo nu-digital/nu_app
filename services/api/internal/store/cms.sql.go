@@ -81,9 +81,9 @@ func (q *Queries) CopyWorkContributors(ctx context.Context, arg CopyWorkContribu
 }
 
 const createContent = `-- name: CreateContent :one
-INSERT INTO contents (id, type, section, slug, creator_user_id, working_revision_id)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, type, section, slug, creator_user_id, working_revision_id, published_revision_id, archived_at, created_at, updated_at
+INSERT INTO contents (id, type, section, slug, creator_user_id, working_revision_id, legacy_author_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, type, section, slug, creator_user_id, working_revision_id, published_revision_id, archived_at, created_at, updated_at, legacy_author_id
 `
 
 type CreateContentParams struct {
@@ -93,6 +93,7 @@ type CreateContentParams struct {
 	Slug              string
 	CreatorUserID     pgtype.UUID
 	WorkingRevisionID pgtype.UUID
+	LegacyAuthorID    pgtype.UUID
 }
 
 func (q *Queries) CreateContent(ctx context.Context, arg CreateContentParams) (Content, error) {
@@ -103,6 +104,7 @@ func (q *Queries) CreateContent(ctx context.Context, arg CreateContentParams) (C
 		arg.Slug,
 		arg.CreatorUserID,
 		arg.WorkingRevisionID,
+		arg.LegacyAuthorID,
 	)
 	var i Content
 	err := row.Scan(
@@ -116,6 +118,7 @@ func (q *Queries) CreateContent(ctx context.Context, arg CreateContentParams) (C
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LegacyAuthorID,
 	)
 	return i, err
 }
@@ -155,7 +158,7 @@ func (q *Queries) ExistingUserIDs(ctx context.Context, ids []pgtype.UUID) ([]pgt
 }
 
 const getContent = `-- name: GetContent :one
-SELECT id, type, section, slug, creator_user_id, working_revision_id, published_revision_id, archived_at, created_at, updated_at FROM contents WHERE id = $1
+SELECT id, type, section, slug, creator_user_id, working_revision_id, published_revision_id, archived_at, created_at, updated_at, legacy_author_id FROM contents WHERE id = $1
 `
 
 func (q *Queries) GetContent(ctx context.Context, id pgtype.UUID) (Content, error) {
@@ -172,12 +175,13 @@ func (q *Queries) GetContent(ctx context.Context, id pgtype.UUID) (Content, erro
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LegacyAuthorID,
 	)
 	return i, err
 }
 
 const getContentForUpdate = `-- name: GetContentForUpdate :one
-SELECT id, type, section, slug, creator_user_id, working_revision_id, published_revision_id, archived_at, created_at, updated_at FROM contents WHERE id = $1 FOR UPDATE
+SELECT id, type, section, slug, creator_user_id, working_revision_id, published_revision_id, archived_at, created_at, updated_at, legacy_author_id FROM contents WHERE id = $1 FOR UPDATE
 `
 
 // 書き込み系は先にこの行をロックしてから関係を読み直す（共同編集者の解除との競合を避ける）
@@ -195,6 +199,7 @@ func (q *Queries) GetContentForUpdate(ctx context.Context, id pgtype.UUID) (Cont
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LegacyAuthorID,
 	)
 	return i, err
 }
@@ -259,9 +264,12 @@ func (q *Queries) GetContentRevisionByNo(ctx context.Context, arg GetContentRevi
 const getPublicContent = `-- name: GetPublicContent :one
 SELECT c.type, c.section, c.slug, r.id AS revision_id, r.title, r.summary, r.markdown, r.metadata_json,
        r.date_label, r.date_kind, r.sort_date, r.sort_date_is_estimated,
-       COALESCE(cm.public_id, '')::text AS cover_public_id
+       COALESCE(cm.public_id, '')::text AS cover_public_id,
+       -- 投稿者名は、公開が許可済み（かつ削除されていない）ときだけ。それ以外は空（=サイトは「nu_digital」）。版には依存しない
+       COALESCE(CASE WHEN la.publication_state = 'permitted' AND la.erased_at IS NULL THEN la.source_name END, '')::text AS author_name
 FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
 LEFT JOIN media_assets cm ON cm.id = r.cover_media_id AND cm.redacted_at IS NULL
+LEFT JOIN legacy_authors la ON la.id = c.legacy_author_id
 WHERE c.section = $1 AND c.slug = $2 AND c.archived_at IS NULL
 `
 
@@ -284,6 +292,7 @@ type GetPublicContentRow struct {
 	SortDate            pgtype.Date
 	SortDateIsEstimated bool
 	CoverPublicID       string
+	AuthorName          string
 }
 
 // 公開API。公開ポインタの版だけを返す（下書き・未公開・アーカイブ・存在しないものは同じ「行なし」）。
@@ -304,6 +313,7 @@ func (q *Queries) GetPublicContent(ctx context.Context, arg GetPublicContentPara
 		&i.SortDate,
 		&i.SortDateIsEstimated,
 		&i.CoverPublicID,
+		&i.AuthorName,
 	)
 	return i, err
 }
@@ -614,9 +624,11 @@ const listPublicContents = `-- name: ListPublicContents :many
 SELECT c.id, c.type, c.section, c.slug, r.title, r.summary, r.metadata_json,
        r.date_label, r.date_kind, r.sort_date, r.sort_date_is_estimated,
        COALESCE(r.sort_date, DATE '0001-01-01')::date AS order_date,
-       COALESCE(cm.public_id, '')::text AS cover_public_id
+       COALESCE(cm.public_id, '')::text AS cover_public_id,
+       COALESCE(CASE WHEN la.publication_state = 'permitted' AND la.erased_at IS NULL THEN la.source_name END, '')::text AS author_name
 FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
 LEFT JOIN media_assets cm ON cm.id = r.cover_media_id AND cm.redacted_at IS NULL
+LEFT JOIN legacy_authors la ON la.id = c.legacy_author_id
 WHERE c.archived_at IS NULL
   AND ($1::text IS NULL OR c.section = $1::text)
   AND ($2::date IS NULL OR (COALESCE(r.sort_date, DATE '0001-01-01'), c.id) < ($2::date, $3::uuid))
@@ -645,6 +657,7 @@ type ListPublicContentsRow struct {
 	SortDateIsEstimated bool
 	OrderDate           pgtype.Date
 	CoverPublicID       string
+	AuthorName          string
 }
 
 // 並び順は日付の新しい順（日付不明は最後）。カーソルは (並び用の日付, id)。
@@ -676,6 +689,7 @@ func (q *Queries) ListPublicContents(ctx context.Context, arg ListPublicContents
 			&i.SortDateIsEstimated,
 			&i.OrderDate,
 			&i.CoverPublicID,
+			&i.AuthorName,
 		); err != nil {
 			return nil, err
 		}

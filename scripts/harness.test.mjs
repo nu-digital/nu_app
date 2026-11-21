@@ -102,6 +102,7 @@ test('緊急復旧(recover-owner)をworkflowから実行することを禁止す
   assert.equal(workflowPolicyErrors('.github/workflows/x.yml', 'run: npm test').length, 0);
   assert.equal(workflowPolicyErrors('.github/workflows/x.yml', 'run: docker compose run api /nuctl bootstrap-owner').length, 0);
   assert.equal(workflowPolicyErrors('.github/workflows/deploy.yml', 'run: ssh vps nuctl recover-owner --login-id x').length, 1);
+  assert.equal(workflowPolicyErrors('.github/workflows/deploy.yml', 'run: nuctl import-legacy --apply').length, 1);
   for (const cmd of ['media-gc --apply', 'media-redact --id x', 'media-verify']) {
     assert.equal(workflowPolicyErrors('.github/workflows/deploy.yml', `run: ssh vps nuctl ${cmd}`).length, 1, cmd);
   }
