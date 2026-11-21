@@ -16,7 +16,7 @@ npm run dev:up                # db → migrate → api → bot / web / admin を
 | admin | http://127.0.0.1:3000/ | 内部アプリの骨組み（`/healthz`のみ。画面はP1以降） |
 | api | http://127.0.0.1:8080/healthz ・ `/readyz` | `readyz`はDB接続を含む |
 | db | `127.0.0.1:15432`（PostgreSQL） | ローカル専用。ポートは`.env`の`DB_PORT` |
-| bot | – | 起動のみ（Discord連携はP2） |
+| bot | – | 起動のみ（Discord通知の送信はAPI内のworker。`DISCORD_BOT_TOKEN`を.envに設定したときだけ有効。docs/OPERATIONS.md） |
 
 `.env`が無い、または`POSTGRES_*`が空のときComposeは起動を拒否する。`.env`は`.gitignore`済みでGitに入れない。
 

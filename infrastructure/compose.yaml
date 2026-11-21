@@ -47,6 +47,8 @@ services:
       API_INSECURE_COOKIES: ${API_INSECURE_COOKIES:-true}
       # adminコンテナ(Nextの中継)はDockerの内部ネットワークから来る。そこが付けたX-Forwarded-Forの右端をクライアントIPとして使う。
       API_TRUSTED_PROXY_CIDRS: ${API_TRUSTED_PROXY_CIDRS:-172.16.0.0/12}
+      # Discord Botのtoken（秘密）。未設定ならDiscord通知workerは起動せず、通知はoutboxに溜まる。値は.env（Git外）にだけ書く。
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
 

@@ -21,6 +21,7 @@ import (
 	"github.com/nu-digital/nu_app/services/api/internal/auth/session"
 	"github.com/nu-digital/nu_app/services/api/internal/authz"
 	"github.com/nu-digital/nu_app/services/api/internal/httpx"
+	"github.com/nu-digital/nu_app/services/api/internal/notify"
 	"github.com/nu-digital/nu_app/services/api/internal/platform/config"
 )
 
@@ -35,6 +36,8 @@ type Deps struct {
 	Limiter  *ratelimit.Limiter
 	Log      *slog.Logger
 	Now      func() time.Time
+	// Notifier はDiscordへ送る口（接続テスト用）。tokenが無い環境ではnil。
+	Notifier notify.Sender
 
 	// BeforeOwnerCount はテスト専用のフック（本番ではnil）。最後のOwnerの判定の直前に呼ばれ、競合を再現するために使う。
 	BeforeOwnerCount func()
@@ -94,6 +97,7 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("PUT /admin/notifications/settings/{eventType}", s.putNotificationSetting)
 	mux.HandleFunc("GET /admin/notifications/deliveries", s.listNotificationDeliveries)
 	mux.HandleFunc("POST /admin/notifications/deliveries/{id}/retry", s.retryNotificationDelivery)
+	mux.HandleFunc("POST /admin/notifications/test", s.testNotification)
 	mux.HandleFunc("GET /members", s.listMembers)
 	mux.HandleFunc("GET /members/{id}", s.getMember)
 	mux.HandleFunc("GET /admin/users/{id}/private-profile", s.getPrivateProfile)

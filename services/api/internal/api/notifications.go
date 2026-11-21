@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/nu-digital/nu_app/services/api/internal/authz"
 	"github.com/nu-digital/nu_app/services/api/internal/httpx"
+	"github.com/nu-digital/nu_app/services/api/internal/notify"
 	"github.com/nu-digital/nu_app/services/api/internal/store"
 )
 
@@ -229,4 +231,50 @@ func (s *server) retryNotificationDelivery(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// testNotification は POST /admin/notifications/test（Admin/Owner）。指定したチャンネルへ接続テストの1通を送る。
+// Botのtoken・権限・チャンネルIDが正しいかを、本番の通知を待たずに確かめる。結果は成否と短い要約だけ（応答本文・tokenは返さない）。
+func (s *server) testNotification(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.authorize(w, r, "notifications.test", authz.Resource{})
+	if !ok {
+		return
+	}
+	var req struct {
+		DiscordChannelID string `json:"discordChannelId"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if !channelIDPattern.MatchString(req.DiscordChannelID) {
+		httpx.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INPUT", "チャンネルIDは数字だけで入力してください")
+		return
+	}
+	if s.Notifier == nil {
+		httpx.Error(w, r, http.StatusServiceUnavailable, "BOT_NOT_CONFIGURED", "Discord Botが設定されていません（サーバーの設定でtokenを指定してください）")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	err := s.Notifier.Send(ctx, req.DiscordChannelID, "【接続テスト】nu_appからの通知テストです。このメッセージは無視してください。")
+	if aerr := s.auditEvent(r.Context(), store.New(s.Pool), a.Identity.UserID, a.Identity.UserID, "notifications.test_sent", map[string]any{"ok": err == nil}); aerr != nil {
+		s.internal(w, r)
+		return
+	}
+	if err != nil {
+		var se *notify.SendError
+		code, status, msg := "DISCORD_UNAVAILABLE", http.StatusBadGateway, "Discordへ送信できませんでした"
+		if errors.As(err, &se) {
+			msg = se.Summary
+			switch se.Kind {
+			case notify.KindPermanent:
+				code = "DISCORD_REJECTED"
+			case notify.KindRateLimited:
+				code, status = "DISCORD_RATE_LIMITED", http.StatusTooManyRequests
+			}
+		}
+		httpx.Error(w, r, status, code, msg)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"ok": true})
 }

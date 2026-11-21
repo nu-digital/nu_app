@@ -80,3 +80,11 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 ## 画像処理の資源（D06）
 
 デコードの同時実行数を制限する（初期値は4GB環境での実測後に決めてここへ記録）。ピークメモリを実測し、他サービス（Go API、Next.js×2、PostgreSQL、Bot、Nginx）との同時稼働で収まることを確認する。
+
+## Discord通知workerの運用（P2-04）
+
+- 通知は業務のDB更新と同じトランザクションでoutboxへ記録され、APIプロセス内のworkerがDiscordへ送る。Discordが落ちても貸出・返却は確定し、通知は送信待ちに残る。
+- 有効にする手順: Discord Botを作成してサーバーへ招待（メッセージ送信の権限だけ）→ Botのtokenを`.env`の`DISCORD_BOT_TOKEN`へ（**Git・チャット・Issueに貼らない**）→ APIを再起動 → 管理画面/APIで通知種別ごとにチャンネルIDを設定 → `POST /admin/notifications/test`で接続テスト。tokenが無い間・チャンネル未設定の間は送らず溜まる（設定後に送られる）。
+- 確認: `GET /admin/notifications/deliveries?status=pending|dead`。`dead`は恒久的な拒否（権限・チャンネルの誤り）か再試行の上限。原因を直してから`POST /admin/notifications/deliveries/{id}/retry`で再送する。
+- 重複: 障害の切り替わりで同じ通知が2回届くことがある（exactly-onceは保証しない）。本文の「通知ID」で同一かを確認できる。
+- tokenを漏らした疑いがあるときは、Discordの開発者ポータルでtokenを再生成し、`.env`を差し替えてAPIを再起動する。ログ・DB・APIの応答にtokenは出ない設計（テストで確認）。

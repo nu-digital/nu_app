@@ -21,6 +21,7 @@ import (
 	"github.com/nu-digital/nu_app/services/api/internal/auth/password"
 	"github.com/nu-digital/nu_app/services/api/internal/auth/ratelimit"
 	"github.com/nu-digital/nu_app/services/api/internal/auth/session"
+	"github.com/nu-digital/nu_app/services/api/internal/notify"
 	"github.com/nu-digital/nu_app/services/api/internal/platform/config"
 	"github.com/nu-digital/nu_app/services/api/internal/store"
 	"github.com/nu-digital/nu_app/services/api/internal/testutil/pgtest"
@@ -45,6 +46,8 @@ type env struct {
 	limiter *ratelimit.Limiter
 	clock   *time.Time
 	hasher  *password.Hasher
+	// notifier は接続テスト用のDiscord送信（nilならBot未設定）。
+	notifier notify.Sender
 }
 
 type opts struct {
@@ -75,6 +78,7 @@ func (e *env) build() http.Handler {
 		Hasher:   e.hasher, Limiter: e.limiter,
 		Log:              slog.New(slog.NewTextHandler(e.logs, nil)),
 		Now:              func() time.Time { return *e.clock },
+		Notifier:         e.notifier,
 		BeforeOwnerCount: e.hook, BeforeInventoryCheck: e.invHook,
 	})
 }

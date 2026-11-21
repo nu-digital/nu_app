@@ -26,6 +26,9 @@ type Config struct {
 	SecureCookies bool
 	// TrustedProxies は X-Forwarded-For を信用するプロキシのアドレス範囲。空なら信用しない（RemoteAddrのみ）。
 	TrustedProxies []netip.Prefix
+	// DiscordBotToken はDiscord Botのtoken（秘密）。環境変数 DISCORD_BOT_TOKEN からだけ読む。
+	// 空ならDiscordへ送るworkerを起動せず、通知はoutboxに溜まる。ログ・DB・エラー文言に出さない。
+	DiscordBotToken string
 }
 
 // Load は環境変数を読む。DATABASE_URL と APP_BASE_URL は必須（未設定なら起動しない）。
@@ -69,6 +72,13 @@ func Load(getenv func(string) string) (Config, error) {
 			return Config{}, fmt.Errorf("API_TRUSTED_PROXY_CIDRS が不正です: %q", part)
 		}
 		c.TrustedProxies = append(c.TrustedProxies, p)
+	}
+	c.DiscordBotToken = strings.TrimSpace(getenv("DISCORD_BOT_TOKEN"))
+	for _, r := range c.DiscordBotToken {
+		if r < 0x21 || r == 0x7f {
+			// 値は出さない（秘密のため）。改行などが混ざるとHTTPヘッダーを壊すため拒否する
+			return Config{}, errors.New("DISCORD_BOT_TOKEN に空白や制御文字を含めないでください")
+		}
 	}
 	return c, nil
 }
