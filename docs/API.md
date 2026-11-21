@@ -49,6 +49,7 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | `DELETE /me/profile/avatar` | – | 204 | – |
 | `PUT /inventory/items/{id}/photo` | `{mediaId}`（Adminが`purpose=inventory`でアップロードした画像） | 204 | 403、404、422 |
 | `DELETE /inventory/items/{id}/photo` | – | 204 | 403、404 |
+| `GET /admin/contents/published-search?q=` | クエリ`q`（2〜50文字） | 200 `{items:[{section,slug,title,found:["title"|"summary"|"markdown"|"roleLabel"],snippet?}],truncated}`（公開中の版だけを大文字小文字を区別せず部分一致で探す。D08の依頼で、公開版に残る名前を確認する。検索語は監査に残さない） | 403、422 |
 | `GET /admin/legacy-authors` | – | 200 `{items:[{id,name,publicationState,confirmedAt,withdrawnAt,erased,linkedUserId,linkedDisplayName,contentCount}]}`（未確認が先頭。名前は管理者にだけ返す） | 403 |
 | `POST /admin/legacy-authors/{id}/permit` | `{note(必須・200字以内)}` | 204（本人の公開許可を確認して記録。確認者・日時を保存。紐付けは変えない） | 403、404、409 `ERASED`、422 |
 | `POST /admin/legacy-authors/{id}/withdraw` | – | 204（公開を止める。冪等） | 403、404 |
@@ -98,6 +99,7 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | GET | `/admin/users/{id}/private-profile` | Admin | 個人情報を閲覧（監査対象） |
 | DELETE | `/admin/users/{id}/private-profile` | Admin | 必要な個人情報を手動削除（確認・監査） |
 | GET | `/admin/legacy-authors` | Admin | 既存記事の投稿者の確認一覧 |
+| GET | `/admin/contents/published-search` | Admin | 公開中の版に語が含まれるコンテンツを探す（D08の確認用） |
 | PUT | `/me/profile/avatar` | Member | アバターを設定 |
 | DELETE | `/me/profile/avatar` | Member | アバターを外す |
 | PUT | `/inventory/items/{id}/photo` | Admin | 物品の写真を設定 |

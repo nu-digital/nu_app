@@ -73,6 +73,7 @@ var wantNoRelation = map[string][]string{
 	"admin.legacy_authors.withdraw":       adminUp,
 	"admin.legacy_authors.link":           adminUp,
 	"admin.legacy_authors.unlink":         adminUp,
+	"admin.contents.published_search":     adminUp,
 	"me.profile.avatar.set":               memberUp,
 	"me.profile.avatar.clear":             memberUp,
 	"inventory.items.photo.set":           adminUp,

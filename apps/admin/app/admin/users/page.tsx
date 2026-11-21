@@ -123,7 +123,7 @@ export default function UsersPage() {
       </header>
       <main className="page">
         <h1>ユーザー管理</h1>
-        <nav className="subnav" aria-label="管理のメニュー"><Link className="btn secondary inline" href="/admin/legacy-authors">既存記事の投稿者</Link></nav>
+        <nav className="subnav" aria-label="管理のメニュー"><Link className="btn secondary inline" href="/admin/legacy-authors">既存記事の投稿者</Link> <Link className="btn secondary inline" href="/admin/published-search">公開版の本人情報の確認</Link></nav>
 
         {(notice || error) && (
           <div className={`notice ${error ? "error" : "success"}`} role={error ? "alert" : "status"} tabIndex={-1} ref={noticeRef}>

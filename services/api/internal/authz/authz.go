@@ -226,6 +226,7 @@ var table = []Action{
 	{"me.profile.avatar.clear", "DELETE", "/me/profile/avatar", anyMember},
 	{"inventory.items.photo.set", "PUT", "/inventory/items/{id}/photo", adminOnly},
 	{"inventory.items.photo.clear", "DELETE", "/inventory/items/{id}/photo", adminOnly},
+	{"admin.contents.published_search", "GET", "/admin/contents/published-search", adminOnly},
 	{"admin.legacy_authors.list", "GET", "/admin/legacy-authors", adminOnly},
 	{"admin.legacy_authors.permit", "POST", "/admin/legacy-authors/{id}/permit", adminOnly},
 	{"admin.legacy_authors.withdraw", "POST", "/admin/legacy-authors/{id}/withdraw", adminOnly},

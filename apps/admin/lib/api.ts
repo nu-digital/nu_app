@@ -341,6 +341,12 @@ export async function putContributors(id: string, baseRevision: number, contribu
   return r.json as ContentDetail;
 }
 
+// ---- 公開版に残る本人情報の確認（D08） ----
+
+export type PublishedHit = { section: string; slug: string; title: string; found: ("title" | "summary" | "markdown" | "roleLabel")[]; snippet?: string };
+export const searchPublished = async (q: string) =>
+  ok<{ items: PublishedHit[]; truncated: boolean }>(await call("GET", `/admin/contents/published-search?q=${encodeURIComponent(q)}`), 200);
+
 // ---- アバター・物品の写真（P3-02b） ----
 
 /** アバター・物品の写真の表示URL（ログイン中のメンバーだけが取得できる）。 */

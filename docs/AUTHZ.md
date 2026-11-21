@@ -49,6 +49,7 @@
 | `me.profile.avatar.clear` | DELETE | `/me/profile/avatar` | Member以上 |
 | `inventory.items.photo.set` | PUT | `/inventory/items/{id}/photo` | Admin / Owner |
 | `inventory.items.photo.clear` | DELETE | `/inventory/items/{id}/photo` | Admin / Owner |
+| `admin.contents.published_search` | GET | `/admin/contents/published-search` | Admin / Owner |
 | `admin.legacy_authors.list` | GET | `/admin/legacy-authors` | Admin / Owner |
 | `admin.legacy_authors.permit` | POST | `/admin/legacy-authors/{id}/permit` | Admin / Owner |
 | `admin.legacy_authors.withdraw` | POST | `/admin/legacy-authors/{id}/withdraw` | Admin / Owner |

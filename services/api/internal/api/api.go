@@ -134,6 +134,7 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("DELETE /me/profile/avatar", s.deleteMyAvatar)
 	mux.HandleFunc("PUT /inventory/items/{id}/photo", s.putItemPhoto)
 	mux.HandleFunc("DELETE /inventory/items/{id}/photo", s.deleteItemPhoto)
+	mux.HandleFunc("GET /admin/contents/published-search", s.searchPublishedContents)
 	mux.HandleFunc("GET /admin/legacy-authors", s.listLegacyAuthors)
 	mux.HandleFunc("POST /admin/legacy-authors/{id}/permit", s.permitLegacyAuthor)
 	mux.HandleFunc("POST /admin/legacy-authors/{id}/withdraw", s.withdrawLegacyAuthor)

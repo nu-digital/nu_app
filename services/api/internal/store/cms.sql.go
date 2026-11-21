@@ -831,6 +831,65 @@ func (q *Queries) NewUUID(ctx context.Context) (pgtype.UUID, error) {
 	return gen_random_uuid, err
 }
 
+const searchPublishedContents = `-- name: SearchPublishedContents :many
+SELECT c.section::text AS section, c.slug::text AS slug, r.title::text AS title,
+       (position(lower($1::text) in lower(r.title)) > 0)::boolean AS in_title,
+       (position(lower($1::text) in lower(r.summary)) > 0)::boolean AS in_summary,
+       (position(lower($1::text) in lower(r.markdown)) > 0)::boolean AS in_markdown,
+       (EXISTS (SELECT 1 FROM work_contributors w WHERE w.revision_id = r.id AND position(lower($1::text) in lower(w.role_label)) > 0))::boolean AS in_role,
+       CASE WHEN position(lower($1::text) in lower(r.markdown)) > 0
+            THEN substr(r.markdown, greatest(position(lower($1::text) in lower(r.markdown)) - 20, 1), 60) ELSE '' END::text AS snippet
+FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
+WHERE position(lower($1::text) in lower(r.title)) > 0
+   OR position(lower($1::text) in lower(r.summary)) > 0
+   OR position(lower($1::text) in lower(r.markdown)) > 0
+   OR EXISTS (SELECT 1 FROM work_contributors w WHERE w.revision_id = r.id AND position(lower($1::text) in lower(w.role_label)) > 0)
+ORDER BY c.section, c.slug
+LIMIT 100
+`
+
+type SearchPublishedContentsRow struct {
+	Section    string
+	Slug       string
+	Title      string
+	InTitle    bool
+	InSummary  bool
+	InMarkdown bool
+	InRole     bool
+	Snippet    string
+}
+
+// 公開中の版（title・summary・本文・制作メンバーの役割名）に語が含まれるコンテンツを探す（管理者の確認用。D08）。
+// 語は大文字小文字を区別せず、部分一致。LIKEの記号は使わず position() で探す。
+func (q *Queries) SearchPublishedContents(ctx context.Context, q_ string) ([]SearchPublishedContentsRow, error) {
+	rows, err := q.db.Query(ctx, searchPublishedContents, q_)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchPublishedContentsRow{}
+	for rows.Next() {
+		var i SearchPublishedContentsRow
+		if err := rows.Scan(
+			&i.Section,
+			&i.Slug,
+			&i.Title,
+			&i.InTitle,
+			&i.InSummary,
+			&i.InMarkdown,
+			&i.InRole,
+			&i.Snippet,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setPublishedRevision = `-- name: SetPublishedRevision :exec
 UPDATE contents SET published_revision_id = $2, updated_at = $3 WHERE id = $1
 `
