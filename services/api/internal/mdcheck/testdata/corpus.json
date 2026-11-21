@@ -1,0 +1,357 @@
+[
+ {
+  "name": "通常のMarkdown",
+  "markdown": "# 見出し\n\n段落 **強調** と `code`。\n\n- a\n- b\n\n> 引用\n\n| a | b |\n|---|---|\n| 1 | 2 |\n",
+  "ok": true
+ },
+ {
+  "name": "コードブロック内のHTMLは無害",
+  "markdown": "```html\n<script>alert(1)</script>\n<iframe src=x></iframe>\n```\n\nインライン `<script>` も無害",
+  "ok": true
+ },
+ {
+  "name": "http/https/mailtoのリンク",
+  "markdown": "[a](https://example.com/x?y=1#z) [b](http://example.com) [c](mailto:a@example.invalid)",
+  "ok": true
+ },
+ {
+  "name": "サイト内の相対リンクとページ内リンク",
+  "markdown": "[a](/news/foo/) [b](#section)",
+  "ok": true
+ },
+ {
+  "name": "自サイトの画像",
+  "markdown": "![alt](/images/imported/img-1.webp) ![m](/api/v1/public/media/abc123)",
+  "ok": true
+ },
+ {
+  "name": "autolink",
+  "markdown": "<https://example.com/path>",
+  "ok": true
+ },
+ {
+  "name": "details/summary",
+  "markdown": "<details>\n<summary>見る</summary>\n\n本文 ![x](/images/a.webp)\n\n</details>\n",
+  "ok": true
+ },
+ {
+  "name": "属性なしdivの中にMarkdown（既存のrecall.md形式）",
+  "markdown": "<details>\n<summary>画面（2枚）</summary>\n\n<div>\n\n![a](/images/a.webp)\n\n![b](/images/b.webp)\n\n</div>\n\n</details>\n",
+  "ok": true
+ },
+ {
+  "name": "YouTube埋め込み",
+  "markdown": "<div data-youtube=\"ZEguS-om_Ec\"></div>",
+  "ok": true
+ },
+ {
+  "name": "data-videoとdata-carousel",
+  "markdown": "<div data-video=\"featured\"></div>\n\n<div data-carousel=\"overview\"></div>",
+  "ok": true
+ },
+ {
+  "name": "本文中のテキストの山括弧",
+  "markdown": "a &lt; b と 1 < 2 のような文",
+  "ok": true
+ },
+ {
+  "name": "scriptタグ",
+  "markdown": "<script>alert(1)</script>",
+  "ok": false
+ },
+ {
+  "name": "インラインのscript",
+  "markdown": "文中に<script>alert(1)</script>がある",
+  "ok": false
+ },
+ {
+  "name": "生のiframe",
+  "markdown": "<iframe src=\"https://www.youtube.com/embed/ZEguS-om_Ec\"></iframe>",
+  "ok": false
+ },
+ {
+  "name": "生のvideo",
+  "markdown": "<video src=\"/x.mp4\" controls></video>",
+  "ok": false
+ },
+ {
+  "name": "imgタグの生HTML",
+  "markdown": "<img src=x onerror=alert(1)>",
+  "ok": false
+ },
+ {
+  "name": "onクリック属性のdiv",
+  "markdown": "<div onclick=\"alert(1)\">x</div>",
+  "ok": false
+ },
+ {
+  "name": "styleつきdiv",
+  "markdown": "<div style=\"position:fixed\">x</div>",
+  "ok": false
+ },
+ {
+  "name": "classつきdiv",
+  "markdown": "<div class=\"a\">x</div>",
+  "ok": false
+ },
+ {
+  "name": "idつきdiv",
+  "markdown": "<div id=\"a\">x</div>",
+  "ok": false
+ },
+ {
+  "name": "detailsのopen属性",
+  "markdown": "<details open>\n<summary>x</summary>\n</details>",
+  "ok": false
+ },
+ {
+  "name": "data-youtubeが11桁でない",
+  "markdown": "<div data-youtube=\"short\"></div>",
+  "ok": false
+ },
+ {
+  "name": "data-youtubeに記号",
+  "markdown": "<div data-youtube=\"abc\"onerror=\"x\"></div>",
+  "ok": false
+ },
+ {
+  "name": "data-videoの値が違う",
+  "markdown": "<div data-video=\"other\"></div>",
+  "ok": false
+ },
+ {
+  "name": "data属性が2つ",
+  "markdown": "<div data-youtube=\"ZEguS-om_Ec\" data-video=\"featured\"></div>",
+  "ok": false
+ },
+ {
+  "name": "data-youtubeの二重",
+  "markdown": "<div data-youtube=\"ZEguS-om_Ec\" data-youtube=\"aaaaaaaaaaa\"></div>",
+  "ok": false
+ },
+ {
+  "name": "data属性付きdivに子",
+  "markdown": "<div data-youtube=\"ZEguS-om_Ec\">中身</div>",
+  "ok": false
+ },
+ {
+  "name": "data属性付きdivを別行で閉じる",
+  "markdown": "<div data-youtube=\"ZEguS-om_Ec\">\n\n本文\n\n</div>",
+  "ok": false
+ },
+ {
+  "name": "大文字のタグ名でもscript",
+  "markdown": "<SCRIPT>alert(1)</SCRIPT>",
+  "ok": false
+ },
+ {
+  "name": "大文字の属性名",
+  "markdown": "<div ONCLICK=\"x\">a</div>",
+  "ok": false
+ },
+ {
+  "name": "閉じ忘れのdiv",
+  "markdown": "<div>\n\n本文",
+  "ok": false
+ },
+ {
+  "name": "開始のない閉じタグ",
+  "markdown": "本文\n\n</div>",
+  "ok": false
+ },
+ {
+  "name": "開閉の順序違い",
+  "markdown": "<details>\n<div>\n\n</details>\n</div>",
+  "ok": false
+ },
+ {
+  "name": "自己終了のdiv",
+  "markdown": "<div />",
+  "ok": false
+ },
+ {
+  "name": "HTMLコメント",
+  "markdown": "本文\n\n<!-- 内部メモ -->",
+  "ok": false
+ },
+ {
+  "name": "元URLコメント（新規保存では不可）",
+  "markdown": "<!-- 元URL: https://example.com | 取得日: 2026-10-16 -->\n\n本文",
+  "ok": false
+ },
+ {
+  "name": "条件付きコメント風",
+  "markdown": "<!--[if IE]><script>x</script><![endif]-->",
+  "ok": false
+ },
+ {
+  "name": "CDATA風",
+  "markdown": "<![CDATA[<script>alert(1)</script>]]>",
+  "ok": false
+ },
+ {
+  "name": "処理命令風",
+  "markdown": "<?php echo 1; ?>",
+  "ok": false
+ },
+ {
+  "name": "DOCTYPE",
+  "markdown": "<!DOCTYPE html>",
+  "ok": false
+ },
+ {
+  "name": "javascriptリンク",
+  "markdown": "[x](javascript:alert(1))",
+  "ok": false
+ },
+ {
+  "name": "大文字のJavaScript",
+  "markdown": "[x](JaVaScRiPt:alert(1))",
+  "ok": false
+ },
+ {
+  "name": "タブ入りのjavascript（Markdownではリンクにならず文字のまま。害はない）",
+  "markdown": "[x](java\tscript:alert(1))",
+  "ok": true
+ },
+ {
+  "name": "エンティティのjavascript",
+  "markdown": "[x](&#106;avascript:alert(1))",
+  "ok": false
+ },
+ {
+  "name": "16進エンティティのjavascript",
+  "markdown": "[x](&#x6A;avascript:alert(1))",
+  "ok": false
+ },
+ {
+  "name": "コロンのエンティティ",
+  "markdown": "[x](javascript&colon;alert(1))",
+  "ok": false
+ },
+ {
+  "name": "パーセントのjavascript",
+  "markdown": "[x](%6Aavascript:alert(1))",
+  "ok": false
+ },
+ {
+  "name": "先頭が空白のjavascript",
+  "markdown": "[x](<  javascript:alert(1)>)",
+  "ok": false
+ },
+ {
+  "name": "dataスキームのリンク",
+  "markdown": "[x](data:text/html;base64,PHNjcmlwdD4=)",
+  "ok": false
+ },
+ {
+  "name": "vbscript",
+  "markdown": "[x](vbscript:msgbox(1))",
+  "ok": false
+ },
+ {
+  "name": "fileスキーム",
+  "markdown": "[x](file:///etc/passwd)",
+  "ok": false
+ },
+ {
+  "name": "プロトコル相対URL",
+  "markdown": "[x](//evil.example/x)",
+  "ok": false
+ },
+ {
+  "name": "バックスラッシュのプロトコル相対",
+  "markdown": "[x](/\\evil.example/x)",
+  "ok": false
+ },
+ {
+  "name": "スキームなしの相対リンク",
+  "markdown": "[x](foo/bar)",
+  "ok": false
+ },
+ {
+  "name": "参照定義経由のjavascript",
+  "markdown": "[x][r]\n\n[r]: javascript:alert(1)",
+  "ok": false
+ },
+ {
+  "name": "autolinkのjavascript",
+  "markdown": "<javascript:alert(1)>",
+  "ok": false
+ },
+ {
+  "name": "外部の画像",
+  "markdown": "![x](https://tracker.example/pixel.png)",
+  "ok": false
+ },
+ {
+  "name": "dataスキームの画像",
+  "markdown": "![x](data:image/svg+xml;base64,PHN2Zz4=)",
+  "ok": false
+ },
+ {
+  "name": "画像のパス移動",
+  "markdown": "![x](/images/../secret.png)",
+  "ok": false
+ },
+ {
+  "name": "相対パスの画像",
+  "markdown": "![x](images/a.png)",
+  "ok": false
+ },
+ {
+  "name": "画像のjavascript",
+  "markdown": "![x](javascript:alert(1))",
+  "ok": false
+ },
+ {
+  "name": "インラインHTMLの複数行",
+  "markdown": "文<a\nhref=\"javascript:alert(1)\">x</a>",
+  "ok": false
+ },
+ {
+  "name": "aタグの生HTML",
+  "markdown": "<a href=\"https://example.com\">x</a>",
+  "ok": false
+ },
+ {
+  "name": "detailsの中の生script",
+  "markdown": "<details>\n<summary>x</summary>\n<script>alert(1)</script>\n</details>",
+  "ok": false
+ },
+ {
+  "name": "表の中のscript",
+  "markdown": "| a |\n|---|\n| <script>alert(1)</script> |",
+  "ok": false
+ },
+ {
+  "name": "リンクテキストの中のscript",
+  "markdown": "[<script>alert(1)</script>](https://example.com)",
+  "ok": false
+ },
+ {
+  "name": "引用の中のiframe",
+  "markdown": "> <iframe src=x></iframe>",
+  "ok": false
+ },
+ {
+  "name": "リストの中のonerror",
+  "markdown": "- <img src=x onerror=alert(1)>",
+  "ok": false
+ },
+ {
+  "name": "属性値にエンティティ（検査と描画で値が食い違う余地を残さない）",
+  "markdown": "<div data-youtube=\"ZEguS&#45;om_Ec\"></div>",
+  "ok": false
+ },
+ {
+  "name": "属性名と値の前後に余計な空白・改行",
+  "markdown": "<div\ndata-youtube=\"ZEguS-om_Ec\"></div>",
+  "ok": false
+ },
+ {
+  "name": "属性値が単一引用符",
+  "markdown": "<div data-youtube='ZEguS-om_Ec'></div>",
+  "ok": false
+ }
+]

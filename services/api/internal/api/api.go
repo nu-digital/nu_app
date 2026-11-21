@@ -43,10 +43,14 @@ type Deps struct {
 	BeforeOwnerCount func()
 	// BeforeInventoryCheck もテスト専用のフック（本番ではnil）。在庫の判定（残数・未返却数の確認）の直前に呼ばれる。
 	BeforeInventoryCheck func()
+	// BeforeContentSave もテスト専用（本番ではnil）。版の保存で、行ロックとbaseRevisionの確認の後・新しい版の追加の前に呼ばれる。
+	BeforeContentSave func()
 }
 
 type server struct {
 	Deps
+	// saves はコンテンツの保存系の頻度制限（利用者ごと）。
+	saves *saveLimiter
 }
 
 // authCtx は検証済みセッション。
@@ -77,7 +81,7 @@ func New(d Deps) http.Handler {
 	if d.Now == nil {
 		d.Now = time.Now
 	}
-	s := &server{Deps: d}
+	s := &server{Deps: d, saves: newSaveLimiter()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /auth/login", s.login)
 	mux.HandleFunc("POST /auth/logout", s.logout)
@@ -93,6 +97,12 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("GET /inventory/loans", s.listLoans)
 	mux.HandleFunc("GET /inventory/history", s.history)
 	mux.HandleFunc("POST /admin/inventory/corrections", s.createCorrection)
+	mux.HandleFunc("GET /contents", s.listContents)
+	mux.HandleFunc("POST /contents", s.createContent)
+	mux.HandleFunc("GET /contents/{id}", s.getContent)
+	mux.HandleFunc("POST /contents/{id}/revisions", s.saveRevision)
+	mux.HandleFunc("PUT /contents/{id}/collaborators", s.putCollaborators)
+	mux.HandleFunc("PUT /contents/{id}/contributors", s.putContributors)
 	mux.HandleFunc("GET /admin/notifications/settings", s.listNotificationSettings)
 	mux.HandleFunc("PUT /admin/notifications/settings/{eventType}", s.putNotificationSetting)
 	mux.HandleFunc("GET /admin/notifications/deliveries", s.listNotificationDeliveries)

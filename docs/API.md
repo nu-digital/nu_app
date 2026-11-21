@@ -140,6 +140,16 @@ actor/borrower はクライアント入力を信用せず、セッションの�
 | GET | `/public/contents` | Public | 公開記事・作品一覧（下書きは除外） |
 | GET | `/public/contents/{section}/{slug}` | Public | 公開済みの版だけ返す |
 
+**P3-01aで実装した契約（暫定採用 DECISIONS P3-01-1/2）**
+
+- `POST /contents`: `{type, section, slug, title, summary?, markdown, metadata?, date?}` → 201（版1）。slug重複は409 `SLUG_TAKEN`。入力不正・Markdown検査の違反は422（本文の内容は応答に含めない）。`metadata`は`category`・`excerpt`（誰でも）と`author`・`image`・`sourceId`・`sourceUrl`（Editor以上のみ。Memberは403）。
+- `GET /contents`: `limit`（≤100）・`cursor`・`section`・`mine=true`。編集できる人（作者・共同編集者・Editor以上）には作業版の値、**それ以外には公開中のものの公開版の値だけ**。
+- `GET /contents/{id}`（`?revision=N`で過去の版）: 作者・共同編集者・Editor以上。**関係が無い人は、存在しないIDと同じ404**。
+- `POST /contents/{id}/revisions`: `baseRevision`必須。古ければ409 `REVISION_CONFLICT`（`current`に現在の作業版）。内容が同じなら200（版は増えない）。公開版は変わらない。
+- `PUT /contents/{id}/collaborators`: `{userIds}`の全件置き換え（作者・Editor以上。共同編集者は403）。新しく加えられるのは有効なユーザーだけ。上限20。
+- `PUT /contents/{id}/contributors`: `{baseRevision, contributors:[{userId, roleLabel}]}`。作品だけ。制作メンバーは**版ごと**で、変更は新しい版になる。停止・退会済みのユーザーも登録できる。公開クレジットの同意は変えない。
+- 保存系（作成・版の保存・共同編集者・制作メンバー）は利用者ごとに1分60回まで（429）。
+
 編集保存例:
 
 ```json

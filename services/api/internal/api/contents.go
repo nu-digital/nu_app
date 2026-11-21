@@ -1,0 +1,1036 @@
+package api
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/nu-digital/nu_app/services/api/internal/authz"
+	"github.com/nu-digital/nu_app/services/api/internal/httpx"
+	"github.com/nu-digital/nu_app/services/api/internal/mdcheck"
+	"github.com/nu-digital/nu_app/services/api/internal/store"
+)
+
+// CMS（記事・作品）の作成・版の保存・共同編集者・制作メンバー。設計の正本は docs/design/p3-cms.md。
+//
+// 方針（Opusレビュー反映）:
+//   - 書き込みは「Tx開始→contents行をFOR UPDATE→関係（作者/共同編集者）を読み直す→authz.Decide→更新」の順。
+//   - 関係が必要な操作で権限が無い場合は、存在しないIDと同じ404にする（下書きの存在を漏らさない）。
+//   - 重い処理（Markdown検査）は、認可と行ロックの後に行う。
+//   - 一覧は、編集できない人には公開版の値だけを返す（作業版の書き換えを見せない）。
+
+const maxContentBody = 512 << 10
+
+var errNotFound = &errTx{http.StatusNotFound, "NOT_FOUND", "見つかりません"}
+
+type dateIn struct {
+	Label    string  `json:"label"`
+	Kind     string  `json:"kind"`
+	SortDate *string `json:"sortDate"`
+}
+
+// contentFields は版の内容。作成と版の保存で共通。
+type contentFields struct {
+	Title    string             `json:"title"`
+	Summary  string             `json:"summary"`
+	Markdown string             `json:"markdown"`
+	Metadata map[string]*string `json:"metadata"`
+	Date     *dateIn            `json:"date"`
+}
+
+type dateView struct {
+	Label    string  `json:"label"`
+	Kind     string  `json:"kind"`
+	SortDate *string `json:"sortDate"`
+	// SortDateIsEstimated: 並び替え用に補った日。開催日として表示してはいけない（D12）
+	SortDateIsEstimated bool `json:"sortDateIsEstimated"`
+}
+
+type contributorView struct {
+	UserID      string `json:"userId"`
+	DisplayName string `json:"displayName"`
+	RoleLabel   string `json:"roleLabel"`
+}
+
+type personView struct {
+	UserID      string `json:"userId"`
+	DisplayName string `json:"displayName"`
+}
+
+type revisionView struct {
+	RevisionNo   int               `json:"revisionNo"`
+	Title        string            `json:"title"`
+	Summary      string            `json:"summary"`
+	Markdown     string            `json:"markdown"`
+	Metadata     map[string]string `json:"metadata"`
+	Date         dateView          `json:"date"`
+	EditedBy     string            `json:"editedBy"`
+	CreatedAt    time.Time         `json:"createdAt"`
+	Contributors []contributorView `json:"contributors,omitempty"`
+}
+
+type revisionSummary struct {
+	RevisionNo int       `json:"revisionNo"`
+	Title      string    `json:"title"`
+	EditedBy   string    `json:"editedBy"`
+	CreatedAt  time.Time `json:"createdAt"`
+}
+
+type contentView struct {
+	ID                  string            `json:"id"`
+	Type                string            `json:"type"`
+	Section             string            `json:"section"`
+	Slug                string            `json:"slug"`
+	Creator             personView        `json:"creator"`
+	WorkingRevision     revisionView      `json:"workingRevision"`
+	PublishedRevisionNo *int              `json:"publishedRevisionNo"`
+	Collaborators       []personView      `json:"collaborators"`
+	Revisions           []revisionSummary `json:"revisions,omitempty"`
+	CanManageCollab     bool              `json:"canManageCollaborators"`
+	CanPublish          bool              `json:"canPublish"`
+	CreatedAt           time.Time         `json:"createdAt"`
+	UpdatedAt           time.Time         `json:"updatedAt"`
+}
+
+// ---- 入力の検査 ----
+
+// editableMetadata は誰でも書ける項目、restrictedMetadata は移行ツールとEditor以上だけが書ける項目。
+// 後者は、他人の名前を載せる（D08の結合を通らない）・画像の差し替えなどを防ぐ。
+var (
+	editableMetadata   = map[string]bool{"category": true, "excerpt": true}
+	restrictedMetadata = map[string]bool{"author": true, "image": true, "sourceId": true, "sourceUrl": true}
+
+	imagePathRe = regexp.MustCompile(`^/images/[A-Za-z0-9._/-]{1,200}$`)
+	sourceIDRe  = regexp.MustCompile(`^[A-Za-z0-9._/-]{1,200}$`)
+	sourceURLRe = regexp.MustCompile(`^https://[^\s<>"]{1,480}$`)
+	slugRe      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`)
+	urlLikeRe   = regexp.MustCompile(`(?i)(https?:|www\.)`)
+)
+
+func hasControl(s string, allowNewline bool) bool {
+	for _, r := range s {
+		if r == '\n' && allowNewline {
+			continue
+		}
+		if r < 0x20 || r == 0x7f || r == ' ' || r == ' ' {
+			return true
+		}
+	}
+	return false
+}
+
+// checkFields は認可の前に行える安い検査（長さ・形式）。Markdownの検査（重い）は含まない。
+func checkFields(f *contentFields) error {
+	f.Title = strings.TrimSpace(f.Title)
+	f.Summary = strings.TrimSpace(f.Summary)
+	if f.Title == "" || utf8.RuneCountInString(f.Title) > 200 || hasControl(f.Title, false) {
+		return invalid("タイトルは1〜200文字で、改行を含めないでください")
+	}
+	if utf8.RuneCountInString(f.Summary) > 500 || hasControl(f.Summary, true) {
+		return invalid("要約は500文字までです")
+	}
+	if len(f.Markdown) > mdcheck.MaxBytes {
+		return invalid("本文が大きすぎます（256KiBまで）")
+	}
+	if f.Date != nil {
+		d := f.Date
+		d.Label = strings.TrimSpace(d.Label)
+		if utf8.RuneCountInString(d.Label) > 100 || hasControl(d.Label, false) {
+			return invalid("日付の表示は100文字までです")
+		}
+		switch d.Kind {
+		case "day", "month", "range", "unknown":
+		default:
+			return invalid("日付の種類が正しくありません")
+		}
+		if d.SortDate != nil {
+			if _, err := time.Parse("2006-01-02", *d.SortDate); err != nil {
+				return invalid("並び替え用の日付は YYYY-MM-DD で指定してください")
+			}
+		}
+		if d.Kind != "unknown" && d.SortDate == nil {
+			return invalid("日付の種類がunknown以外のときは、並び替え用の日付が必要です")
+		}
+	}
+	return nil
+}
+
+func validMetadataValue(key, v string) error {
+	bad := func(msg string) error { return invalid(msg) }
+	switch key {
+	case "category":
+		if v == "" || utf8.RuneCountInString(v) > 30 || hasControl(v, false) {
+			return bad("カテゴリは1〜30文字で入力してください")
+		}
+	case "excerpt":
+		if utf8.RuneCountInString(v) > 300 || hasControl(v, true) {
+			return bad("抜粋は300文字までです")
+		}
+	case "author":
+		if v == "" || utf8.RuneCountInString(v) > 64 || hasControl(v, false) || strings.ContainsAny(v, "<>@") {
+			return bad("投稿者の表示が正しくありません")
+		}
+	case "image":
+		if !imagePathRe.MatchString(v) || strings.Contains(v, "..") {
+			return bad("画像はこのサイトの /images/ のパスだけ指定できます")
+		}
+	case "sourceId":
+		if !sourceIDRe.MatchString(v) {
+			return bad("sourceIdの形式が正しくありません")
+		}
+	case "sourceUrl":
+		if !sourceURLRe.MatchString(v) {
+			return bad("sourceUrlはhttpsのURLにしてください")
+		}
+	}
+	return nil
+}
+
+// mergeMetadata は入力と前の版から、新しい版のmetadataを決める。
+//   - 未知のキーは422。誰でも書ける項目は、入力に無ければ消える。
+//   - 制限項目（author等）は、入力に無ければ前の版から引き継ぐ。Editor以上だけが変更・削除できる。
+//     それ以外の人が**違う値**を指定したら403（同じ値の再送は許す）。
+func mergeMetadata(in map[string]*string, prev map[string]string, editor bool) (map[string]string, error) {
+	out := map[string]string{}
+	for k, v := range prev {
+		if restrictedMetadata[k] {
+			out[k] = v
+		}
+	}
+	for k, v := range in {
+		switch {
+		case editableMetadata[k]:
+			if v != nil && !(*v == "" && k == "excerpt") {
+				if err := validMetadataValue(k, *v); err != nil {
+					return nil, err
+				}
+				out[k] = *v
+			}
+		case restrictedMetadata[k]:
+			if v == nil {
+				if !editor {
+					if _, had := prev[k]; had {
+						return nil, &errTx{http.StatusForbidden, "FORBIDDEN", "この項目は編集者だけが変更できます"}
+					}
+					continue
+				}
+				delete(out, k)
+				continue
+			}
+			if !editor {
+				if prev[k] != *v {
+					return nil, &errTx{http.StatusForbidden, "FORBIDDEN", "この項目は編集者だけが変更できます"}
+				}
+				continue
+			}
+			if err := validMetadataValue(k, *v); err != nil {
+				return nil, err
+			}
+			out[k] = *v
+		default:
+			return nil, invalid("使えないメタデータの項目があります")
+		}
+	}
+	return out, nil
+}
+
+type revData struct {
+	Title, Summary, Markdown string
+	Metadata                 map[string]string
+	DateLabel, DateKind      string
+	SortDate                 pgtype.Date
+	Estimated                bool
+}
+
+func dateFromInput(d *dateIn, prev *store.ContentRevision) (label, kind string, sd pgtype.Date, est bool) {
+	switch {
+	case d != nil:
+		label, kind = d.Label, d.Kind
+		if d.SortDate != nil {
+			t, _ := time.Parse("2006-01-02", *d.SortDate)
+			sd = pgtype.Date{Time: t, Valid: true}
+		}
+		est = kind != "day" && sd.Valid
+	case prev != nil:
+		label, kind, sd, est = prev.DateLabel, prev.DateKind, prev.SortDate, prev.SortDateIsEstimated
+	default:
+		kind = "unknown"
+	}
+	return
+}
+
+func decodeMetadata(b []byte) map[string]string {
+	m := map[string]string{}
+	_ = json.Unmarshal(b, &m)
+	return m
+}
+
+func sameMetadata(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if bv, ok := b[k]; !ok || bv != v {
+			return false
+		}
+	}
+	return true
+}
+
+func sameRevision(d revData, r store.ContentRevision) bool {
+	return d.Title == r.Title && d.Summary == r.Summary && d.Markdown == r.Markdown && d.DateLabel == r.DateLabel && d.DateKind == r.DateKind &&
+		d.SortDate == r.SortDate && d.Estimated == r.SortDateIsEstimated && sameMetadata(d.Metadata, decodeMetadata(r.MetadataJson))
+}
+
+// markdownError はMarkdownの検査結果を、利用者に見せてよい文言にまとめる（本文の内容は含めない）。
+func markdownError(src string) error {
+	vs := mdcheck.Validate(src)
+	if len(vs) == 0 {
+		return nil
+	}
+	parts := make([]string, 0, 3)
+	for i, v := range vs {
+		if i == 3 {
+			parts = append(parts, fmt.Sprintf("ほか%d件", len(vs)-3))
+			break
+		}
+		parts = append(parts, v.String())
+	}
+	return invalid("本文に使えない記述があります: " + strings.Join(parts, " / "))
+}
+
+// ---- 認可 ----
+
+// memberOrReject は認証済みの有効なユーザーだけを通す（未認証は401）。関係が必要な操作の最初の入口。
+func (s *server) memberOrReject(w http.ResponseWriter, r *http.Request) (authCtx, bool) {
+	return s.authorize(w, r, "contents.list", authz.Resource{})
+}
+
+// contentResource は作者・共同編集者の関係をDBから読む（毎回。キャッシュしない）。
+func contentResource(r *http.Request, q *store.Queries, a authCtx, c store.Content) (authz.Resource, error) {
+	res := authz.Resource{IsAuthor: c.CreatorUserID == a.Identity.UserID}
+	if !res.IsAuthor {
+		ok, err := q.IsContentCollaborator(r.Context(), store.IsContentCollaboratorParams{ContentID: c.ID, UserID: a.Identity.UserID})
+		if err != nil {
+			return res, err
+		}
+		res.IsCollaborator = ok
+	}
+	return res, nil
+}
+
+// lockContent は contents行をロックして関係を読み直し、actionが許されなければ、閲覧できない人には404（存在しないのと同じ）、閲覧できる人には403を返す。
+func (s *server) lockContent(r *http.Request, q *store.Queries, a authCtx, id pgtype.UUID, action string) (store.Content, error) {
+	c, err := q.GetContentForUpdate(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return c, errNotFound
+		}
+		return c, err
+	}
+	res, err := contentResource(r, q, a, c)
+	if err != nil {
+		return c, err
+	}
+	subject := a.Identity.Subject()
+	if d := authz.Decide(subject, action, res); !d.Allowed {
+		// 閲覧できない人には存在しないのと同じ404。閲覧できる人（共同編集者が共同編集者を指定しようとした等）には403
+		if authz.Decide(subject, "contents.get", res).Allowed {
+			return c, &errTx{http.StatusForbidden, "FORBIDDEN", "この操作を行う権限がありません"}
+		}
+		return c, errNotFound
+	}
+	return c, nil
+}
+
+func (s *server) saveAllowed(w http.ResponseWriter, r *http.Request, a authCtx) bool {
+	ok, retry := s.saves.allow(a.Identity.UserID.String(), s.Now())
+	if ok {
+		return true
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())+1))
+	httpx.Error(w, r, http.StatusTooManyRequests, "RATE_LIMITED", "保存の回数が多すぎます。しばらくしてからお試しください")
+	return false
+}
+
+// ---- 表示 ----
+
+func toRevisionView(r store.ContentRevision, editedBy string, contribs []store.ListWorkContributorsRow) revisionView {
+	v := revisionView{RevisionNo: int(r.RevisionNo), Title: r.Title, Summary: r.Summary, Markdown: r.Markdown, Metadata: decodeMetadata(r.MetadataJson),
+		Date: dateView{Label: r.DateLabel, Kind: r.DateKind, SortDateIsEstimated: r.SortDateIsEstimated}, EditedBy: editedBy, CreatedAt: r.CreatedAt.Time}
+	if r.SortDate.Valid {
+		d := r.SortDate.Time.Format("2006-01-02")
+		v.Date.SortDate = &d
+	}
+	for _, c := range contribs {
+		v.Contributors = append(v.Contributors, contributorView{UserID: c.UserID.String(), DisplayName: c.DisplayName, RoleLabel: c.RoleLabel})
+	}
+	return v
+}
+
+// loadContentView は作業版・共同編集者などを組み立てる（閲覧権限は呼び出し元が確認済み）。
+func (s *server) loadContentView(r *http.Request, q *store.Queries, a authCtx, c store.Content, res authz.Resource, withHistory bool, rev *store.ContentRevision) (contentView, error) {
+	ctx := r.Context()
+	if rev == nil {
+		w, err := q.GetContentRevision(ctx, c.WorkingRevisionID)
+		if err != nil {
+			return contentView{}, err
+		}
+		rev = &w
+	}
+	contribs, err := q.ListWorkContributors(ctx, rev.ID)
+	if err != nil {
+		return contentView{}, err
+	}
+	collabs, err := q.ListContentCollaborators(ctx, c.ID)
+	if err != nil {
+		return contentView{}, err
+	}
+	v := contentView{
+		ID: c.ID.String(), Type: c.Type, Section: c.Section, Slug: c.Slug,
+		Creator:         personView{UserID: c.CreatorUserID.String(), DisplayName: s.displayName(ctx, q, c.CreatorUserID)},
+		WorkingRevision: toRevisionView(*rev, s.displayName(ctx, q, rev.EditedBy), contribs),
+		Collaborators:   []personView{},
+		CreatedAt:       c.CreatedAt.Time, UpdatedAt: c.UpdatedAt.Time,
+	}
+	for _, cl := range collabs {
+		v.Collaborators = append(v.Collaborators, personView{UserID: cl.UserID.String(), DisplayName: cl.DisplayName})
+	}
+	subject := a.Identity.Subject()
+	v.CanManageCollab = authz.Decide(subject, "contents.collaborators.update", res).Allowed
+	v.CanPublish = authz.Decide(subject, "contents.publish", res).Allowed
+	if c.PublishedRevisionID.Valid {
+		p, err := q.GetContentRevision(ctx, c.PublishedRevisionID)
+		if err != nil {
+			return contentView{}, err
+		}
+		n := int(p.RevisionNo)
+		v.PublishedRevisionNo = &n
+	}
+	if withHistory {
+		hist, err := q.ListContentRevisionSummaries(ctx, c.ID)
+		if err != nil {
+			return contentView{}, err
+		}
+		for _, h := range hist {
+			v.Revisions = append(v.Revisions, revisionSummary{RevisionNo: int(h.RevisionNo), Title: h.Title, EditedBy: h.EditedByName, CreatedAt: h.CreatedAt.Time})
+		}
+	}
+	return v, nil
+}
+
+// ---- 作成 ----
+
+// createContent は POST /contents（Member）。下書きを作る（版1）。公開はしない。
+func (s *server) createContent(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.authorize(w, r, "contents.create", authz.Resource{})
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxContentBody)
+	var req struct {
+		Type    string `json:"type"`
+		Section string `json:"section"`
+		Slug    string `json:"slug"`
+		contentFields
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if !s.saveAllowed(w, r, a) {
+		return
+	}
+	if err := checkFields(&req.contentFields); err != nil {
+		s.writeTxErr(w, r, err)
+		return
+	}
+	if !slugRe.MatchString(req.Slug) {
+		httpx.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INPUT", "URL用の名前（slug）は英数字・.・_・-で、100文字までにしてください")
+		return
+	}
+	if !(req.Type == "article" && (req.Section == "blog" || req.Section == "news")) && !(req.Type == "project" && req.Section == "project") {
+		httpx.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INPUT", "種別と区分の組み合わせが正しくありません")
+		return
+	}
+	editor := a.Identity.Subject().IsEditorPlus()
+	var out contentView
+	err := s.inTx(r.Context(), func(q *store.Queries, tx pgx.Tx) error {
+		// 重い検査は、認証済み・入力の形式確認の後に行う
+		if err := markdownError(req.Markdown); err != nil {
+			return err
+		}
+		meta, err := mergeMetadata(req.Metadata, nil, editor)
+		if err != nil {
+			return err
+		}
+		label, kind, sd, est := dateFromInput(req.Date, nil)
+		if _, err := tx.Exec(r.Context(), `SET CONSTRAINTS contents_working_revision_fk, contents_published_revision_fk, content_revisions_content_id_fkey DEFERRED`); err != nil {
+			return err
+		}
+		contentID, err := q.NewUUID(r.Context())
+		if err != nil {
+			return err
+		}
+		revID, err := q.NewUUID(r.Context())
+		if err != nil {
+			return err
+		}
+		c, err := q.CreateContent(r.Context(), store.CreateContentParams{ID: contentID, Type: req.Type, Section: req.Section, Slug: req.Slug, CreatorUserID: a.Identity.UserID, WorkingRevisionID: revID})
+		if err != nil {
+			var pe *pgconn.PgError
+			if errors.As(err, &pe) && pe.Code == "23505" {
+				return &errTx{http.StatusConflict, "SLUG_TAKEN", "このURL用の名前（slug）は既に使われています"}
+			}
+			return err
+		}
+		mj, _ := json.Marshal(meta)
+		rev, err := q.InsertContentRevision(r.Context(), store.InsertContentRevisionParams{ID: revID, ContentID: contentID, RevisionNo: 1, Title: req.Title, Summary: req.Summary, Markdown: req.Markdown,
+			MetadataJson: mj, DateLabel: label, DateKind: kind, SortDate: sd, SortDateIsEstimated: est, EditedBy: a.Identity.UserID})
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(r.Context(), `SET CONSTRAINTS contents_working_revision_fk, contents_published_revision_fk, content_revisions_content_id_fkey IMMEDIATE`); err != nil {
+			return err
+		}
+		if err := s.auditContent(r, q, a, c.ID, "content.created", map[string]any{"type": c.Type, "section": c.Section}); err != nil {
+			return err
+		}
+		out, err = s.loadContentView(r, q, a, c, authz.Resource{IsAuthor: true}, false, &rev)
+		return err
+	})
+	if err != nil {
+		s.writeTxErr(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusCreated, out)
+}
+
+func (s *server) auditContent(r *http.Request, q *store.Queries, a authCtx, id pgtype.UUID, action string, summary map[string]any) error {
+	b, _ := json.Marshal(summary)
+	return q.InsertAuditLog(r.Context(), store.InsertAuditLogParams{
+		ActorUserID: a.Identity.UserID, Action: action, TargetType: pgtype.Text{String: "content", Valid: true},
+		TargetID: pgtype.Text{String: id.String(), Valid: true}, SummaryJson: b,
+	})
+}
+
+// ---- 取得・一覧 ----
+
+// getContent は GET /contents/{id}（作者・共同編集者・Editor以上）。権限が無ければ存在しないのと同じ404。
+// ?revision=N で過去の版の内容を返す。
+func (s *server) getContent(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.memberOrReject(w, r)
+	if !ok {
+		return
+	}
+	id, ok := parseItemID(w, r)
+	if !ok {
+		return
+	}
+	q := store.New(s.Pool)
+	c, err := q.GetContent(r.Context(), id)
+	if err != nil {
+		httpx.Error(w, r, http.StatusNotFound, "NOT_FOUND", "見つかりません")
+		return
+	}
+	res, err := contentResource(r, q, a, c)
+	if err != nil {
+		s.internal(w, r)
+		return
+	}
+	if !authz.Decide(a.Identity.Subject(), "contents.get", res).Allowed {
+		httpx.Error(w, r, http.StatusNotFound, "NOT_FOUND", "見つかりません")
+		return
+	}
+	var rev *store.ContentRevision
+	if v := r.URL.Query().Get("revision"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			httpx.Error(w, r, http.StatusBadRequest, "INVALID_REQUEST", "revision が正しくありません")
+			return
+		}
+		got, err := q.GetContentRevisionByNo(r.Context(), store.GetContentRevisionByNoParams{ContentID: c.ID, RevisionNo: int32(n)})
+		if err != nil {
+			httpx.Error(w, r, http.StatusNotFound, "NOT_FOUND", "見つかりません")
+			return
+		}
+		rev = &got
+	}
+	v, err := s.loadContentView(r, q, a, c, res, true, rev)
+	if err != nil {
+		s.internal(w, r)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, v)
+}
+
+type contentListItem struct {
+	ID                    string    `json:"id"`
+	Type                  string    `json:"type"`
+	Section               string    `json:"section"`
+	Slug                  string    `json:"slug"`
+	Title                 string    `json:"title"`
+	Summary               string    `json:"summary"`
+	RevisionNo            int       `json:"revisionNo"`
+	IsPublished           bool      `json:"isPublished"`
+	CanEdit               bool      `json:"canEdit"`
+	HasUnpublishedChanges bool      `json:"hasUnpublishedChanges"`
+	UpdatedAt             time.Time `json:"updatedAt"`
+}
+
+// listContents は GET /contents（Member）。編集できるものは作業版、そうでない公開中のものは**公開版の値だけ**を返す。
+func (s *server) listContents(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.authorize(w, r, "contents.list", authz.Resource{})
+	if !ok {
+		return
+	}
+	qp := r.URL.Query()
+	limit := 30
+	if v := qp.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 100 {
+			httpx.Error(w, r, http.StatusBadRequest, "INVALID_REQUEST", "limit は1〜100で指定してください")
+			return
+		}
+		limit = n
+	}
+	p := store.ListContentsParams{IsEditor: a.Identity.Subject().IsEditorPlus(), UserID: a.Identity.UserID, Mine: qp.Get("mine") == "true", Lim: int32(limit + 1)}
+	if v := qp.Get("section"); v != "" {
+		if v != "blog" && v != "news" && v != "project" {
+			httpx.Error(w, r, http.StatusBadRequest, "INVALID_REQUEST", "section が正しくありません")
+			return
+		}
+		p.Section = pgtype.Text{String: v, Valid: true}
+	}
+	if c := qp.Get("cursor"); c != "" {
+		t, id, ok := decodeTimeCursor(c)
+		if !ok {
+			httpx.Error(w, r, http.StatusBadRequest, "INVALID_REQUEST", "cursor が正しくありません")
+			return
+		}
+		p.BeforeAt, p.BeforeID = pgtype.Timestamptz{Time: t, Valid: true}, id
+	}
+	rows, err := store.New(s.Pool).ListContents(r.Context(), p)
+	if err != nil {
+		s.internal(w, r)
+		return
+	}
+	var next *string
+	if len(rows) > limit {
+		last := rows[limit-1]
+		c := encodeTimeCursor(last.UpdatedAt.Time, last.ID)
+		next = &c
+		rows = rows[:limit]
+	}
+	items := make([]contentListItem, 0, len(rows))
+	for _, x := range rows {
+		it := contentListItem{ID: x.ID.String(), Type: x.Type, Section: x.Section, Slug: x.Slug, Title: x.Title, Summary: x.Summary, RevisionNo: int(x.RevisionNo),
+			IsPublished: x.IsPublished, CanEdit: x.CanEdit, HasUnpublishedChanges: x.HasUnpublishedChanges, UpdatedAt: x.UpdatedAt.Time}
+		items = append(items, it)
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": next})
+}
+
+// ---- 版の保存 ----
+
+func (s *server) conflict(w http.ResponseWriter, r *http.Request, current revisionView) {
+	var b struct {
+		Error struct {
+			Code      string `json:"code"`
+			Message   string `json:"message"`
+			RequestID string `json:"requestId,omitempty"`
+		} `json:"error"`
+		Current revisionView `json:"current"`
+	}
+	b.Error.Code, b.Error.Message, b.Error.RequestID = "REVISION_CONFLICT", "他の人が先に保存しました。最新の内容を確認してから保存し直してください", httpx.RequestID(r.Context())
+	b.Current = current
+	httpx.JSON(w, http.StatusConflict, b)
+}
+
+type conflictErr struct{ current revisionView }
+
+func (e *conflictErr) Error() string { return "revision conflict" }
+
+// saveRevision は POST /contents/{id}/revisions（作者・共同編集者・Editor以上）。
+// baseRevisionが現在の作業版と違えば409。公開ポインタは変えない（公開は再公開まで旧版のまま）。
+func (s *server) saveRevision(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.memberOrReject(w, r)
+	if !ok {
+		return
+	}
+	id, ok := parseItemID(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxContentBody)
+	var req struct {
+		BaseRevision *int `json:"baseRevision"`
+		contentFields
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.BaseRevision == nil || *req.BaseRevision < 1 {
+		httpx.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INPUT", "baseRevision（編集の元にした版の番号）を指定してください")
+		return
+	}
+	if !s.saveAllowed(w, r, a) {
+		return
+	}
+	if err := checkFields(&req.contentFields); err != nil {
+		s.writeTxErr(w, r, err)
+		return
+	}
+	editor := a.Identity.Subject().IsEditorPlus()
+	status := http.StatusCreated
+	var out contentView
+	err := s.inTx(r.Context(), func(q *store.Queries, tx pgx.Tx) error {
+		c, err := s.lockContent(r, q, a, id, "contents.revisions.create")
+		if err != nil {
+			return err
+		}
+		cur, err := q.GetContentRevision(r.Context(), c.WorkingRevisionID)
+		if err != nil {
+			return err
+		}
+		if int(cur.RevisionNo) != *req.BaseRevision {
+			contribs, err := q.ListWorkContributors(r.Context(), cur.ID)
+			if err != nil {
+				return err
+			}
+			return &conflictErr{current: toRevisionView(cur, s.displayName(r.Context(), q, cur.EditedBy), contribs)}
+		}
+		if s.BeforeContentSave != nil {
+			s.BeforeContentSave() // テスト専用: 全員が確認を終えた状態で止めて、ロックが無ければ必ず競合させる
+		}
+		// 認可と行ロックの後に、重い検査を行う
+		if err := markdownError(req.Markdown); err != nil {
+			return err
+		}
+		meta, err := mergeMetadata(req.Metadata, decodeMetadata(cur.MetadataJson), editor)
+		if err != nil {
+			return err
+		}
+		label, kind, sd, est := dateFromInput(req.Date, &cur)
+		d := revData{Title: req.Title, Summary: req.Summary, Markdown: req.Markdown, Metadata: meta, DateLabel: label, DateKind: kind, SortDate: sd, Estimated: est}
+		res, err := contentResource(r, q, a, c)
+		if err != nil {
+			return err
+		}
+		if sameRevision(d, cur) { // 内容が同じなら版を増やさない（自動保存の連打）
+			status = http.StatusOK
+			out, err = s.loadContentView(r, q, a, c, res, false, &cur)
+			return err
+		}
+		newRev, err := s.insertNextRevision(r, q, a, c, cur, d, true)
+		if err != nil {
+			return err
+		}
+		if err := s.auditContent(r, q, a, c.ID, "content.revision_saved", map[string]any{"revisionNo": newRev.RevisionNo}); err != nil {
+			return err
+		}
+		out, err = s.loadContentView(r, q, a, c, res, false, &newRev)
+		return err
+	})
+	var ce *conflictErr
+	if errors.As(err, &ce) {
+		s.conflict(w, r, ce.current)
+		return
+	}
+	if err != nil {
+		s.writeTxErr(w, r, err)
+		return
+	}
+	httpx.JSON(w, status, out)
+}
+
+// insertNextRevision は新しい版を追加して作業版ポインタを進める（公開ポインタは変えない）。copyContributors=trueなら前の版の制作メンバーを引き継ぐ。
+func (s *server) insertNextRevision(r *http.Request, q *store.Queries, a authCtx, c store.Content, cur store.ContentRevision, d revData, copyContributors bool) (store.ContentRevision, error) {
+	revID, err := q.NewUUID(r.Context())
+	if err != nil {
+		return store.ContentRevision{}, err
+	}
+	mj, _ := json.Marshal(d.Metadata)
+	rev, err := q.InsertContentRevision(r.Context(), store.InsertContentRevisionParams{ID: revID, ContentID: c.ID, RevisionNo: cur.RevisionNo + 1, Title: d.Title, Summary: d.Summary, Markdown: d.Markdown,
+		MetadataJson: mj, DateLabel: d.DateLabel, DateKind: d.DateKind, SortDate: d.SortDate, SortDateIsEstimated: d.Estimated, EditedBy: a.Identity.UserID})
+	if err != nil {
+		return rev, err
+	}
+	if copyContributors {
+		if err := q.CopyWorkContributors(r.Context(), store.CopyWorkContributorsParams{ToRevisionID: revID, FromRevisionID: cur.ID}); err != nil {
+			return rev, err
+		}
+	}
+	if err := q.SetWorkingRevision(r.Context(), store.SetWorkingRevisionParams{ID: c.ID, WorkingRevisionID: revID, UpdatedAt: pgtype.Timestamptz{Time: s.Now(), Valid: true}}); err != nil {
+		return rev, err
+	}
+	return rev, nil
+}
+
+// ---- 共同編集者 ----
+
+const maxCollaborators = 20
+
+// putCollaborators は PUT /contents/{id}/collaborators（作者・Editor以上。共同編集者は不可）。全件置き換え。
+// 新しく加えられるのは有効（active）なユーザーだけ。作者本人は無視する。
+func (s *server) putCollaborators(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.memberOrReject(w, r)
+	if !ok {
+		return
+	}
+	id, ok := parseItemID(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	var req struct {
+		UserIDs []string `json:"userIds"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if !s.saveAllowed(w, r, a) {
+		return
+	}
+	if len(req.UserIDs) > maxCollaborators {
+		httpx.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INPUT", fmt.Sprintf("共同編集者は%d人までです", maxCollaborators))
+		return
+	}
+	want := make([]pgtype.UUID, 0, len(req.UserIDs))
+	seen := map[string]bool{}
+	for _, raw := range req.UserIDs {
+		var u pgtype.UUID
+		if err := u.Scan(raw); err != nil || !u.Valid {
+			httpx.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INPUT", "ユーザーIDが正しくありません")
+			return
+		}
+		if !seen[u.String()] {
+			seen[u.String()] = true
+			want = append(want, u)
+		}
+	}
+	var out []personView
+	err := s.inTx(r.Context(), func(q *store.Queries, tx pgx.Tx) error {
+		c, err := s.lockContent(r, q, a, id, "contents.collaborators.update")
+		if err != nil {
+			return err
+		}
+		prev, err := q.ListContentCollaborators(r.Context(), c.ID)
+		if err != nil {
+			return err
+		}
+		had := map[string]bool{}
+		for _, p := range prev {
+			had[p.UserID.String()] = true
+		}
+		var added, final []pgtype.UUID
+		for _, u := range want {
+			if u == c.CreatorUserID {
+				continue // 作者は最初から編集できる
+			}
+			final = append(final, u)
+			if !had[u.String()] {
+				added = append(added, u)
+			}
+		}
+		if len(added) > 0 { // 新しく加えるのは有効なユーザーだけ（停止・招待中は不可）
+			act, err := q.ActiveUserIDs(r.Context(), added)
+			if err != nil {
+				return err
+			}
+			ok := map[string]bool{}
+			for _, u := range act {
+				ok[u.String()] = true
+			}
+			for _, u := range added {
+				if !ok[u.String()] {
+					return invalid("共同編集者に指定できるのは、有効なユーザーだけです")
+				}
+			}
+		}
+		if err := q.DeleteContentCollaborators(r.Context(), c.ID); err != nil {
+			return err
+		}
+		for _, u := range final {
+			if err := q.InsertContentCollaborator(r.Context(), store.InsertContentCollaboratorParams{ContentID: c.ID, UserID: u, AddedBy: a.Identity.UserID}); err != nil {
+				return err
+			}
+		}
+		if err := s.auditContent(r, q, a, c.ID, "content.collaborators_updated", map[string]any{"count": len(final)}); err != nil {
+			return err
+		}
+		list, err := q.ListContentCollaborators(r.Context(), c.ID)
+		if err != nil {
+			return err
+		}
+		out = make([]personView, 0, len(list))
+		for _, p := range list {
+			out = append(out, personView{UserID: p.UserID.String(), DisplayName: p.DisplayName})
+		}
+		return nil
+	})
+	if err != nil {
+		s.writeTxErr(w, r, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"collaborators": out})
+}
+
+// ---- 制作メンバー ----
+
+const maxContributors = 50
+
+type contributorIn struct {
+	UserID    string `json:"userId"`
+	RoleLabel string `json:"roleLabel"`
+}
+
+// putContributors は PUT /contents/{id}/contributors（作者・共同編集者・Editor以上）。作品だけ。
+// 制作メンバーは版ごとに持つため、変更は**新しい版**になる（公開版には影響しない）。baseRevisionが必要。
+// 公開クレジットの同意は変えない（本人だけが別のAPIで変更する）。
+func (s *server) putContributors(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.memberOrReject(w, r)
+	if !ok {
+		return
+	}
+	id, ok := parseItemID(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 128<<10)
+	var req struct {
+		BaseRevision *int            `json:"baseRevision"`
+		Contributors []contributorIn `json:"contributors"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.BaseRevision == nil || *req.BaseRevision < 1 {
+		httpx.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INPUT", "baseRevision（編集の元にした版の番号）を指定してください")
+		return
+	}
+	if len(req.Contributors) > maxContributors {
+		httpx.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INPUT", fmt.Sprintf("制作メンバーは%d件までです", maxContributors))
+		return
+	}
+	if !s.saveAllowed(w, r, a) {
+		return
+	}
+	type cm struct {
+		user pgtype.UUID
+		role string
+	}
+	list := make([]cm, 0, len(req.Contributors))
+	pair := map[string]bool{}
+	ids := make([]pgtype.UUID, 0, len(req.Contributors))
+	for _, c := range req.Contributors {
+		var u pgtype.UUID
+		role := strings.TrimSpace(c.RoleLabel)
+		if err := u.Scan(c.UserID); err != nil || !u.Valid {
+			httpx.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INPUT", "ユーザーIDが正しくありません")
+			return
+		}
+		if role == "" || utf8.RuneCountInString(role) > 50 || hasControl(role, false) || strings.ContainsAny(role, "@<>") || urlLikeRe.MatchString(role) {
+			httpx.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INPUT", "役割は1〜50文字で、URLや記号（@ < >）を含めないでください")
+			return
+		}
+		k := u.String() + "|" + role
+		if pair[k] {
+			httpx.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INPUT", "同じ人の同じ役割が重複しています")
+			return
+		}
+		pair[k] = true
+		list = append(list, cm{u, role})
+		ids = append(ids, u)
+	}
+	status := http.StatusCreated
+	var out contentView
+	err := s.inTx(r.Context(), func(q *store.Queries, tx pgx.Tx) error {
+		c, err := s.lockContent(r, q, a, id, "contents.contributors.update")
+		if err != nil {
+			return err
+		}
+		if c.Type != "project" {
+			return invalid("制作メンバーを登録できるのは作品だけです")
+		}
+		cur, err := q.GetContentRevision(r.Context(), c.WorkingRevisionID)
+		if err != nil {
+			return err
+		}
+		curContribs, err := q.ListWorkContributors(r.Context(), cur.ID)
+		if err != nil {
+			return err
+		}
+		if int(cur.RevisionNo) != *req.BaseRevision {
+			return &conflictErr{current: toRevisionView(cur, s.displayName(r.Context(), q, cur.EditedBy), curContribs)}
+		}
+		if len(ids) > 0 { // 停止・退会済みでも登録できる（D08）。存在しないIDだけ拒否
+			exist, err := q.ExistingUserIDs(r.Context(), ids)
+			if err != nil {
+				return err
+			}
+			have := map[string]bool{}
+			for _, u := range exist {
+				have[u.String()] = true
+			}
+			for _, u := range ids {
+				if !have[u.String()] {
+					return invalid("存在しないユーザーが含まれています")
+				}
+			}
+		}
+		res, err := contentResource(r, q, a, c)
+		if err != nil {
+			return err
+		}
+		same := len(curContribs) == len(list)
+		if same {
+			for i, cc := range curContribs {
+				if cc.UserID != list[i].user || cc.RoleLabel != list[i].role {
+					same = false
+					break
+				}
+			}
+		}
+		if same { // 変更なしなら新しい版を作らない
+			status = http.StatusOK
+			out, err = s.loadContentView(r, q, a, c, res, false, &cur)
+			return err
+		}
+		d := revData{Title: cur.Title, Summary: cur.Summary, Markdown: cur.Markdown, Metadata: decodeMetadata(cur.MetadataJson),
+			DateLabel: cur.DateLabel, DateKind: cur.DateKind, SortDate: cur.SortDate, Estimated: cur.SortDateIsEstimated}
+		newRev, err := s.insertNextRevision(r, q, a, c, cur, d, false)
+		if err != nil {
+			return err
+		}
+		for i, cc := range list {
+			if err := q.InsertWorkContributor(r.Context(), store.InsertWorkContributorParams{ContentID: c.ID, RevisionID: newRev.ID, UserID: cc.user, RoleLabel: cc.role, SortOrder: int32(i), AddedBy: a.Identity.UserID}); err != nil {
+				return err
+			}
+		}
+		if err := s.auditContent(r, q, a, c.ID, "content.contributors_updated", map[string]any{"revisionNo": newRev.RevisionNo, "count": len(list)}); err != nil {
+			return err
+		}
+		out, err = s.loadContentView(r, q, a, c, res, false, &newRev)
+		return err
+	})
+	var ce *conflictErr
+	if errors.As(err, &ce) {
+		s.conflict(w, r, ce.current)
+		return
+	}
+	if err != nil {
+		s.writeTxErr(w, r, err)
+		return
+	}
+	httpx.JSON(w, status, out)
+}
