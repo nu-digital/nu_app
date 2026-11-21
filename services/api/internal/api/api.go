@@ -38,6 +38,8 @@ type Deps struct {
 
 	// BeforeOwnerCount はテスト専用のフック（本番ではnil）。最後のOwnerの判定の直前に呼ばれ、競合を再現するために使う。
 	BeforeOwnerCount func()
+	// BeforeInventoryCheck もテスト専用のフック（本番ではnil）。在庫の判定（残数・未返却数の確認）の直前に呼ばれる。
+	BeforeInventoryCheck func()
 }
 
 type server struct {
@@ -83,6 +85,10 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("POST /inventory/items", s.createItem)
 	mux.HandleFunc("PATCH /inventory/items/{id}", s.updateItem)
 	mux.HandleFunc("POST /inventory/items/{id}/units", s.createUnit)
+	mux.HandleFunc("POST /inventory/loans", s.createLoan)
+	mux.HandleFunc("POST /inventory/loans/{id}/returns", s.returnLoan)
+	mux.HandleFunc("GET /inventory/loans", s.listLoans)
+	mux.HandleFunc("GET /inventory/history", s.history)
 	mux.HandleFunc("GET /members", s.listMembers)
 	mux.HandleFunc("GET /members/{id}", s.getMember)
 	mux.HandleFunc("GET /admin/users/{id}/private-profile", s.getPrivateProfile)

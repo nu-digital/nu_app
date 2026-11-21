@@ -50,6 +50,10 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | `POST /inventory/items`（Admin） | `{name,description?,category?,location?,mode:"quantity"\|"individual",totalQuantity?}` | 201 | 422 |
 | `PATCH /inventory/items/{id}`（Admin） | `{name?,description?,category?,location?,mode?,totalQuantity?,reason?,archived?}`。総数の変更は`reason`必須・履歴に記録 | 200 | 409 `BELOW_OUTSTANDING`（貸出中の数量を下回る総数）・`HAS_OUTSTANDING`（貸出中の廃止）・`MODE_LOCKED`（貸出履歴/個体がある物品の方式変更） |
 | `POST /inventory/items/{id}/units`（Admin） | `{assetTag,serialNumber?}`（個体管理のみ） | 201 | 409 `TAG_TAKEN`・`WRONG_MODE`・`ARCHIVED` |
+| `POST /inventory/loans` | 数量管理 `{itemId,quantity}`／個体管理 `{itemId,unitId}`（借りた本人はセッションのユーザー。指定項目なし） | 201 `{id,itemId,unitId,quantity,borrowedAt,remaining}` | 409 `INSUFFICIENT_STOCK`・`UNIT_UNAVAILABLE`・`ARCHIVED`、422 |
+| `POST /inventory/loans/{id}/returns` | `{quantity?}`（省略=残りをすべて。**誰でも他人の貸出を返却できる**＝代理返却。部分返却可） | 200 `{loanId,returned,outstanding}` | 409 `EXCEEDS_OUTSTANDING`（未返却数を超える）・`ALREADY_RETURNED`（二重返却）、404 |
+| `GET /inventory/loans` | `q`（物品名・借りた人の表示名）, `mine=true`, `itemId`, `limit`, `cursor` | 200 `{items:[{id,itemId,itemName,assetTag,borrowerDisplayName,quantity(未返却),borrowedAt,elapsedDays,mine}],nextCursor}`（古い順） | 400 |
+| `GET /inventory/history` | `itemId?`, `limit`, `cursor` | 200 `{items:[{id,kind:"loan"\|"return",itemId,itemName,assetTag,borrowerDisplayName,actorDisplayName,quantity,at}],nextCursor}`（新しい順。返却では**借りた人と返却した人が別に分かる**） | 400 |
 | `POST /admin/users` | `{loginId,displayName}` | 201 `{user,url,expiresAt}`（`url`=`<APP_BASE_URL>/invite#token=…`、一度だけ） | 409 `LOGIN_ID_TAKEN`、422 |
 | `POST /admin/users/{id}/invite-link` | – | 200 `{url,expiresAt}`（invitedのみ） | 409 `INVALID_STATE`・`CONFLICT` |
 | `POST /admin/users/{id}/reset-link` | – | 200 `{url,expiresAt}`（activeのみ。管理者対象はOwnerのみ） | 403、409 |
