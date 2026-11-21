@@ -54,6 +54,7 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | `POST /inventory/loans/{id}/returns` | `{quantity?}`（省略=残りをすべて。**誰でも他人の貸出を返却できる**＝代理返却。部分返却可） | 200 `{loanId,returned,outstanding}` | 409 `EXCEEDS_OUTSTANDING`（未返却数を超える）・`ALREADY_RETURNED`（二重返却）、404 |
 | `GET /inventory/loans` | `q`（物品名・借りた人の表示名）, `mine=true`, `itemId`, `limit`, `cursor` | 200 `{items:[{id,itemId,itemName,assetTag,borrowerDisplayName,quantity(未返却),borrowedAt,elapsedDays,mine}],nextCursor}`（古い順） | 400 |
 | `GET /inventory/history` | `itemId?`, `limit`, `cursor` | 200 `{items:[{id,kind:"loan"\|"return",itemId,itemName,assetTag,borrowerDisplayName,actorDisplayName,quantity,at}],nextCursor}`（新しい順。返却では**借りた人と返却した人が別に分かる**） | 400 |
+| `POST /admin/inventory/corrections`（Admin/Owner） | ヘッダー`Idempotency-Key`（必須）、`{targetType:"loan"\|"return",targetId,kind:"adjust"\|"void",deltaQuantity?,reason}`。元記録は変更せず訂正イベントを追加し、有効数量へ反映（個体管理の貸出は`void`のみ） | 201 `{id,...,replayed:false,itemOutstanding,itemAvailable}`／同じキー・同じ内容の再送は200（`replayed:true`・二重適用なし） | 409 `CORRECTION_INVALID`（在庫が負・返却数が貸出数超過・数量が1未満）・`ALREADY_VOIDED`・`UNIT_UNAVAILABLE`、422 `IDEMPOTENCY_KEY_REUSED`（同じキーで内容が違う）・入力不正、400（キー不備）、403 |
 | `POST /admin/users` | `{loginId,displayName}` | 201 `{user,url,expiresAt}`（`url`=`<APP_BASE_URL>/invite#token=…`、一度だけ） | 409 `LOGIN_ID_TAKEN`、422 |
 | `POST /admin/users/{id}/invite-link` | – | 200 `{url,expiresAt}`（invitedのみ） | 409 `INVALID_STATE`・`CONFLICT` |
 | `POST /admin/users/{id}/reset-link` | – | 200 `{url,expiresAt}`（activeのみ。管理者対象はOwnerのみ） | 403、409 |

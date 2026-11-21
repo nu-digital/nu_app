@@ -17,8 +17,8 @@ RETURNING *;
 
 -- name: ItemOutstanding :one
 -- 物品の貸出中の数量（貸出数の合計 − 返却数の合計）。呼び出し側が物品行をロックしてから使う。
-SELECT (COALESCE((SELECT SUM(l.quantity) FROM inventory_loans l WHERE l.item_id = $1), 0)
-      - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r JOIN inventory_loans l ON l.id = r.loan_id WHERE l.item_id = $1), 0))::bigint;
+SELECT (COALESCE((SELECT SUM(l.quantity) FROM inventory_loans_eff l WHERE l.item_id = $1), 0)
+      - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r JOIN inventory_loans_eff l ON l.id = r.loan_id WHERE l.item_id = $1), 0))::bigint;
 
 -- name: ItemLoanCount :one
 SELECT count(*) FROM inventory_loans WHERE item_id = $1;
@@ -47,19 +47,19 @@ ORDER BY u.asset_tag, u.id;
 -- name: ListItemLoansOutstanding :many
 -- 数量管理の物品の貸出中の一覧（貸出ごとの未返却数）。
 SELECT l.id, l.quantity, l.borrowed_at, l.borrower_user_id, COALESCE(p.display_name, '') AS borrower_display_name,
-       (l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r WHERE r.loan_id = l.id), 0))::int AS outstanding
-FROM inventory_loans l
+       (l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r WHERE r.loan_id = l.id), 0))::int AS outstanding
+FROM inventory_loans_eff l
 LEFT JOIN profiles p ON p.user_id = l.borrower_user_id
 WHERE l.item_id = $1 AND l.unit_id IS NULL
-  AND l.quantity > COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r WHERE r.loan_id = l.id), 0)
+  AND l.quantity > COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r WHERE r.loan_id = l.id), 0)
 ORDER BY l.borrowed_at, l.id;
 
 -- name: ListInventoryItems :many
 -- 一覧。残数(数量管理)・利用可能な個体数(個体管理)を導出して返す。廃止した物品は含めない。
 WITH base AS (
   SELECT i.*,
-    (COALESCE((SELECT SUM(l.quantity) FROM inventory_loans l WHERE l.item_id = i.id), 0)
-     - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r JOIN inventory_loans l ON l.id = r.loan_id WHERE l.item_id = i.id), 0))::bigint AS outstanding,
+    (COALESCE((SELECT SUM(l.quantity) FROM inventory_loans_eff l WHERE l.item_id = i.id), 0)
+     - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r JOIN inventory_loans_eff l ON l.id = r.loan_id WHERE l.item_id = i.id), 0))::bigint AS outstanding,
     (SELECT count(*) FROM inventory_units u WHERE u.item_id = i.id AND u.state = 'active')::bigint AS unit_count,
     (SELECT count(*) FROM inventory_units u WHERE u.item_id = i.id AND u.state = 'active' AND u.current_loan_id IS NULL)::bigint AS units_available
   FROM inventory_items i
@@ -83,8 +83,8 @@ SELECT * FROM inventory_loans WHERE id = $1;
 
 -- name: LoanOutstanding :one
 -- 貸出ごとの未返却数。
-SELECT (l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r WHERE r.loan_id = l.id), 0))::int
-FROM inventory_loans l WHERE l.id = $1;
+SELECT (l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r WHERE r.loan_id = l.id), 0))::int
+FROM inventory_loans_eff l WHERE l.id = $1;
 
 -- name: CreateInventoryLoan :one
 INSERT INTO inventory_loans (item_id, unit_id, borrower_user_id, quantity, borrowed_at)
@@ -110,12 +110,12 @@ RETURNING *;
 -- 貸出中（未返却数>0）の一覧。古い順。
 SELECT l.id, l.item_id, i.name AS item_name, l.unit_id, COALESCE(un.asset_tag, '') AS asset_tag,
        l.borrower_user_id, COALESCE(p.display_name, '') AS borrower_display_name, l.borrowed_at,
-       (l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r WHERE r.loan_id = l.id), 0))::int AS outstanding
-FROM inventory_loans l
+       (l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r WHERE r.loan_id = l.id), 0))::int AS outstanding
+FROM inventory_loans_eff l
 JOIN inventory_items i ON i.id = l.item_id
 LEFT JOIN inventory_units un ON un.id = l.unit_id
 LEFT JOIN profiles p ON p.user_id = l.borrower_user_id
-WHERE l.quantity > COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r WHERE r.loan_id = l.id), 0)
+WHERE l.quantity > COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r WHERE r.loan_id = l.id), 0)
   AND (NOT $1::bool OR l.borrower_user_id = $2::uuid)
   AND ($3::text = '' OR i.name ILIKE '%' || $3 || '%' ESCAPE '\' OR p.display_name ILIKE '%' || $3 || '%' ESCAPE '\')
   AND ($4::uuid IS NULL OR l.item_id = $4::uuid)
@@ -128,22 +128,50 @@ LIMIT $8;
 SELECT * FROM (
   SELECT l.id AS event_id, 'loan'::text AS kind, l.item_id, i.name AS item_name, COALESCE(un.asset_tag, '') AS asset_tag,
          COALESCE(pb.display_name, '') AS borrower_display_name, COALESCE(pb.display_name, '') AS actor_display_name,
-         l.quantity, l.borrowed_at AS at
+         l.quantity, l.borrowed_at AS at, ''::text AS correction_kind, ''::text AS target_type, ''::text AS reason
   FROM inventory_loans l
   JOIN inventory_items i ON i.id = l.item_id
   LEFT JOIN inventory_units un ON un.id = l.unit_id
   LEFT JOIN profiles pb ON pb.user_id = l.borrower_user_id
   UNION ALL
   SELECT r.id, 'return'::text, l.item_id, i.name, COALESCE(un.asset_tag, ''),
-         COALESCE(pb.display_name, ''), COALESCE(pa.display_name, ''), r.quantity, r.returned_at
+         COALESCE(pb.display_name, ''), COALESCE(pa.display_name, ''), r.quantity, r.returned_at, ''::text, ''::text, ''::text
   FROM inventory_returns r
   JOIN inventory_loans l ON l.id = r.loan_id
   JOIN inventory_items i ON i.id = l.item_id
   LEFT JOIN inventory_units un ON un.id = l.unit_id
   LEFT JOIN profiles pb ON pb.user_id = l.borrower_user_id
   LEFT JOIN profiles pa ON pa.user_id = r.actor_user_id
+  UNION ALL
+  SELECT c.id, 'correction'::text, c.item_id, i.name, COALESCE(un.asset_tag, ''),
+         COALESCE(pb.display_name, ''), COALESCE(pc.display_name, ''), COALESCE(c.delta_quantity, 0), c.created_at, c.kind, c.target_type, c.reason
+  FROM inventory_correction_events c
+  JOIN inventory_items i ON i.id = c.item_id
+  LEFT JOIN inventory_loans tl ON c.target_type = 'loan' AND tl.id = c.target_id
+  LEFT JOIN inventory_returns tr ON c.target_type = 'return' AND tr.id = c.target_id
+  LEFT JOIN inventory_loans tl2 ON tl2.id = tr.loan_id
+  LEFT JOIN inventory_units un ON un.id = COALESCE(tl.unit_id, tl2.unit_id)
+  LEFT JOIN profiles pb ON pb.user_id = COALESCE(tl.borrower_user_id, tl2.borrower_user_id)
+  LEFT JOIN profiles pc ON pc.user_id = c.actor_user_id
 ) h
 WHERE ($1::uuid IS NULL OR h.item_id = $1::uuid)
   AND (NOT $2::bool OR (h.at, h.event_id) < ($3::timestamptz, $4::uuid))
 ORDER BY h.at DESC, h.event_id DESC
 LIMIT $5;
+
+-- name: GetLoanEff :one
+SELECT * FROM inventory_loans_eff WHERE id = $1;
+
+-- name: GetReturnEff :one
+SELECT * FROM inventory_returns_eff WHERE id = $1;
+
+-- name: GetRawReturn :one
+SELECT * FROM inventory_returns WHERE id = $1;
+
+-- name: GetCorrectionByKey :one
+SELECT * FROM inventory_correction_events WHERE idempotency_key = $1;
+
+-- name: InsertCorrection :one
+INSERT INTO inventory_correction_events (item_id, target_type, target_id, kind, delta_quantity, reason, actor_user_id, idempotency_key, request_fingerprint, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING *;
