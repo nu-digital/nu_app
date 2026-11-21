@@ -35,6 +35,12 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | `POST /auth/accept-invite` | `{token,password}` | 204（自動ログインしない） | 400 `INVALID_LINK`（無効/期限切れ/使用済み/失効を区別しない）、422 `WEAK_PASSWORD` |
 | `POST /auth/reset-password` | `{token,password}` | 204（全セッション失効） | 同上 |
 | `GET /admin/users` | クエリ `q`（ログインID・表示名の部分一致）, `limit`（1〜100、既定50）, `cursor` | 200 `{items:[{id,loginId,displayName,status,roles,createdAt,activatedAt}],nextCursor}`（Admin/Owner。個人情報・秘密値は含まない） | 401、403、400 |
+| `GET /me/profile` | – | 200 自分の全項目（表示名・自己紹介・学部・学科・学年・メンバー内公開の設定・**個人情報4項目（本人のみ）**・外部リンク・個人機材・公開クレジット同意） | 401 |
+| `PATCH /me/profile` | 任意項目の部分更新（`displayName`・`bio`・`faculty`・`department`・`schoolYear`・`legalName`・`studentNumber`・`universityEmail`・`nearestStation`。`null`か空で任意項目を消去、表示名は消せない） | 200（GET /me/profileと同形式） | 422 |
+| `PUT /me/profile/visibility` | `{bio\|faculty\|department\|schoolYear: "private"\|"members"}`（既定はprivate。個人情報4項目は指定不可） | 200 | 422 |
+| `GET/PUT /me/profile/public-credit-consent` | PUT `{granted:bool}`（**メンバー内公開とは別の、インターネット公開の同意**） | 200 `{granted,grantedAt,withdrawnAt}` | 422 |
+| `POST/PATCH/DELETE /me/profile/links` | `{label,url(http/https),sortOrder?,visibility?}`（最大10件） | 201/200/204 | 409 `LIMIT_REACHED`、422、404（他人の項目） |
+| `POST/PATCH/DELETE /me/devices` | `{category,name,spec?,sortOrder?,visibility?}`（最大20件） | 201/200/204 | 同上 |
 | `POST /admin/users` | `{loginId,displayName}` | 201 `{user,url,expiresAt}`（`url`=`<APP_BASE_URL>/invite#token=…`、一度だけ） | 409 `LOGIN_ID_TAKEN`、422 |
 | `POST /admin/users/{id}/invite-link` | – | 200 `{url,expiresAt}`（invitedのみ） | 409 `INVALID_STATE`・`CONFLICT` |
 | `POST /admin/users/{id}/reset-link` | – | 200 `{url,expiresAt}`（activeのみ。管理者対象はOwnerのみ） | 403、409 |

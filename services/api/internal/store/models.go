@@ -59,6 +59,18 @@ type PasswordCredential struct {
 	UpdatedAt    pgtype.Timestamptz
 }
 
+type PersonalDevice struct {
+	ID         pgtype.UUID
+	UserID     pgtype.UUID
+	Category   string
+	Name       string
+	SpecsJson  []byte
+	SortOrder  int32
+	Visibility string
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
+}
+
 type PersonalProfile struct {
 	UserID          pgtype.UUID
 	LegalName       pgtype.Text
@@ -83,6 +95,17 @@ type ProfileFieldVisibility struct {
 	UserID     pgtype.UUID
 	FieldKey   string
 	Visibility string
+	UpdatedAt  pgtype.Timestamptz
+}
+
+type ProfileLink struct {
+	ID         pgtype.UUID
+	UserID     pgtype.UUID
+	Label      string
+	Url        string
+	SortOrder  int32
+	Visibility string
+	CreatedAt  pgtype.Timestamptz
 	UpdatedAt  pgtype.Timestamptz
 }
 
