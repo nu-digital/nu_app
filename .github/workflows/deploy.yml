@@ -1,0 +1,135 @@
+name: deploy
+
+# 本番へのデプロイ・切り戻し（P4-01）。**リポジトリの変数 DEPLOY_ENABLED が 'true' でない限り、どのジョブも動かない**（既定は無効）。
+# 有効にする前に、運用責任者が次を確認する: VPSの契約とセットアップ（docs/OPERATIONS.md「本番の構成と初回セットアップ」）、
+# GitHubの環境 `production`（必須レビュアー＝承認者の設定）、環境のsecret（DEPLOY_HOST・DEPLOY_USER・DEPLOY_SSH_KEY・DEPLOY_KNOWN_HOSTS）。
+# PRにはこれらのsecretを渡さない（このワークフローはmainへのpushと手動実行だけで動く）。デプロイは直列化し、途中で中断しない。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "デプロイ（切り戻し）するコミットSHA（40桁。そのSHAのイメージがGHCRにあること）"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: deploy / verify（テスト済みのSHAだけ）
+    if: vars.DEPLOY_ENABLED == 'true' && github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      checks: read
+      contents: read
+    steps:
+      # このコミットのCI（go・web・admin・compose・harness・ops）がすべて成功してから進める。1つでも失敗・未完了のままなら進めない
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          end=$((SECONDS + 2400))
+          while [ "$SECONDS" -lt "$end" ]; do
+            runs=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" --jq '[.check_runs[] | select(.name | startswith("deploy") | not)]')
+            total=$(echo "$runs" | jq 'length')
+            bad=$(echo "$runs" | jq '[.[] | select(.status == "completed" and (.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral"))] | length')
+            pending=$(echo "$runs" | jq '[.[] | select(.status != "completed")] | length')
+            echo "チェック $total 件・失敗 $bad・未完了 $pending"
+            if [ "$bad" -gt 0 ]; then echo "::error::CIが失敗しているコミットはデプロイしません"; exit 1; fi
+            if [ "$total" -ge 10 ] && [ "$pending" -eq 0 ]; then exit 0; fi
+            sleep 30
+          done
+          echo "::error::CIの完了を待ちきれませんでした"; exit 1
+
+  build:
+    name: deploy / build（イメージのビルド・push）
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      # GHCRへ。イメージのタグはコミットSHA。VPSではビルドしない
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          owner="${REPO_OWNER,,}"
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          build() { # 名前 コンテキスト [追加の引数...]
+            local name="$1" ctx="$2"; shift 2
+            docker build "$@" -t "ghcr.io/$owner/nu_app-$name:$SHA" "$ctx"
+            docker push "ghcr.io/$owner/nu_app-$name:$SHA"
+          }
+          build api services/api
+          build bot services/bot
+          build migrate db
+          build web apps/web --build-arg API_INTERNAL_URL=http://api:8080
+          build admin apps/admin --build-arg API_INTERNAL_URL=http://api:8080
+
+  deploy:
+    name: deploy / production
+    needs: build
+    if: vars.DEPLOY_ENABLED == 'true' && github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # 承認者の確認（GitHubの環境 production の必須レビュアー）を通ってから本番へ
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          # ホスト鍵は事前に登録したものだけを信頼する（初回接続で受け入れない）
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes "$DEPLOY_USER@$DEPLOY_HOST" "sudo /srv/nu_app/infrastructure/deploy/deploy.sh $SHA"
+
+  rollback:
+    name: rollback / production（手動）
+    if: vars.DEPLOY_ENABLED == 'true' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      # 切り戻しもレビューされたワークフローから。指定したSHAのイメージ（GHCRに残っているもの）へ更新する。DBの完全な巻き戻しではない
+      - env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::tagは40桁のコミットSHAです"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes "$DEPLOY_USER@$DEPLOY_HOST" "sudo /srv/nu_app/infrastructure/deploy/deploy.sh $TAG"
