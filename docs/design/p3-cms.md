@@ -41,7 +41,7 @@
 - ポインタの整合性: `contents.working_revision_id`は**NOT NULL**、`published_revision_id`はNULL可。どちらも**複合FK** `(id, working_revision_id) → content_revisions(content_id, id)`（同じコンテンツの版だけを指せる。参照先に`UNIQUE(content_id, id)`）。循環参照（revision.content_id→contents、contents→revision）は両FKとも`DEFERRABLE INITIALLY IMMEDIATE`にし、作成処理だけが`SET CONSTRAINTS ... DEFERRED`で、**版のUUIDをGo側で先に発行**してcontents→revisionの順に挿入する（違反は通常のFKエラーとして出る）。
 - 日付（D12）: `date_label` / `date_kind` / `sort_date` / `sort_date_is_estimated`。CHECK: kind=dayは`sort_date`必須かつestimated=false、month/rangeは`sort_date`あり（estimated=true可）、unknownは`sort_date` NULL可。表示は常に`date_label`。
 - `cover_media_id`はP3-02までFKなしのuuid（NULL可。P3-01aでは常にNULL）。P3-02で`media`を作るときFKを追加。
-- `metadata_json`: キー許可リスト（`category`, `excerpt`, `author`, `image`, `sourceId`, `sourceUrl`）。未知のキーは422。**`author`・`image`・`sourceId`・`sourceUrl`は移行ツール（コマンドライン）とEditor以上だけが書ける**（Memberは書けない＝なりすまし・D08を通らない名前の掲載を防ぐ）。長さ・型を制限。
+- `metadata_json`: キー許可リスト（`category`, `excerpt`, `image`, `sourceId`, `sourceUrl`。**`author`は2026-11-21のD14で許可キーから外す**＝投稿者名は版に保存せず`legacy_authors`で管理し、公開APIが配信時に解決する。[p3-web.md §2.1](p3-web.md)）。未知のキーは422。**`image`・`sourceId`・`sourceUrl`は移行ツール（コマンドライン）とEditor以上だけが書ける**（`author`はD14で廃止）（Memberは書けない＝なりすまし・D08を通らない名前の掲載を防ぐ）。長さ・型を制限。
 - `work_contributors`: 列に`revision_id`（`content_revisions`へのFK）を加え、**その版の制作メンバー**とする。`(revision_id, user_id, role_label)` UNIQUE。`type=project`のコンテンツの版だけ（トリガーで検査）。ユーザーは停止・退会済みでも登録できる（D08）。`role_label`は1〜50文字で、URL・改行・制御文字・`@ < >`を含めない。制作メンバーを変えると**新しい版**ができる（§4）。
 - `content_collaborators`: 作者本人は含めない（冪等に無視）。新規に追加できるのは有効（active）なユーザーだけ。上限20人。変更は監査ログ。
 - `content_publication_events`: publish/unpublishの追記（誰が・どの版を・いつ）。**追記専用トリガー**（`content_revisions`と同じ）。
