@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"golang.org/x/crypto/argon2"
@@ -27,21 +28,39 @@ var DefaultParams = Params{MemoryKiB: 64 * 1024, Time: 3, Threads: 1, SaltLen: 1
 
 // Hasher はハッシュ計算の同時実行数を制限する（メモリを大量に使うため、4GB環境を守る）。
 type Hasher struct {
-	params Params
-	sem    chan struct{}
+	params      Params
+	sem         chan struct{}
+	waitTimeout time.Duration
 }
 
-func NewHasher(p Params, maxConcurrent int) *Hasher {
+// ErrBusy は同時実行の待ちが上限時間を超えたとき（呼び出し側は503にする）。待ち行列を無制限に溜めない。
+var ErrBusy = errors.New("混み合っています。しばらくしてからお試しください")
+
+// NewHasher は同時実行数と、順番待ちの上限時間(waitTimeout)を指定する。waitTimeoutが0以下なら待ち続ける。
+func NewHasher(p Params, maxConcurrent int, waitTimeout time.Duration) *Hasher {
 	if maxConcurrent < 1 {
 		maxConcurrent = 1
 	}
-	return &Hasher{params: p, sem: make(chan struct{}, maxConcurrent)}
+	return &Hasher{params: p, sem: make(chan struct{}, maxConcurrent), waitTimeout: waitTimeout}
 }
 
-func (h *Hasher) acquire() func() {
-	h.sem <- struct{}{}
-	return func() { <-h.sem }
+func (h *Hasher) acquire() (func(), error) {
+	if h.waitTimeout <= 0 {
+		h.sem <- struct{}{}
+		return func() { <-h.sem }, nil
+	}
+	timer := time.NewTimer(h.waitTimeout)
+	defer timer.Stop()
+	select {
+	case h.sem <- struct{}{}:
+		return func() { <-h.sem }, nil
+	case <-timer.C:
+		return nil, ErrBusy
+	}
 }
+
+// Hold は計算枠を1つ占有する（混雑時の挙動をテストするための口。呼び出し側は必ず release を呼ぶ）。
+func (h *Hasher) Hold() (release func(), err error) { return h.acquire() }
 
 // Hash は "$argon2id$v=19$m=…,t=…,p=…$<salt>$<hash>" 形式の文字列を返す。
 func (h *Hasher) Hash(pw string) (string, error) {
@@ -49,7 +68,11 @@ func (h *Hasher) Hash(pw string) (string, error) {
 	if _, err := rand.Read(salt); err != nil {
 		return "", err
 	}
-	defer h.acquire()()
+	release, err := h.acquire()
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	key := argon2.IDKey([]byte(pw), salt, h.params.Time, h.params.MemoryKiB, h.params.Threads, h.params.KeyLen)
 	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s", argon2.Version, h.params.MemoryKiB, h.params.Time, h.params.Threads,
 		base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(key)), nil
@@ -64,7 +87,11 @@ func (h *Hasher) Verify(encoded, pw string) (ok bool, needsRehash bool, err erro
 	if err != nil {
 		return false, false, err
 	}
-	defer h.acquire()()
+	release, aerr := h.acquire()
+	if aerr != nil {
+		return false, false, aerr
+	}
+	defer release()
 	got := argon2.IDKey([]byte(pw), salt, p.Time, p.MemoryKiB, p.Threads, uint32(len(want)))
 	if subtle.ConstantTimeCompare(got, want) != 1 {
 		return false, false, nil
@@ -73,10 +100,15 @@ func (h *Hasher) Verify(encoded, pw string) (ok bool, needsRehash bool, err erro
 }
 
 // dummyHash は存在しないユーザーのログインでも同程度の計算時間をかけるための固定ハッシュ（時間差によるユーザー列挙の緩和）。
-func (h *Hasher) VerifyDummy(pw string) {
-	defer h.acquire()()
+func (h *Hasher) VerifyDummy(pw string) error {
+	release, err := h.acquire()
+	if err != nil {
+		return err
+	}
+	defer release()
 	salt := make([]byte, h.params.SaltLen)
 	_ = argon2.IDKey([]byte(pw), salt, h.params.Time, h.params.MemoryKiB, h.params.Threads, h.params.KeyLen)
+	return nil
 }
 
 func paramsOf(p Params, keyLen int) Params { p.KeyLen = uint32(keyLen); return p }

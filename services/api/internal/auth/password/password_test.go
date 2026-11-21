@@ -12,7 +12,7 @@ import (
 var fast = Params{MemoryKiB: 64, Time: 1, Threads: 1, SaltLen: 16, KeyLen: 32}
 
 func TestHashAndVerify(t *testing.T) {
-	h := NewHasher(fast, 2)
+	h := NewHasher(fast, 2, 0)
 	a, err := h.Hash("correct horse battery")
 	if err != nil {
 		t.Fatal(err)
@@ -34,18 +34,18 @@ func TestHashAndVerify(t *testing.T) {
 }
 
 func TestNeedsRehashWhenParamsChange(t *testing.T) {
-	old := NewHasher(fast, 1)
+	old := NewHasher(fast, 1, 0)
 	enc, _ := old.Hash("some long password")
 	stronger := fast
 	stronger.Time = 2
-	ok, rehash, err := NewHasher(stronger, 1).Verify(enc, "some long password")
+	ok, rehash, err := NewHasher(stronger, 1, 0).Verify(enc, "some long password")
 	if err != nil || !ok || !rehash {
 		t.Fatalf("パラメータ変更後は再ハッシュが必要になるはず: ok=%v rehash=%v err=%v", ok, rehash, err)
 	}
 }
 
 func TestVerifyRejectsMalformedAndHostileHashes(t *testing.T) {
-	h := NewHasher(fast, 1)
+	h := NewHasher(fast, 1, 0)
 	for _, bad := range []string{
 		"", "plain-text-password", "$argon2id$", "$argon2i$v=19$m=64,t=1,p=1$c2FsdHNhbHRzYWx0$a2V5a2V5a2V5a2V5a2V5",
 		"$argon2id$v=19$m=64,t=1,p=0$c2FsdHNhbHRzYWx0$a2V5a2V5a2V5a2V5a2V5a2V5",
@@ -61,7 +61,7 @@ func TestVerifyRejectsMalformedAndHostileHashes(t *testing.T) {
 
 func TestConcurrencyIsLimited(t *testing.T) {
 	const limit = 2
-	h := NewHasher(Params{MemoryKiB: 4096, Time: 2, Threads: 1, SaltLen: 16, KeyLen: 32}, limit)
+	h := NewHasher(Params{MemoryKiB: 4096, Time: 2, Threads: 1, SaltLen: 16, KeyLen: 32}, limit, 0)
 	var cur, peak int32
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
@@ -69,7 +69,7 @@ func TestConcurrencyIsLimited(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			// Hash内部のsemaphoreの外側から観測できないため、acquireを直接使って上限を確認する
-			release := h.acquire()
+			release, _ := h.acquire()
 			n := atomic.AddInt32(&cur, 1)
 			for {
 				p := atomic.LoadInt32(&peak)
@@ -102,6 +102,28 @@ func TestConcurrencyIsLimited(t *testing.T) {
 		}()
 	}
 	wg2.Wait()
+}
+
+func TestWaitTimeoutReturnsBusyInsteadOfQueueingForever(t *testing.T) {
+	h := NewHasher(fast, 1, 30*time.Millisecond)
+	release, err := h.acquire()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	start := time.Now()
+	if _, err := h.Hash("a long enough password"); err != ErrBusy {
+		t.Fatalf("上限時間を超えたらErrBusyのはず: %v", err)
+	}
+	if _, _, err := h.Verify("$argon2id$v=19$m=64,t=1,p=1$c2FsdHNhbHRzYWx0$a2V5a2V5a2V5a2V5a2V5a2V5", "x"); err != ErrBusy {
+		t.Fatalf("Verifyも同様: %v", err)
+	}
+	if err := h.VerifyDummy("x"); err != ErrBusy {
+		t.Fatalf("VerifyDummyも同様: %v", err)
+	}
+	if time.Since(start) > 2*time.Second {
+		t.Fatal("待ちが上限時間で打ち切られていない")
+	}
 }
 
 func TestValidatePolicy(t *testing.T) {

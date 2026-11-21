@@ -49,3 +49,6 @@ RETURNING id, user_id;
 
 -- name: ActivateInvitedUser :execrows
 UPDATE users SET status = 'active', activated_at = $2 WHERE id = $1 AND status = 'invited';
+
+-- name: GetDisplayName :one
+SELECT display_name FROM profiles WHERE user_id = $1;

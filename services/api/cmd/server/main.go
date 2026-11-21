@@ -16,6 +16,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/nu-digital/nu_app/services/api/internal/api"
+	"github.com/nu-digital/nu_app/services/api/internal/auth/password"
+	"github.com/nu-digital/nu_app/services/api/internal/auth/ratelimit"
+	"github.com/nu-digital/nu_app/services/api/internal/auth/session"
 	"github.com/nu-digital/nu_app/services/api/internal/platform/config"
 	"github.com/nu-digital/nu_app/services/api/internal/platform/httpserver"
 )
@@ -48,9 +52,22 @@ func run(log *slog.Logger) error {
 	}
 	defer pool.Close()
 
+	// /healthz・/readyz（インフラ用）と /api/v1（認証付きAPI）を1つのサーバーで提供する。
+	root := http.NewServeMux()
+	root.Handle("/api/v1/", http.StripPrefix("/api/v1", api.New(api.Deps{
+		Pool:     pool,
+		Cfg:      cfg,
+		Sessions: session.New(pool, session.DefaultConfig),
+		// 同時にArgon2idを計算する数と、順番待ちの上限時間（超えたら503）。暫定値: DECISIONS P1-02-3。
+		Hasher:  password.NewHasher(password.DefaultParams, 4, 3*time.Second),
+		Limiter: ratelimit.New(ratelimit.DefaultConfig, nil),
+		Log:     log,
+	})))
+	root.Handle("/", httpserver.New(pool, cfg.ReadyTimeout))
+
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           httpserver.New(pool, cfg.ReadyTimeout),
+		Handler:           root,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
