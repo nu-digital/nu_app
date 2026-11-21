@@ -11,6 +11,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const clearUnitLoan = `-- name: ClearUnitLoan :exec
+UPDATE inventory_units SET current_loan_id = NULL WHERE current_loan_id = $1
+`
+
+func (q *Queries) ClearUnitLoan(ctx context.Context, currentLoanID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, clearUnitLoan, currentLoanID)
+	return err
+}
+
 const countItemUnits = `-- name: CountItemUnits :one
 SELECT count(*) FROM inventory_units WHERE item_id = $1 AND state = 'active'
 `
@@ -59,6 +68,71 @@ func (q *Queries) CreateInventoryItem(ctx context.Context, arg CreateInventoryIt
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createInventoryLoan = `-- name: CreateInventoryLoan :one
+INSERT INTO inventory_loans (item_id, unit_id, borrower_user_id, quantity, borrowed_at)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, item_id, unit_id, borrower_user_id, quantity, borrowed_at
+`
+
+type CreateInventoryLoanParams struct {
+	ItemID         pgtype.UUID
+	UnitID         pgtype.UUID
+	BorrowerUserID pgtype.UUID
+	Quantity       int32
+	BorrowedAt     pgtype.Timestamptz
+}
+
+func (q *Queries) CreateInventoryLoan(ctx context.Context, arg CreateInventoryLoanParams) (InventoryLoan, error) {
+	row := q.db.QueryRow(ctx, createInventoryLoan,
+		arg.ItemID,
+		arg.UnitID,
+		arg.BorrowerUserID,
+		arg.Quantity,
+		arg.BorrowedAt,
+	)
+	var i InventoryLoan
+	err := row.Scan(
+		&i.ID,
+		&i.ItemID,
+		&i.UnitID,
+		&i.BorrowerUserID,
+		&i.Quantity,
+		&i.BorrowedAt,
+	)
+	return i, err
+}
+
+const createInventoryReturn = `-- name: CreateInventoryReturn :one
+INSERT INTO inventory_returns (loan_id, actor_user_id, quantity, returned_at)
+VALUES ($1, $2, $3, $4)
+RETURNING id, loan_id, actor_user_id, quantity, returned_at
+`
+
+type CreateInventoryReturnParams struct {
+	LoanID      pgtype.UUID
+	ActorUserID pgtype.UUID
+	Quantity    int32
+	ReturnedAt  pgtype.Timestamptz
+}
+
+func (q *Queries) CreateInventoryReturn(ctx context.Context, arg CreateInventoryReturnParams) (InventoryReturn, error) {
+	row := q.db.QueryRow(ctx, createInventoryReturn,
+		arg.LoanID,
+		arg.ActorUserID,
+		arg.Quantity,
+		arg.ReturnedAt,
+	)
+	var i InventoryReturn
+	err := row.Scan(
+		&i.ID,
+		&i.LoanID,
+		&i.ActorUserID,
+		&i.Quantity,
+		&i.ReturnedAt,
 	)
 	return i, err
 }
@@ -137,6 +211,49 @@ func (q *Queries) GetInventoryItemForUpdate(ctx context.Context, id pgtype.UUID)
 	return i, err
 }
 
+const getInventoryLoan = `-- name: GetInventoryLoan :one
+SELECT id, item_id, unit_id, borrower_user_id, quantity, borrowed_at FROM inventory_loans WHERE id = $1
+`
+
+func (q *Queries) GetInventoryLoan(ctx context.Context, id pgtype.UUID) (InventoryLoan, error) {
+	row := q.db.QueryRow(ctx, getInventoryLoan, id)
+	var i InventoryLoan
+	err := row.Scan(
+		&i.ID,
+		&i.ItemID,
+		&i.UnitID,
+		&i.BorrowerUserID,
+		&i.Quantity,
+		&i.BorrowedAt,
+	)
+	return i, err
+}
+
+const getInventoryUnitForUpdate = `-- name: GetInventoryUnitForUpdate :one
+SELECT id, item_id, asset_tag, serial_number, state, current_loan_id, archived_at, created_at FROM inventory_units WHERE id = $1 AND item_id = $2 FOR UPDATE
+`
+
+type GetInventoryUnitForUpdateParams struct {
+	ID     pgtype.UUID
+	ItemID pgtype.UUID
+}
+
+func (q *Queries) GetInventoryUnitForUpdate(ctx context.Context, arg GetInventoryUnitForUpdateParams) (InventoryUnit, error) {
+	row := q.db.QueryRow(ctx, getInventoryUnitForUpdate, arg.ID, arg.ItemID)
+	var i InventoryUnit
+	err := row.Scan(
+		&i.ID,
+		&i.ItemID,
+		&i.AssetTag,
+		&i.SerialNumber,
+		&i.State,
+		&i.CurrentLoanID,
+		&i.ArchivedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const insertInventoryAdjustment = `-- name: InsertInventoryAdjustment :exec
 INSERT INTO inventory_adjustments (item_id, actor_user_id, before_quantity, after_quantity, reason)
 VALUES ($1, $2, $3, $4, $5)
@@ -202,6 +319,88 @@ func (q *Queries) ListInventoryCategories(ctx context.Context) ([]string, error)
 			return nil, err
 		}
 		items = append(items, category)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listInventoryHistory = `-- name: ListInventoryHistory :many
+SELECT event_id, kind, item_id, item_name, asset_tag, borrower_display_name, actor_display_name, quantity, at FROM (
+  SELECT l.id AS event_id, 'loan'::text AS kind, l.item_id, i.name AS item_name, COALESCE(un.asset_tag, '') AS asset_tag,
+         COALESCE(pb.display_name, '') AS borrower_display_name, COALESCE(pb.display_name, '') AS actor_display_name,
+         l.quantity, l.borrowed_at AS at
+  FROM inventory_loans l
+  JOIN inventory_items i ON i.id = l.item_id
+  LEFT JOIN inventory_units un ON un.id = l.unit_id
+  LEFT JOIN profiles pb ON pb.user_id = l.borrower_user_id
+  UNION ALL
+  SELECT r.id, 'return'::text, l.item_id, i.name, COALESCE(un.asset_tag, ''),
+         COALESCE(pb.display_name, ''), COALESCE(pa.display_name, ''), r.quantity, r.returned_at
+  FROM inventory_returns r
+  JOIN inventory_loans l ON l.id = r.loan_id
+  JOIN inventory_items i ON i.id = l.item_id
+  LEFT JOIN inventory_units un ON un.id = l.unit_id
+  LEFT JOIN profiles pb ON pb.user_id = l.borrower_user_id
+  LEFT JOIN profiles pa ON pa.user_id = r.actor_user_id
+) h
+WHERE ($1::uuid IS NULL OR h.item_id = $1::uuid)
+  AND (NOT $2::bool OR (h.at, h.event_id) < ($3::timestamptz, $4::uuid))
+ORDER BY h.at DESC, h.event_id DESC
+LIMIT $5
+`
+
+type ListInventoryHistoryParams struct {
+	Column1 pgtype.UUID
+	Column2 bool
+	Column3 pgtype.Timestamptz
+	Column4 pgtype.UUID
+	Limit   int32
+}
+
+type ListInventoryHistoryRow struct {
+	EventID             pgtype.UUID
+	Kind                string
+	ItemID              pgtype.UUID
+	ItemName            string
+	AssetTag            string
+	BorrowerDisplayName string
+	ActorDisplayName    string
+	Quantity            int32
+	At                  pgtype.Timestamptz
+}
+
+// 貸出と返却の履歴（新しい順）。借りた人(borrower)と返却した人(actor)を別に返す。
+func (q *Queries) ListInventoryHistory(ctx context.Context, arg ListInventoryHistoryParams) ([]ListInventoryHistoryRow, error) {
+	rows, err := q.db.Query(ctx, listInventoryHistory,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListInventoryHistoryRow{}
+	for rows.Next() {
+		var i ListInventoryHistoryRow
+		if err := rows.Scan(
+			&i.EventID,
+			&i.Kind,
+			&i.ItemID,
+			&i.ItemName,
+			&i.AssetTag,
+			&i.BorrowerDisplayName,
+			&i.ActorDisplayName,
+			&i.Quantity,
+			&i.At,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -396,6 +595,118 @@ func (q *Queries) ListItemUnits(ctx context.Context, itemID pgtype.UUID) ([]List
 		return nil, err
 	}
 	return items, nil
+}
+
+const listOutstandingLoans = `-- name: ListOutstandingLoans :many
+SELECT l.id, l.item_id, i.name AS item_name, l.unit_id, COALESCE(un.asset_tag, '') AS asset_tag,
+       l.borrower_user_id, COALESCE(p.display_name, '') AS borrower_display_name, l.borrowed_at,
+       (l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r WHERE r.loan_id = l.id), 0))::int AS outstanding
+FROM inventory_loans l
+JOIN inventory_items i ON i.id = l.item_id
+LEFT JOIN inventory_units un ON un.id = l.unit_id
+LEFT JOIN profiles p ON p.user_id = l.borrower_user_id
+WHERE l.quantity > COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r WHERE r.loan_id = l.id), 0)
+  AND (NOT $1::bool OR l.borrower_user_id = $2::uuid)
+  AND ($3::text = '' OR i.name ILIKE '%' || $3 || '%' ESCAPE '\' OR p.display_name ILIKE '%' || $3 || '%' ESCAPE '\')
+  AND ($4::uuid IS NULL OR l.item_id = $4::uuid)
+  AND (NOT $5::bool OR (l.borrowed_at, l.id) > ($6::timestamptz, $7::uuid))
+ORDER BY l.borrowed_at, l.id
+LIMIT $8
+`
+
+type ListOutstandingLoansParams struct {
+	Column1 bool
+	Column2 pgtype.UUID
+	Column3 string
+	Column4 pgtype.UUID
+	Column5 bool
+	Column6 pgtype.Timestamptz
+	Column7 pgtype.UUID
+	Limit   int32
+}
+
+type ListOutstandingLoansRow struct {
+	ID                  pgtype.UUID
+	ItemID              pgtype.UUID
+	ItemName            string
+	UnitID              pgtype.UUID
+	AssetTag            string
+	BorrowerUserID      pgtype.UUID
+	BorrowerDisplayName string
+	BorrowedAt          pgtype.Timestamptz
+	Outstanding         int32
+}
+
+// 貸出中（未返却数>0）の一覧。古い順。
+func (q *Queries) ListOutstandingLoans(ctx context.Context, arg ListOutstandingLoansParams) ([]ListOutstandingLoansRow, error) {
+	rows, err := q.db.Query(ctx, listOutstandingLoans,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Column6,
+		arg.Column7,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOutstandingLoansRow{}
+	for rows.Next() {
+		var i ListOutstandingLoansRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ItemID,
+			&i.ItemName,
+			&i.UnitID,
+			&i.AssetTag,
+			&i.BorrowerUserID,
+			&i.BorrowerDisplayName,
+			&i.BorrowedAt,
+			&i.Outstanding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const loanOutstanding = `-- name: LoanOutstanding :one
+SELECT (l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r WHERE r.loan_id = l.id), 0))::int
+FROM inventory_loans l WHERE l.id = $1
+`
+
+// 貸出ごとの未返却数。
+func (q *Queries) LoanOutstanding(ctx context.Context, id pgtype.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, loanOutstanding, id)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const setUnitLoan = `-- name: SetUnitLoan :execrows
+UPDATE inventory_units SET current_loan_id = $3 WHERE id = $1 AND item_id = $2 AND current_loan_id IS NULL AND state = 'active'
+`
+
+type SetUnitLoanParams struct {
+	ID            pgtype.UUID
+	ItemID        pgtype.UUID
+	CurrentLoanID pgtype.UUID
+}
+
+// 貸出中でない有効な個体にだけ貸出IDを付ける（0行なら貸出できない）。
+func (q *Queries) SetUnitLoan(ctx context.Context, arg SetUnitLoanParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setUnitLoan, arg.ID, arg.ItemID, arg.CurrentLoanID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateInventoryItem = `-- name: UpdateInventoryItem :one

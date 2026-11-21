@@ -63,7 +63,13 @@ func New(t testing.TB) (*pgxpool.Pool, string) {
 	}
 	dsn := WithDatabase(t, adminURL(t), name)
 	Migrate(t, dsn)
-	pool, err := pgxpool.New(ctx, dsn)
+	// 並行テストで接続プールの枯渇が競合を隠さないよう（接続待ちで要求が直列化されると、ロックの欠陥を見逃す）、十分大きくする。
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatalf("DSNを解釈できません: %v", err)
+	}
+	cfg.MaxConns = 64
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		t.Fatalf("接続に失敗: %v", err)
 	}
