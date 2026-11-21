@@ -86,3 +86,33 @@ ON CONFLICT (user_id, role) DO NOTHING;
 
 -- name: RevokeRole :execrows
 DELETE FROM user_roles WHERE user_id = $1 AND role = $2;
+
+-- name: ExpireOwnerTransfers :execrows
+-- 期限切れのpending申請をexpiredにする（失効は遅延評価。申請者ごとの1件制限を解放する）。
+UPDATE owner_transfer_requests SET status = 'expired', resolved_at = $2
+WHERE from_user_id = $1 AND status = 'pending' AND expires_at <= $2;
+
+-- name: CreateOwnerTransfer :one
+INSERT INTO owner_transfer_requests (from_user_id, to_user_id, requested_at, expires_at)
+VALUES ($1, $2, $3, $4)
+RETURNING *;
+
+-- name: GetOwnerTransferForUpdate :one
+SELECT * FROM owner_transfer_requests WHERE id = $1 FOR UPDATE;
+
+-- name: ResolveOwnerTransfer :exec
+UPDATE owner_transfer_requests SET status = $2, resolved_at = $3 WHERE id = $1;
+
+-- name: ListIncomingOwnerTransfers :many
+SELECT t.id, t.expires_at, u.login_id AS from_login_id, COALESCE(p.display_name, '') AS from_display_name
+FROM owner_transfer_requests t
+JOIN users u ON u.id = t.from_user_id
+LEFT JOIN profiles p ON p.user_id = t.from_user_id
+WHERE t.to_user_id = $1 AND t.status = 'pending' AND t.expires_at > $2
+ORDER BY t.requested_at;
+
+-- name: HasRole :one
+SELECT EXISTS (SELECT 1 FROM user_roles WHERE user_id = $1 AND role = $2);
+
+-- name: CountActiveOwners :one
+SELECT count(*) FROM user_roles r JOIN users u ON u.id = r.user_id WHERE r.role = 'owner' AND u.status = 'active';

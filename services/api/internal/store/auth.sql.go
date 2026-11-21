@@ -53,6 +53,17 @@ func (q *Queries) ConsumeToken(ctx context.Context, arg ConsumeTokenParams) (Con
 	return i, err
 }
 
+const countActiveOwners = `-- name: CountActiveOwners :one
+SELECT count(*) FROM user_roles r JOIN users u ON u.id = r.user_id WHERE r.role = 'owner' AND u.status = 'active'
+`
+
+func (q *Queries) CountActiveOwners(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveOwners)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countActiveOwnersExcept = `-- name: CountActiveOwnersExcept :one
 SELECT count(*) FROM user_roles r JOIN users u ON u.id = r.user_id
 WHERE r.role = 'owner' AND u.status = 'active' AND u.id <> $1
@@ -63,6 +74,39 @@ func (q *Queries) CountActiveOwnersExcept(ctx context.Context, id pgtype.UUID) (
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const createOwnerTransfer = `-- name: CreateOwnerTransfer :one
+INSERT INTO owner_transfer_requests (from_user_id, to_user_id, requested_at, expires_at)
+VALUES ($1, $2, $3, $4)
+RETURNING id, from_user_id, to_user_id, status, requested_at, expires_at, resolved_at
+`
+
+type CreateOwnerTransferParams struct {
+	FromUserID  pgtype.UUID
+	ToUserID    pgtype.UUID
+	RequestedAt pgtype.Timestamptz
+	ExpiresAt   pgtype.Timestamptz
+}
+
+func (q *Queries) CreateOwnerTransfer(ctx context.Context, arg CreateOwnerTransferParams) (OwnerTransferRequest, error) {
+	row := q.db.QueryRow(ctx, createOwnerTransfer,
+		arg.FromUserID,
+		arg.ToUserID,
+		arg.RequestedAt,
+		arg.ExpiresAt,
+	)
+	var i OwnerTransferRequest
+	err := row.Scan(
+		&i.ID,
+		&i.FromUserID,
+		&i.ToUserID,
+		&i.Status,
+		&i.RequestedAt,
+		&i.ExpiresAt,
+		&i.ResolvedAt,
+	)
+	return i, err
 }
 
 const createSession = `-- name: CreateSession :one
@@ -92,6 +136,25 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 	return i, err
 }
 
+const expireOwnerTransfers = `-- name: ExpireOwnerTransfers :execrows
+UPDATE owner_transfer_requests SET status = 'expired', resolved_at = $2
+WHERE from_user_id = $1 AND status = 'pending' AND expires_at <= $2
+`
+
+type ExpireOwnerTransfersParams struct {
+	FromUserID pgtype.UUID
+	ResolvedAt pgtype.Timestamptz
+}
+
+// 期限切れのpending申請をexpiredにする（失効は遅延評価。申請者ごとの1件制限を解放する）。
+func (q *Queries) ExpireOwnerTransfers(ctx context.Context, arg ExpireOwnerTransfersParams) (int64, error) {
+	result, err := q.db.Exec(ctx, expireOwnerTransfers, arg.FromUserID, arg.ResolvedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getDisplayName = `-- name: GetDisplayName :one
 SELECT display_name FROM profiles WHERE user_id = $1
 `
@@ -101,6 +164,25 @@ func (q *Queries) GetDisplayName(ctx context.Context, userID pgtype.UUID) (strin
 	var display_name string
 	err := row.Scan(&display_name)
 	return display_name, err
+}
+
+const getOwnerTransferForUpdate = `-- name: GetOwnerTransferForUpdate :one
+SELECT id, from_user_id, to_user_id, status, requested_at, expires_at, resolved_at FROM owner_transfer_requests WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) GetOwnerTransferForUpdate(ctx context.Context, id pgtype.UUID) (OwnerTransferRequest, error) {
+	row := q.db.QueryRow(ctx, getOwnerTransferForUpdate, id)
+	var i OwnerTransferRequest
+	err := row.Scan(
+		&i.ID,
+		&i.FromUserID,
+		&i.ToUserID,
+		&i.Status,
+		&i.RequestedAt,
+		&i.ExpiresAt,
+		&i.ResolvedAt,
+	)
+	return i, err
 }
 
 const getPasswordHash = `-- name: GetPasswordHash :one
@@ -213,6 +295,68 @@ func (q *Queries) HasPassword(ctx context.Context, userID pgtype.UUID) (bool, er
 	return exists, err
 }
 
+const hasRole = `-- name: HasRole :one
+SELECT EXISTS (SELECT 1 FROM user_roles WHERE user_id = $1 AND role = $2)
+`
+
+type HasRoleParams struct {
+	UserID pgtype.UUID
+	Role   string
+}
+
+func (q *Queries) HasRole(ctx context.Context, arg HasRoleParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasRole, arg.UserID, arg.Role)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const listIncomingOwnerTransfers = `-- name: ListIncomingOwnerTransfers :many
+SELECT t.id, t.expires_at, u.login_id AS from_login_id, COALESCE(p.display_name, '') AS from_display_name
+FROM owner_transfer_requests t
+JOIN users u ON u.id = t.from_user_id
+LEFT JOIN profiles p ON p.user_id = t.from_user_id
+WHERE t.to_user_id = $1 AND t.status = 'pending' AND t.expires_at > $2
+ORDER BY t.requested_at
+`
+
+type ListIncomingOwnerTransfersParams struct {
+	ToUserID  pgtype.UUID
+	ExpiresAt pgtype.Timestamptz
+}
+
+type ListIncomingOwnerTransfersRow struct {
+	ID              pgtype.UUID
+	ExpiresAt       pgtype.Timestamptz
+	FromLoginID     string
+	FromDisplayName string
+}
+
+func (q *Queries) ListIncomingOwnerTransfers(ctx context.Context, arg ListIncomingOwnerTransfersParams) ([]ListIncomingOwnerTransfersRow, error) {
+	rows, err := q.db.Query(ctx, listIncomingOwnerTransfers, arg.ToUserID, arg.ExpiresAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListIncomingOwnerTransfersRow{}
+	for rows.Next() {
+		var i ListIncomingOwnerTransfersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ExpiresAt,
+			&i.FromLoginID,
+			&i.FromDisplayName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUserRoles = `-- name: ListUserRoles :many
 SELECT role FROM user_roles WHERE user_id = $1 ORDER BY role
 `
@@ -287,6 +431,21 @@ func (q *Queries) PeekToken(ctx context.Context, arg PeekTokenParams) (PeekToken
 	var i PeekTokenRow
 	err := row.Scan(&i.UserID, &i.LoginID, &i.Status)
 	return i, err
+}
+
+const resolveOwnerTransfer = `-- name: ResolveOwnerTransfer :exec
+UPDATE owner_transfer_requests SET status = $2, resolved_at = $3 WHERE id = $1
+`
+
+type ResolveOwnerTransferParams struct {
+	ID         pgtype.UUID
+	Status     string
+	ResolvedAt pgtype.Timestamptz
+}
+
+func (q *Queries) ResolveOwnerTransfer(ctx context.Context, arg ResolveOwnerTransferParams) error {
+	_, err := q.db.Exec(ctx, resolveOwnerTransfer, arg.ID, arg.Status, arg.ResolvedAt)
+	return err
 }
 
 const revokeActiveTokens = `-- name: RevokeActiveTokens :execrows
