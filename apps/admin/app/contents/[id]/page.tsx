@@ -5,23 +5,25 @@ import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import AppShell from "@/components/AppShell";
+import CollaboratorsPanel from "@/components/CollaboratorsPanel";
+import ContributorsPanel from "@/components/ContributorsPanel";
 import MarkdownPreview from "@/components/MarkdownPreview";
 import Notice from "@/components/Notice";
 import {
-  conflictRevision, describe, getContent, publishContent, saveRevision, unpublishContent,
-  type ContentDetail, type ContentRevision,
+  conflictRevision, describe, getContent, publishContent, saveRevision, unpublishContent, uploadMedia,
+  type ContentDetail, type ContentRevision, type MediaInfo,
 } from "@/lib/api";
 
 export default function ContentEditorPage() {
   return <AppShell>{() => <Editor />}</AppShell>;
 }
 
-type Form = { title: string; summary: string; markdown: string; category: string; excerpt: string; dateLabel: string; dateKind: string; sortDate: string };
+type Form = { title: string; summary: string; markdown: string; category: string; excerpt: string; dateLabel: string; dateKind: string; sortDate: string; cover: MediaInfo | null };
 
 function fromRevision(r: ContentRevision): Form {
   return {
     title: r.title, summary: r.summary, markdown: r.markdown, category: r.metadata.category ?? "", excerpt: r.metadata.excerpt ?? "",
-    dateLabel: r.date.label, dateKind: r.date.kind, sortDate: r.date.sortDate ?? "",
+    dateLabel: r.date.label, dateKind: r.date.kind, sortDate: r.date.sortDate ?? "", cover: r.coverMedia,
   };
 }
 
@@ -38,6 +40,9 @@ function Editor() {
   const [tab, setTab] = useState<"edit" | "preview">("edit");
   const [version, setVersion] = useState(0);
   const msgRef = useRef<HTMLDivElement>(null);
+  const mdRef = useRef<HTMLTextAreaElement>(null);
+  const [uploads, setUploads] = useState<MediaInfo[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -93,6 +98,7 @@ function Editor() {
       const { content, changed } = await saveRevision(doc.id, {
         baseRevision, title: form.title, summary: form.summary, markdown: form.markdown, metadata,
         date: { label: form.dateLabel, kind: form.dateKind, sortDate: form.sortDate || null },
+        coverMediaId: form.cover?.id ?? null,
       });
       setDoc(content);
       setForm(fromRevision(content.workingRevision));
@@ -109,6 +115,33 @@ function Editor() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onUpload(file: File | undefined) {
+    if (!file || uploading) return;
+    setUploading(true);
+    setMsg(null);
+    try {
+      const m = await uploadMedia(file);
+      setUploads((u) => [...u, m]);
+      notify({ kind: "success", text: `画像をアップロードしました（${m.width}×${m.height}）。「本文に挿入」か「カバーにする」で使えます。` });
+    } catch (e) {
+      notify({ kind: "error", text: describe(e) });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  // 本文のカーソル位置に画像を挿入する（アップロードした画像のURLは、公開されるまで匿名には配信されない）
+  function insertImage(m: MediaInfo) {
+    if (!form) return;
+    const el = mdRef.current;
+    const at = el ? el.selectionStart : form.markdown.length;
+    const text = `![画像の説明](${m.publicUrl})`;
+    const before = form.markdown.slice(0, at), after = form.markdown.slice(at);
+    const sep1 = before && !before.endsWith("\n\n") ? (before.endsWith("\n") ? "\n" : "\n\n") : "";
+    const sep2 = after && !after.startsWith("\n\n") ? (after.startsWith("\n") ? "\n" : "\n\n") : "";
+    set({ markdown: before + sep1 + text + sep2 + after });
   }
 
   async function onPublish() {
@@ -185,9 +218,36 @@ function Editor() {
           </div>
           <div className="field">
             <label htmlFor="e-md">本文（Markdown）</label>
-            <textarea id="e-md" className="input md-input" rows={18} spellCheck={false} value={form.markdown} onChange={(e) => set({ markdown: e.target.value })} />
+            <textarea id="e-md" ref={mdRef} className="input md-input" rows={18} spellCheck={false} value={form.markdown} onChange={(e) => set({ markdown: e.target.value })} />
             <p className="hint">見出し・リスト・表・リンク・画像が使えます。生のHTMLは、折りたたみ（details・summary）と埋め込み用の限られた形だけです。YouTubeはURLを書くと動画が表示されます。</p>
           </div>
+          <fieldset className="field" aria-label="画像">
+            <legend>画像</legend>
+            <label htmlFor="e-file">画像をアップロードする（JPEG・PNG・WebP。10MiBまで）</label>
+            <input id="e-file" type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={(e) => { void onUpload(e.target.files?.[0]); e.target.value = ""; }} />
+            <p className="hint">アップロードした画像は、向きの補正と縮小をして、撮影場所などの情報（EXIF）を消して保存されます。記事で使うまで、他の人には公開されません。</p>
+            {form.cover && (
+              <div className="cover" data-testid="cover">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={form.cover.url} alt="カバー画像" width={form.cover.width} height={form.cover.height} />
+                <button type="button" className="btn secondary inline" onClick={() => set({ cover: null })}>カバー画像を外す</button>
+              </div>
+            )}
+            {uploads.length > 0 && (
+              <ul className="items" data-testid="uploads">
+                {uploads.map((m) => (
+                  <li key={m.id} className="item">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="thumb-sm" src={m.url} alt="アップロードした画像" width={64} height={64} />
+                    <div className="actions">
+                      <button type="button" className="btn secondary inline" onClick={() => insertImage(m)}>本文に挿入</button>
+                      <button type="button" className="btn secondary inline" onClick={() => set({ cover: m })}>カバーにする</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </fieldset>
           <div className="field">
             <label htmlFor="e-cat">カテゴリ</label>
             <input id="e-cat" className="input" maxLength={30} value={form.category} onChange={(e) => set({ category: e.target.value })} />
@@ -214,6 +274,10 @@ function Editor() {
         </section>
         <section className="editor-preview" aria-label="プレビュー">
           <h2>プレビュー</h2>
+          {form.cover && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="preview-cover" src={form.cover.url} alt="カバー画像" />
+          )}
           <p className="hint">保存していない入力もそのまま表示します。危険な記述は表示の段階で取り除かれます。</p>
           <MarkdownPreview markdown={form.markdown} />
         </section>
@@ -239,6 +303,18 @@ function Editor() {
           <p className="hint">公開できるのは編集者（Editor）以上です。{published === null ? "公開してほしいときは、編集者に頼んでください。" : `公開中は版${published}です。編集を保存しても、編集者が公開し直すまでは公開サイトに反映されません。`}</p>
         )}
       </section>
+
+      <CollaboratorsPanel key={doc.id} contentId={doc.id} creator={doc.creator} initial={doc.collaborators} canManage={doc.canManageCollaborators} />
+
+      {doc.type === "project" && (
+        <ContributorsPanel
+          key={w.revisionNo}
+          doc={doc}
+          dirty={dirty}
+          onSaved={(c) => { setDoc(c); setForm(fromRevision(c.workingRevision)); setBaseRevision(c.workingRevision.revisionNo); notify({ kind: "success", text: `制作メンバーを保存しました（版${c.workingRevision.revisionNo}）。` }); }}
+          onConflict={() => setVersion((v) => v + 1)}
+        />
+      )}
 
       {doc.revisions && doc.revisions.length > 1 && (
         <section className="panel" aria-labelledby="hist-title">

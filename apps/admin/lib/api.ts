@@ -144,7 +144,10 @@ export type MyProfile = {
   links: { id: string; label: string; url: string; sortOrder: number; visibility: Visibility }[];
   devices: { id: string; category: string; name: string; spec: string; sortOrder: number; visibility: Visibility }[];
   publicCreditConsent: { granted: boolean; grantedAt: string | null; withdrawnAt: string | null };
+  /** 制作実績（公開版が本人をクレジットしている作品）。 */
+  works: Work[];
 };
+export type Work = { section: string; slug: string; title: string; roles: string[] };
 
 export type Member = {
   id: string;
@@ -155,6 +158,8 @@ export type Member = {
   schoolYear: number | null;
   links?: { id: string; label: string; url: string }[];
   devices?: { id: string; category: string; name: string; spec: string }[];
+  /** 制作実績。本人の公開クレジットの同意が続いているあいだだけ、他のメンバーに見える。 */
+  works?: Work[];
 };
 
 async function ok<T>(r: { status: number; json: unknown; retryAfter?: number }, ...good: number[]): Promise<T> {
@@ -305,4 +310,31 @@ export function conflictRevision(e: unknown): ContentRevision | null {
   const err = e as Partial<ApiError>;
   if (err?.code !== "REVISION_CONFLICT") return null;
   return ((err.body as { current?: ContentRevision } | undefined)?.current) ?? null;
+}
+
+/** 画像をアップロードする（生のバイト列。形式・大きさ・寸法の検査と再エンコードはAPIが行う）。 */
+export async function uploadMedia(file: File): Promise<MediaInfo> {
+  const ct = file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/webp" ? file.type : "application/octet-stream";
+  const headers: Record<string, string> = { "Content-Type": ct };
+  if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+  const res = await fetch("/api/v1/media?purpose=cms", { method: "POST", headers, body: file, credentials: "same-origin", cache: "no-store" });
+  let json: unknown = null;
+  try {
+    json = JSON.parse(await res.text());
+  } catch {
+    json = null;
+  }
+  const ra = Number(res.headers.get("Retry-After"));
+  if (res.status !== 201) throw toError({ status: res.status, json, retryAfter: Number.isFinite(ra) && ra > 0 ? ra : undefined });
+  return json as MediaInfo;
+}
+
+export const putCollaborators = async (id: string, userIds: string[]) =>
+  ok<{ collaborators: { userId: string; displayName: string }[] }>(await call("PUT", `/contents/${id}/collaborators`, { userIds }), 200);
+
+/** 制作メンバーを置き換える（新しい版ができる）。baseRevisionは編集の元にした版の番号。 */
+export async function putContributors(id: string, baseRevision: number, contributors: { userId: string; roleLabel: string }[]): Promise<ContentDetail> {
+  const r = await call("PUT", `/contents/${id}/contributors`, { baseRevision, contributors });
+  if (r.status !== 200 && r.status !== 201) throw toError(r);
+  return r.json as ContentDetail;
 }
