@@ -105,7 +105,7 @@ func TestMembersListShowsOnlyActiveAndOnlyPublicFields(t *testing.T) {
 	}
 	var raw struct{ Items []map[string]any }
 	_ = json.Unmarshal([]byte(body), &raw)
-	allowed := map[string]bool{"id": true, "displayName": true, "bio": true, "faculty": true, "department": true, "schoolYear": true}
+	allowed := map[string]bool{"id": true, "displayName": true, "bio": true, "faculty": true, "department": true, "schoolYear": true, "avatarMediaId": true}
 	for k := range raw.Items[0] {
 		if !allowed[k] {
 			t.Fatalf("想定外の項目 %q", k)

@@ -131,10 +131,12 @@ func (s *server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 	}
 	purpose := media.Purpose(r.URL.Query().Get("purpose"))
 	switch purpose {
-	case media.CMS:
-	case media.Avatar, media.Inventory:
-		httpx.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INPUT", "この用途の画像はまだアップロードできません")
-		return
+	case media.CMS, media.Avatar:
+	case media.Inventory: // 物品の写真は管理者だけ
+		if !authz.Decide(a.Identity.Subject(), "inventory.items.photo.set", authz.Resource{}).Allowed {
+			httpx.Error(w, r, http.StatusForbidden, "FORBIDDEN", "物品の写真をアップロードできるのは管理者だけです")
+			return
+		}
 	default:
 		httpx.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INPUT", "purposeを指定してください")
 		return
@@ -285,6 +287,13 @@ func mediaNotFound(w http.ResponseWriter, r *http.Request) {
 // canViewMedia: アップロード者、Editor以上、またはその画像を参照するコンテンツの作者・共同編集者。
 func (s *server) canViewMedia(r *http.Request, q *store.Queries, a authCtx, m store.MediaAsset, action string) (bool, error) {
 	res := authz.Resource{IsUploader: m.UploadedBy == a.Identity.UserID}
+	if !res.IsUploader && (action == "media.get") {
+		img, err := q.MediaIsMemberImage(r.Context(), m.ID)
+		if err != nil {
+			return false, err
+		}
+		res.IsMemberImage = img
+	}
 	if !res.IsUploader && !a.Identity.Subject().IsEditorPlus() {
 		via, err := q.MediaViewableViaContent(r.Context(), store.MediaViewableViaContentParams{MediaID: m.ID, UserID: a.Identity.UserID})
 		if err != nil {

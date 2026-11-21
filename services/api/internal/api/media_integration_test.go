@@ -115,8 +115,6 @@ func TestMediaUploadValidation(t *testing.T) {
 	}{
 		"purposeなし":         {"", "image/png", png1, 422},
 		"未知のpurpose":        {"x", "image/png", png1, 422},
-		"avatarはまだ":         {"avatar", "image/png", png1, 422},
-		"inventoryはまだ":      {"inventory", "image/png", png1, 422},
 		"Content-Typeがhtml": {"cms", "text/html", png1, 415},
 		"JSONで送る":           {"cms", "application/json", png1, 415},
 		"空":                 {"cms", "image/png", nil, 422},

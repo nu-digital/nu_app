@@ -5,8 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import AppShell from "@/components/AppShell";
+import ImageUploader from "@/components/ImageUploader";
 import Notice from "@/components/Notice";
-import { createUnit, describe, getItem, updateItem, type ItemDetail } from "@/lib/api";
+import { clearItemPhoto, createUnit, describe, getItem, setItemPhoto, updateItem, type ItemDetail } from "@/lib/api";
 
 export default function AdminItemPage() {
   return <AppShell>{() => <Edit />}</AppShell>;
@@ -63,6 +64,16 @@ function Edit() {
       <h1>{it.name}</h1>
       <p className="meta">{it.mode === "quantity" ? "数量で管理" : "個体ごとに管理"}（管理方式は、貸出や個体ができたあとは変えられません）</p>
       {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
+      <section className="panel" aria-labelledby="photo-title">
+        <h2 id="photo-title">写真</h2>
+        <p className="hint">物品の一覧・詳細に、ログイン中のメンバーへ表示されます。</p>
+        <ImageUploader
+          label="物品の写真" purpose="inventory" currentId={it.photoMediaId} busy={busy}
+          attach={async (mid) => { await setItemPhoto(id, mid); setVersion((v) => v + 1); }}
+          detach={async () => { await clearItemPhoto(id); setVersion((v) => v + 1); }}
+          onError={(text) => setMsg({ kind: "error", text })} onDone={(text) => setMsg({ kind: "success", text })}
+        />
+      </section>
 
       <section className="panel" aria-labelledby="basic-title">
         <h2 id="basic-title">基本情報</h2>

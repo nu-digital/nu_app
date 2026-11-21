@@ -70,6 +70,8 @@ type Resource struct {
 	IsUploader bool
 	// IsMediaContentMember: その画像を（いずれかの版が）参照しているコンテンツの作者または共同編集者（下書きのプレビュー用）。
 	IsMediaContentMember bool
+	// IsMemberImage: ログイン中のメンバーに見せてよい画像（有効なユーザーの現在のアバター、アーカイブされていない物品の現在の写真）。
+	IsMemberImage bool
 	// TargetIsAdmin / TargetIsOwner: 対象ユーザーが管理者権限を持つ（Ownerは両方true）。
 	TargetIsAdmin bool
 	TargetIsOwner bool
@@ -107,6 +109,7 @@ var (
 	collaborator relation = func(r Resource) bool { return r.IsCollaborator }
 	uploader     relation = func(r Resource) bool { return r.IsUploader }
 	mediaContent relation = func(r Resource) bool { return r.IsMediaContentMember }
+	memberImage  relation = func(r Resource) bool { return r.IsMemberImage }
 )
 
 // Decision は判断結果。
@@ -219,6 +222,10 @@ var table = []Action{
 	{"me.devices.delete", "DELETE", "/me/devices/{id}", anyMember},
 	{"admin.users.private_profile.get", "GET", "/admin/users/{id}/private-profile", adminOnly},
 	{"admin.users.private_profile.delete", "DELETE", "/admin/users/{id}/private-profile", adminOnly},
+	{"me.profile.avatar.set", "PUT", "/me/profile/avatar", anyMember},
+	{"me.profile.avatar.clear", "DELETE", "/me/profile/avatar", anyMember},
+	{"inventory.items.photo.set", "PUT", "/inventory/items/{id}/photo", adminOnly},
+	{"inventory.items.photo.clear", "DELETE", "/inventory/items/{id}/photo", adminOnly},
 	{"admin.legacy_authors.list", "GET", "/admin/legacy-authors", adminOnly},
 	{"admin.legacy_authors.permit", "POST", "/admin/legacy-authors/{id}/permit", adminOnly},
 	{"admin.legacy_authors.withdraw", "POST", "/admin/legacy-authors/{id}/withdraw", adminOnly},
@@ -256,7 +263,7 @@ var table = []Action{
 
 	// 5. メディア・通知・ダッシュボード
 	{"media.upload", "POST", "/media", anyMember},
-	{"media.get", "GET", "/media/{id}", rule{roles: editorPlus, relations: []relation{uploader, mediaContent}}},
+	{"media.get", "GET", "/media/{id}", rule{roles: editorPlus, relations: []relation{uploader, mediaContent, memberImage}}},
 	{"media.get_by_public", "GET", "/media/by-public/{publicId}", rule{roles: editorPlus, relations: []relation{uploader, mediaContent}}},
 	{"public.media.get", "GET", "/public/media/{publicId}", pub},
 	{"dashboard.feed", "GET", "/dashboard/feed", anyMember},

@@ -86,3 +86,36 @@ SELECT count(*)::bigint AS n, COALESCE(sum(byte_size), 0)::bigint AS bytes FROM 
 
 -- name: RedactMedia :one
 UPDATE media_assets SET redacted_at = $2 WHERE id = $1 AND redacted_at IS NULL RETURNING storage_key;
+
+-- アバター・物品写真（P3-02b）
+
+-- name: DeleteOwnerMediaReference :execrows
+DELETE FROM media_references WHERE owner_type = $1 AND owner_id = $2;
+
+-- name: InsertOwnerMediaReference :exec
+INSERT INTO media_references (media_id, owner_type, owner_id, purpose) VALUES ($1, $2, $3, $4);
+
+-- name: SetProfileAvatar :exec
+UPDATE profiles SET avatar_media_id = $2, updated_at = now() WHERE user_id = $1;
+
+-- name: ClearProfileAvatar :exec
+UPDATE profiles SET avatar_media_id = NULL, updated_at = now() WHERE user_id = $1;
+
+-- name: SetItemPhoto :exec
+UPDATE inventory_items SET cover_media_id = $2, updated_at = now() WHERE id = $1;
+
+-- name: ListAvatarsOfUsers :many
+SELECT user_id, avatar_media_id FROM profiles WHERE user_id = ANY(@ids::uuid[]) AND avatar_media_id IS NOT NULL;
+
+-- name: ListPhotosOfItems :many
+SELECT id, cover_media_id FROM inventory_items WHERE id = ANY(@ids::uuid[]) AND cover_media_id IS NOT NULL;
+
+-- ログイン中のメンバーに見せてよい画像か: 有効なユーザーの現在のアバター、またはアーカイブされていない物品の現在の写真（redactedは除く）
+-- name: MediaIsMemberImage :one
+SELECT EXISTS (
+    SELECT 1 FROM media_references r JOIN media_assets m ON m.id = r.media_id
+    WHERE r.media_id = $1 AND m.redacted_at IS NULL AND (
+        (r.owner_type = 'profile' AND r.purpose = 'avatar' AND EXISTS (SELECT 1 FROM users u WHERE u.id = r.owner_id AND u.status = 'active'))
+        OR (r.owner_type = 'inventory_item' AND r.purpose = 'photo' AND EXISTS (SELECT 1 FROM inventory_items i WHERE i.id = r.owner_id AND i.archived_at IS NULL))
+    )
+);

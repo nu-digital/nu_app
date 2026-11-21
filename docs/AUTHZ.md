@@ -45,6 +45,10 @@
 | `me.devices.delete` | DELETE | `/me/devices/{id}` | 有効なユーザー（Member以上） |
 | `admin.users.private_profile.get` | GET | `/admin/users/{id}/private-profile` | Admin / Owner |
 | `admin.users.private_profile.delete` | DELETE | `/admin/users/{id}/private-profile` | Admin / Owner |
+| `me.profile.avatar.set` | PUT | `/me/profile/avatar` | Member以上 |
+| `me.profile.avatar.clear` | DELETE | `/me/profile/avatar` | Member以上 |
+| `inventory.items.photo.set` | PUT | `/inventory/items/{id}/photo` | Admin / Owner |
+| `inventory.items.photo.clear` | DELETE | `/inventory/items/{id}/photo` | Admin / Owner |
 | `admin.legacy_authors.list` | GET | `/admin/legacy-authors` | Admin / Owner |
 | `admin.legacy_authors.permit` | POST | `/admin/legacy-authors/{id}/permit` | Admin / Owner |
 | `admin.legacy_authors.withdraw` | POST | `/admin/legacy-authors/{id}/withdraw` | Admin / Owner |

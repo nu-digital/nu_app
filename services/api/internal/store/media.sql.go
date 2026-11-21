@@ -11,6 +11,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const clearProfileAvatar = `-- name: ClearProfileAvatar :exec
+UPDATE profiles SET avatar_media_id = NULL, updated_at = now() WHERE user_id = $1
+`
+
+func (q *Queries) ClearProfileAvatar(ctx context.Context, userID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, clearProfileAvatar, userID)
+	return err
+}
+
 const copyMediaReferences = `-- name: CopyMediaReferences :exec
 INSERT INTO media_references (media_id, owner_type, owner_id, purpose)
 SELECT src.media_id, 'content_revision', $1::uuid, src.purpose
@@ -49,6 +58,25 @@ func (q *Queries) DeleteOneOrphanMedia(ctx context.Context, createdAt pgtype.Tim
 	var i DeleteOneOrphanMediaRow
 	err := row.Scan(&i.ID, &i.StorageKey)
 	return i, err
+}
+
+const deleteOwnerMediaReference = `-- name: DeleteOwnerMediaReference :execrows
+
+DELETE FROM media_references WHERE owner_type = $1 AND owner_id = $2
+`
+
+type DeleteOwnerMediaReferenceParams struct {
+	OwnerType string
+	OwnerID   pgtype.UUID
+}
+
+// アバター・物品写真（P3-02b）
+func (q *Queries) DeleteOwnerMediaReference(ctx context.Context, arg DeleteOwnerMediaReferenceParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOwnerMediaReference, arg.OwnerType, arg.OwnerID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getMediaAsset = `-- name: GetMediaAsset :one
@@ -194,6 +222,27 @@ func (q *Queries) InsertMediaReference(ctx context.Context, arg InsertMediaRefer
 	return err
 }
 
+const insertOwnerMediaReference = `-- name: InsertOwnerMediaReference :exec
+INSERT INTO media_references (media_id, owner_type, owner_id, purpose) VALUES ($1, $2, $3, $4)
+`
+
+type InsertOwnerMediaReferenceParams struct {
+	MediaID   pgtype.UUID
+	OwnerType string
+	OwnerID   pgtype.UUID
+	Purpose   string
+}
+
+func (q *Queries) InsertOwnerMediaReference(ctx context.Context, arg InsertOwnerMediaReferenceParams) error {
+	_, err := q.db.Exec(ctx, insertOwnerMediaReference,
+		arg.MediaID,
+		arg.OwnerType,
+		arg.OwnerID,
+		arg.Purpose,
+	)
+	return err
+}
+
 const listAllMediaKeys = `-- name: ListAllMediaKeys :many
 SELECT id, storage_key, redacted_at, byte_size FROM media_assets ORDER BY created_at
 `
@@ -220,6 +269,35 @@ func (q *Queries) ListAllMediaKeys(ctx context.Context) ([]ListAllMediaKeysRow, 
 			&i.RedactedAt,
 			&i.ByteSize,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAvatarsOfUsers = `-- name: ListAvatarsOfUsers :many
+SELECT user_id, avatar_media_id FROM profiles WHERE user_id = ANY($1::uuid[]) AND avatar_media_id IS NOT NULL
+`
+
+type ListAvatarsOfUsersRow struct {
+	UserID        pgtype.UUID
+	AvatarMediaID pgtype.UUID
+}
+
+func (q *Queries) ListAvatarsOfUsers(ctx context.Context, ids []pgtype.UUID) ([]ListAvatarsOfUsersRow, error) {
+	rows, err := q.db.Query(ctx, listAvatarsOfUsers, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAvatarsOfUsersRow{}
+	for rows.Next() {
+		var i ListAvatarsOfUsersRow
+		if err := rows.Scan(&i.UserID, &i.AvatarMediaID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -260,6 +338,35 @@ func (q *Queries) ListOrphanMedia(ctx context.Context, createdAt pgtype.Timestam
 			&i.ByteSize,
 			&i.CreatedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPhotosOfItems = `-- name: ListPhotosOfItems :many
+SELECT id, cover_media_id FROM inventory_items WHERE id = ANY($1::uuid[]) AND cover_media_id IS NOT NULL
+`
+
+type ListPhotosOfItemsRow struct {
+	ID           pgtype.UUID
+	CoverMediaID pgtype.UUID
+}
+
+func (q *Queries) ListPhotosOfItems(ctx context.Context, ids []pgtype.UUID) ([]ListPhotosOfItemsRow, error) {
+	rows, err := q.db.Query(ctx, listPhotosOfItems, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPhotosOfItemsRow{}
+	for rows.Next() {
+		var i ListPhotosOfItemsRow
+		if err := rows.Scan(&i.ID, &i.CoverMediaID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -385,6 +492,24 @@ func (q *Queries) LockMediaByPublicIDs(ctx context.Context, publicIds []string) 
 	return items, nil
 }
 
+const mediaIsMemberImage = `-- name: MediaIsMemberImage :one
+SELECT EXISTS (
+    SELECT 1 FROM media_references r JOIN media_assets m ON m.id = r.media_id
+    WHERE r.media_id = $1 AND m.redacted_at IS NULL AND (
+        (r.owner_type = 'profile' AND r.purpose = 'avatar' AND EXISTS (SELECT 1 FROM users u WHERE u.id = r.owner_id AND u.status = 'active'))
+        OR (r.owner_type = 'inventory_item' AND r.purpose = 'photo' AND EXISTS (SELECT 1 FROM inventory_items i WHERE i.id = r.owner_id AND i.archived_at IS NULL))
+    )
+)
+`
+
+// ログイン中のメンバーに見せてよい画像か: 有効なユーザーの現在のアバター、またはアーカイブされていない物品の現在の写真（redactedは除く）
+func (q *Queries) MediaIsMemberImage(ctx context.Context, mediaID pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, mediaIsMemberImage, mediaID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const mediaReferencedByContent = `-- name: MediaReferencedByContent :one
 SELECT EXISTS (
     SELECT 1 FROM media_references r JOIN content_revisions rv ON rv.id = r.owner_id
@@ -458,6 +583,34 @@ func (q *Queries) RedactMedia(ctx context.Context, arg RedactMediaParams) (strin
 	var storage_key string
 	err := row.Scan(&storage_key)
 	return storage_key, err
+}
+
+const setItemPhoto = `-- name: SetItemPhoto :exec
+UPDATE inventory_items SET cover_media_id = $2, updated_at = now() WHERE id = $1
+`
+
+type SetItemPhotoParams struct {
+	ID           pgtype.UUID
+	CoverMediaID pgtype.UUID
+}
+
+func (q *Queries) SetItemPhoto(ctx context.Context, arg SetItemPhotoParams) error {
+	_, err := q.db.Exec(ctx, setItemPhoto, arg.ID, arg.CoverMediaID)
+	return err
+}
+
+const setProfileAvatar = `-- name: SetProfileAvatar :exec
+UPDATE profiles SET avatar_media_id = $2, updated_at = now() WHERE user_id = $1
+`
+
+type SetProfileAvatarParams struct {
+	UserID        pgtype.UUID
+	AvatarMediaID pgtype.UUID
+}
+
+func (q *Queries) SetProfileAvatar(ctx context.Context, arg SetProfileAvatarParams) error {
+	_, err := q.db.Exec(ctx, setProfileAvatar, arg.UserID, arg.AvatarMediaID)
+	return err
 }
 
 const userMediaUsage = `-- name: UserMediaUsage :one

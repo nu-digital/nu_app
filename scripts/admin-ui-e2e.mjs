@@ -659,6 +659,58 @@ export async function runAdminUiE2E(o) {
         await ctx.close();
       }
     }
+    // アバター・物品の写真（P3-02b）: 画像を選ぶ→設定→表示→外す（PC・スマホ・320px）
+    {
+      // 40x30の単色PNG（APIが再エンコードする）。zlibは Node 組み込み
+      const { deflateSync, crc32 } = await import('node:zlib');
+      const chunk = (t, d) => { const l = Buffer.alloc(4); l.writeUInt32BE(d.length); const c = Buffer.alloc(4); c.writeUInt32BE(crc32(Buffer.concat([Buffer.from(t), d])) >>> 0); return Buffer.concat([l, Buffer.from(t), d, c]); };
+      const mkPng = (w, h, rgb) => {
+        const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+        const raw = Buffer.alloc((w * 3 + 1) * h);
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const o = y * (w * 3 + 1) + 1 + x * 3; raw[o] = rgb[0]; raw[o + 1] = rgb[1] + ((x * 5) % 40); raw[o + 2] = rgb[2]; }
+        return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+      };
+      for (const [label, width, height] of [['pc', 1440, 900], ['sp', 390, 844], ['narrow', 320, 640]]) {
+        const own = { cookie: o.ownerCookie, csrf: o.ownerCsrf };
+        const ctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+        const page = await ctx.newPage();
+        await login(page, o.ownerLogin, o.ownerPass);
+        await page.goto(`${adminUrl}/profile`);
+        const av = page.getByTestId('uploader-avatar');
+        await av.waitFor();
+        await av.locator('input[type=file]').setInputFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: mkPng(40, 30, [200, 60, 60]) });
+        await page.locator('.notice.success').filter({ hasText: 'アバターを設定しました' }).waitFor();
+        const img = av.locator('img.avatar');
+        await img.waitFor();
+        check(`[${label}] アバターを設定すると画像が表示される（WebPとして読める）`, await img.evaluate((i) => i.complete && i.naturalWidth > 0), '');
+        check(`[${label}] アバターの画面で横スクロールが出ない`, (await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0);
+        if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-avatar.png`), fullPage: true });
+        await page.goto(`${adminUrl}/members`);
+        await page.locator('li.user img.avatar').first().waitFor();
+        check(`[${label}] メンバー一覧にアバターが出る`, (await page.locator('li.user img.avatar').count()) >= 1);
+        await page.goto(`${adminUrl}/profile`);
+        await page.getByTestId('uploader-avatar').getByRole('button', { name: '外す' }).click();
+        await page.locator('.notice.success').filter({ hasText: 'アバターを外しました' }).waitFor();
+        check(`[${label}] アバターを外すと画像が消える`, (await page.getByTestId('uploader-avatar').locator('img').count()) === 0);
+        // 物品の写真（管理者）
+        const it = await o.apiCall('POST', '/inventory/items', { body: { name: `写真確認用(${label})`, mode: 'quantity', totalQuantity: 2 }, ...own });
+        await page.goto(`${adminUrl}/admin/inventory/${it.json.id}`);
+        const up = page.getByTestId('uploader-inventory');
+        await up.waitFor();
+        await up.locator('input[type=file]').setInputFiles({ name: 'item.png', mimeType: 'image/png', buffer: mkPng(60, 40, [40, 120, 200]) });
+        await page.locator('.notice.success').filter({ hasText: '物品の写真を設定しました' }).waitFor();
+        await page.goto(`${adminUrl}/inventory/${it.json.id}`);
+        const photo = page.locator('img.photo');
+        await photo.waitFor();
+        check(`[${label}] 物品の写真が詳細に表示される`, await photo.evaluate((i) => i.complete && i.naturalWidth > 0));
+        await page.goto(`${adminUrl}/inventory`);
+        await page.locator('.item-card .thumb img').first().waitFor();
+        check(`[${label}] 物品の一覧にサムネイルが出る`, (await page.locator('.item-card .thumb img').count()) >= 1);
+        check(`[${label}] 物品の画面で横スクロールが出ない`, (await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0);
+        if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-item-photo.png`), fullPage: true });
+        await ctx.close();
+      }
+    }
     // 記事・作品（CMS）: 下書き・プレビュー（描画時のサニタイズ）・保存の競合・公開（PC・スマホ・320px）
     for (const [label, width, height] of [['pc', 1440, 900], ['sp', 390, 844], ['narrow', 320, 640]]) {
       const own = { cookie: o.ownerCookie, csrf: o.ownerCsrf };

@@ -123,12 +123,13 @@ type consentView struct {
 }
 
 type myProfileView struct {
-	DisplayName string            `json:"displayName"`
-	Bio         *string           `json:"bio"`
-	Faculty     *string           `json:"faculty"`
-	Department  *string           `json:"department"`
-	SchoolYear  *int16            `json:"schoolYear"`
-	Visibility  map[string]string `json:"visibility"`
+	AvatarMediaID *string           `json:"avatarMediaId"`
+	DisplayName   string            `json:"displayName"`
+	Bio           *string           `json:"bio"`
+	Faculty       *string           `json:"faculty"`
+	Department    *string           `json:"department"`
+	SchoolYear    *int16            `json:"schoolYear"`
+	Visibility    map[string]string `json:"visibility"`
 	// Private は氏名・大学メール・学生証番号・最寄り駅。本人と権限あるAdmin/Ownerだけが読める（メンバーには決して返さない）。
 	Private struct {
 		LegalName       *string `json:"legalName"`
@@ -188,6 +189,10 @@ func (s *server) loadMyProfile(ctx context.Context, q *store.Queries, uid pgtype
 	if p.SchoolYear.Valid {
 		y := p.SchoolYear.Int16
 		v.SchoolYear = &y
+	}
+	if p.AvatarMediaID.Valid {
+		a := p.AvatarMediaID.String()
+		v.AvatarMediaID = &a
 	}
 	vis, err := q.ListFieldVisibility(ctx, uid)
 	if err != nil {

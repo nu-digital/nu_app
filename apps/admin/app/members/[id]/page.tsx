@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import AppShell from "@/components/AppShell";
 import Notice from "@/components/Notice";
+import MediaImg from "@/components/MediaImg";
 import { describe, getMember, type Member } from "@/lib/api";
 
 export default function MemberPage() {
@@ -25,6 +26,7 @@ function Detail() {
       {error && <Notice kind="error">{error}</Notice>}
       {m && (
         <>
+          {m.avatarMediaId && <MediaImg className="avatar lg" id={m.avatarMediaId} />}
           <h1>{m.displayName}</h1>
           <dl className="facts">
             {m.faculty && (<><dt>学部</dt><dd>{m.faculty}</dd></>)}

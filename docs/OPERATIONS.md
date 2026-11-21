@@ -118,3 +118,8 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 - **検索エンジン**: 作品ページは`noarchive`。撤回・削除の依頼で検索結果に残る場合は、各検索エンジンの削除依頼（URL削除ツール）を使う。
 - 末尾スラッシュ: 標準のとおり、スラッシュ無しはスラッシュ付きへ308。ドットを含むslug（例: `/blog/nu.metasou/`）はNextがファイル扱いにして、スラッシュ無しのURLへ308する（内容は同じ）。
 - 検査（CI: `web / lint-typecheck-build`）: 擬似の公開APIと組み合わせて起動し、全ルート・記事・画像、ブラウザー操作、移設前基準との**指紋の比較**（意図した差は`docs/legacy-baseline/known-diffs.json`に理由つき。投稿者名を伏せたDOMのハッシュは基準と完全一致）、APIが使えないときの5xx・`no-store`を確認する。
+
+### アバター・物品の写真の運用（P3-02b）
+
+- アバター・物品の写真は、WebPで`MEDIA_DIR`に保存される（cmsの画像と同じ。バックアップも同じ1組）。配信はログイン中のメンバーだけ（`GET /api/v1/media/{id}`。`Cache-Control: private, no-store`）。**公開サイトのNginxでは`/api/v1/media/`（`public`以外）を外へ出さない**。
+- 差し替え・解除で外れた画像、個人情報の削除（D08）でアバターを外した画像は、参照が無くなるので`nuctl media-gc --apply`（24時間後）がファイルごと消す。**急ぐ場合**（本人の依頼で顔写真を直ちに消す等）は`nuctl media-redact --id <uuid> --reason "<理由>"`。
