@@ -219,6 +219,11 @@ var table = []Action{
 	{"me.devices.delete", "DELETE", "/me/devices/{id}", anyMember},
 	{"admin.users.private_profile.get", "GET", "/admin/users/{id}/private-profile", adminOnly},
 	{"admin.users.private_profile.delete", "DELETE", "/admin/users/{id}/private-profile", adminOnly},
+	{"admin.legacy_authors.list", "GET", "/admin/legacy-authors", adminOnly},
+	{"admin.legacy_authors.permit", "POST", "/admin/legacy-authors/{id}/permit", adminOnly},
+	{"admin.legacy_authors.withdraw", "POST", "/admin/legacy-authors/{id}/withdraw", adminOnly},
+	{"admin.legacy_authors.link", "PUT", "/admin/legacy-authors/{id}/link", adminOnly},
+	{"admin.legacy_authors.unlink", "DELETE", "/admin/legacy-authors/{id}/link", adminOnly},
 
 	// 3. 物品管理
 	{"inventory.items.list", "GET", "/inventory/items", anyMember},

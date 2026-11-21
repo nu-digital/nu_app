@@ -45,6 +45,11 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | `GET /members/{id}` | – | 200 上記＋`links`・`devices`（メンバー内公開のみ） | 404（無効・招待中・存在しない・不正なID） |
 | `GET /admin/users/{id}/private-profile` | – | 200 `{id,loginId,displayName,private:{legalName,studentNumber,universityEmail,nearestStation}}`（Admin/Owner。**閲覧を監査に記録**、値は記録しない） | 403、404 |
 | `DELETE /admin/users/{id}/private-profile` | `{reason(必須・200字以内),anonymizeDisplayName?}` | 200 `{consentWithdrawn,displayNameAnonymized,linksDeleted,devicesDeleted}`（個人情報・プロフィール項目・リンク・機材・公開設定を削除、公開クレジット同意を撤回） | 409 `NOT_DISABLED`（**停止中のユーザーだけ**）、422、404 |
+| `GET /admin/legacy-authors` | – | 200 `{items:[{id,name,publicationState,confirmedAt,withdrawnAt,erased,linkedUserId,linkedDisplayName,contentCount}]}`（未確認が先頭。名前は管理者にだけ返す） | 403 |
+| `POST /admin/legacy-authors/{id}/permit` | `{note(必須・200字以内)}` | 204（本人の公開許可を確認して記録。確認者・日時を保存。紐付けは変えない） | 403、404、409 `ERASED`、422 |
+| `POST /admin/legacy-authors/{id}/withdraw` | – | 204（公開を止める。冪等） | 403、404 |
+| `PUT /admin/legacy-authors/{id}/link` | `{userId}` | 204（ユーザーIDを明示して紐付ける。表示名では紐付けない。公開可否は変えない） | 403、404、409 `ERASED`、422 |
+| `DELETE /admin/legacy-authors/{id}/link` | – | 204（紐付けを外す。公開可否は変えない） | 403、404 |
 | `GET /inventory/items` | `q`（名前・カテゴリ・保管場所・説明）, `category`, `available=true`, `limit`, `cursor` | 200 `{items:[{id,name,description,category,location,mode,totalQuantity,outstanding,unitCount,available}],nextCursor,categories}`（廃止した物品は含まない。`available`=数量管理は残数、個体管理は利用可能な個体数） | 400 |
 | `GET /inventory/items/{id}` | – | 200 物品＋`units`（管理番号・状態・貸出中なら借りた人の表示名と経過日数）＋`loans`（数量管理の貸出中。未返却数・経過日数） | 404 |
 | `POST /inventory/items`（Admin） | `{name,description?,category?,location?,mode:"quantity"\|"individual",totalQuantity?}` | 201 | 422 |
@@ -88,6 +93,11 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | DELETE | `/me/devices/{id}` | Member | 個人所有機材を削除 |
 | GET | `/admin/users/{id}/private-profile` | Admin | 個人情報を閲覧（監査対象） |
 | DELETE | `/admin/users/{id}/private-profile` | Admin | 必要な個人情報を手動削除（確認・監査） |
+| GET | `/admin/legacy-authors` | Admin | 既存記事の投稿者の確認一覧 |
+| POST | `/admin/legacy-authors/{id}/permit` | Admin | 投稿者名の公開許可を確認して記録 |
+| POST | `/admin/legacy-authors/{id}/withdraw` | Admin | 投稿者名の公開を止める |
+| PUT | `/admin/legacy-authors/{id}/link` | Admin | 投稿者をユーザーIDで紐付ける |
+| DELETE | `/admin/legacy-authors/{id}/link` | Admin | 紐付けを外す |
 
 公開一覧ではDBの非公開列は返さない。公開許可のない機材スペック・外部リンクも除外する。本人も他人のprivate項目を取得できない。
 

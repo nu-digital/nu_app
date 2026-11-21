@@ -135,6 +135,10 @@ func (s *server) deletePrivateProfile(w http.ResponseWriter, r *http.Request) {
 		if c, err := q.GetPublicCreditConsent(r.Context(), target); err == nil && c.WithdrawnAt.Valid {
 			out.ConsentWithdrawn = true
 		}
+		// D14: 紐付く既存記事の投稿者名も公開不能にし、名前を匿名の記号へ置換する
+		if err := s.eraseLegacyAuthorsOf(r.Context(), q, a.Identity.UserID, target); err != nil {
+			return err
+		}
 		if req.AnonymizeDisplayName {
 			if err := q.SetDisplayName(r.Context(), store.SetDisplayNameParams{UserID: target, DisplayName: anonymizedName}); err != nil {
 				return err
