@@ -86,8 +86,10 @@ const fetchAll = cache(async (): Promise<ContentMeta[]> => {
   throw new Error("公開APIのページ数が多すぎます");
 });
 
-// 並びは、以前（ファイル読み込み）と同じ規則: slug昇順で取得してから、開始日の降順の安定ソート
-const bySlug = (a: ContentMeta, b: ContentMeta) => (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0);
+// 並びは、以前（ファイル読み込み）と同じ規則: ファイル名（slug + ".md"）の昇順で取り込んでから、開始日の降順の安定ソート。
+// ".md" を付けて比べるのが肝心（"demo" と "demo-yura" は、ファイル名では "demo-yura.md" が先。以前の並びを変えない）
+const fileName = (p: ContentMeta) => `${p.slug}.md`;
+const bySlug = (a: ContentMeta, b: ContentMeta) => (fileName(a) < fileName(b) ? -1 : fileName(a) > fileName(b) ? 1 : 0);
 // 期間だけの記録は、記載された開始の月・日を並び順にだけ使う（sortDateは使わず、表示の日付は原文のまま）
 const chronology = (post: ContentMeta) => articleDateOrder(post.date);
 

@@ -41,10 +41,8 @@ try {
   r = await fetch(`http://127.0.0.1:${api}/api/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"loginId":"x","password":"y"}' }).catch(() => null);
   check('api ログインはOrigin無しだと403', r?.status === 403);
   r = await get(admin, '/healthz'); check('admin /healthz 200', r?.status === 200);
-  const bad = [];
-  for (const route of inv.routes.filter(x => !['/404/', '/_not-found/'].includes(x))) { const x = await get(web, route); if (x?.status !== 200) bad.push(`${route}:${x?.status}`); }
-  check(`web 全${inv.routes.length - 2}ルート200`, bad.length === 0, bad.slice(0, 3).join(','));
   r = await get(web, '/no-such-page/'); check('web 未定義URLは404', r?.status === 404);
+  r = await get(web, '/healthz/'); check('web /healthz/ 200（公開APIに依存しない）', r?.status === 200);
 
   // 初期Owner作成CLI: 1回目は成功してtokenを表示、2回目は別IDでも拒否(終了コード3)でtokenを表示しない
   const boot = (id) => compose('run', '--rm', '--no-deps', '--entrypoint', '/nuctl', 'api', 'bootstrap-owner', '--login-id', id, '--display-name', 'スモーク(架空)');
@@ -97,6 +95,31 @@ try {
 
 
     // メディア（画像）: 実際のスタックで、Nextの中継経由の大きな画像・公開境界・永続ボリューム・運用CLIを確かめる
+    // 既存記事の移行（運用CLI。サーバー上で手動実行する手順と同じ）。CMSで記事を作る前（画面E2Eが作る公開記事が基準比較に混ざらない）に行う→ 公式サイトが公開APIから描画 → 移設前基準との一致（P3-04c）
+    {
+      const imp = (extra = []) => compose('run', '--rm', '--no-deps', '-v', `${root}/apps/web/content:/content:ro`, '-v', `${root}/docs/legacy-baseline:/baseline:ro`, '--entrypoint', '/nuctl', 'api', 'import-legacy', '--content-dir', '/content', '--baseline-dir', '/baseline', '--as', 'smoke.owner', ...extra);
+      const dry = imp();
+      check('移行: dry-runは何も書かずに成功する', dry.status === 0, `exit=${dry.status} ${(dry.stderr || '').slice(-300)}`);
+      const apply = imp(['--apply']);
+      check('移行: nuctl import-legacy --apply で既存67記事を取り込める', apply.status === 0 && /67/.test(apply.stdout), `exit=${apply.status} ${(apply.stderr || '').slice(-300)}`);
+      const again = imp(['--apply']);
+      check('移行: 再実行しても成功し、重複して作らない（冪等）', again.status === 0, `exit=${again.status} ${(again.stderr || '').slice(-300)}`);
+      const bad = [];
+      for (const route of inv.routes.filter(x => !['/404/', '/_not-found/'].includes(x))) { const x = await get(web, route); if (x?.status !== 200) bad.push(`${route}:${x?.status}`); }
+      check(`web 全${inv.routes.length - 2}ルート200（実際の公開APIから描画）`, bad.length === 0, bad.slice(0, 3).join(','));
+      const site = `http://127.0.0.1:${web}`;
+      const ver = spawnSync('node', ['scripts/web-verify.mjs', site], { cwd: root, encoding: 'utf8' });
+      check('web-verify: 全ルート・記事・画像が移設前基準と一致', ver.status === 0, (ver.stdout + ver.stderr).slice(-400));
+      if (process.env.PLAYWRIGHT_SKIP !== '1') {
+        const cmp = spawnSync('node', ['scripts/legacy-fingerprint-capture.mjs', '--base', site, '--compare', 'docs/legacy-baseline/pages.json', '--known', 'docs/legacy-baseline/known-diffs.json'], { cwd: root, encoding: 'utf8', env: { ...process.env, PLAYWRIGHT_DIR: join(root, 'apps/admin') } });
+        check('指紋: 実際のAPI・実際の移行結果が、移設前基準と一致（意図した差を除く）', cmp.status === 0, (cmp.stdout + cmp.stderr).slice(-3500));
+      }
+      // 投稿者は公開許可が確認されるまで「nu_digital」。名前は公開APIにも公式サイトのHTMLにも出ない
+      const api1 = await (await get(api, '/api/v1/public/contents?limit=100'))?.text();
+      check('移行: 公開APIに、未確認の投稿者名が出ない', !!api1 && !/"author":"(?!nu_digital)/.test(api1));
+      const html = await (await get(web, '/blog/another/'))?.text();
+      check('移行: 公式サイトの記事に「投稿者：nu_digital」と表示される', !!html && /投稿者：(<!-- -->)?nu_digital/.test(html));
+    }
     {
       const { randomBytes } = await import('node:crypto');
       const zlib = await import('node:zlib');

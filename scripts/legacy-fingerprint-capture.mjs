@@ -55,7 +55,14 @@ if (arg('compare')) {
   const diffs = compareFingerprints(baseline, result, known);
   if (arg('dump')) writeFileSync(resolve(String(arg('dump'))), JSON.stringify(diffs, null, 1));
   if (diffs.length) {
-    for (const d of diffs.slice(0, 40)) console.error(`差: ${d.url} [${d.field}] 基準=${JSON.stringify(d.baseline)?.slice(0, 80)} 実際=${JSON.stringify(d.actual)?.slice(0, 80)}`);
+    // 並びの食い違いを見つけやすいよう、カードはhrefの列で示す（先頭から最初に違う位置を含む）
+    const show = (f, v) => (f === 'cards' && Array.isArray(v) ? v.map(c => c.href) : v);
+    for (const d of diffs.slice(0, 40)) {
+      const b = JSON.stringify(show(d.field, d.baseline)) ?? '', a = JSON.stringify(show(d.field, d.actual)) ?? '';
+      let i = 0; while (i < b.length && b[i] === a[i]) i++;
+      const w = d.field === 'cards' ? 120 : 80;
+      console.error(`差: ${d.url} [${d.field}] 基準=${b.slice(0, w)} 実際=${a.slice(0, w)}` + (i < Math.max(a.length, b.length) && d.field !== 'mainDomSha' && !/Sha/.test(d.field) ? ` ／最初の違い(位置${i}): 基準=…${b.slice(Math.max(0, i - 20), i + 60)} 実際=…${a.slice(Math.max(0, i - 20), i + 60)}` : ''));
+    }
     console.error(`FAIL: 基準との差 ${diffs.length}件`);
     process.exit(1);
   }
