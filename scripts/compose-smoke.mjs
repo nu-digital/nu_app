@@ -108,6 +108,8 @@ try {
         adminUrl: `http://127.0.0.1:${admin}`, apiCall: call, ownerLogin: 'smoke.owner', ownerPass: pw, ownerCookie: cookie, ownerCsrf: csrf,
         memberLogin: 'ui.login.member', memberPass: 'ui-login-passphrase-1', memberName: 'UI会員(架空)',
         shotsDir: process.env.UI_SHOTS_DIR ?? join(root, '.local/ui-shots'), check,
+        // 使い捨てのsmoke用DB（本番ではない）へSQLを流す。APIでは作れない状態（送信に失敗して止まった通知）を用意するために使う
+        dbExec: (sql) => { const r = compose('exec', '-T', 'db', 'psql', '-U', 'smoke', '-d', 'smoke', '-v', 'ON_ERROR_STOP=1', '-c', sql); if (r.status !== 0) throw new Error('dbExec失敗: ' + (r.stderr || '').slice(0, 300)); },
       });
     }
   }

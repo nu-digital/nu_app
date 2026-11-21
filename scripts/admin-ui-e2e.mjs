@@ -8,7 +8,7 @@ const require = createRequire(join(resolve('apps/admin'), 'x.js'));
 const { chromium } = require('playwright');
 
 /**
- * @param {{ownerLogin:string, ownerPass:string, adminUrl:string, apiCall:Function, ownerCookie:string, ownerCsrf:string, memberLogin:string, memberPass:string, memberName:string, shotsDir?:string, check:(name:string, ok:boolean, detail?:string)=>void}} o
+ * @param {{dbExec?:(sql:string)=>void, ownerLogin:string, ownerPass:string, adminUrl:string, apiCall:Function, ownerCookie:string, ownerCsrf:string, memberLogin:string, memberPass:string, memberName:string, shotsDir?:string, check:(name:string, ok:boolean, detail?:string)=>void}} o
  */
 export async function runAdminUiE2E(o) {
   const { adminUrl, check } = o;
@@ -554,6 +554,75 @@ export async function runAdminUiE2E(o) {
       await page.waitForURL('**/admin/inventory');
       await page.locator(`li.item[data-name="${inn}"]`).waitFor();
       check(`[${label}] 廃止した物品は管理の一覧から消える`, (await page.locator(`li.item[data-name="${qn}"]`).count()) === 0);
+      await ctx.close();
+    }
+    // 通知の設定（Admin/Owner。PC・スマホ・320px）
+    for (const [label, width, height, ch] of [['pc', 1440, 900, '111111111111111111'], ['sp', 390, 844, '222222222222222222'], ['narrow', 320, 640, '333333333333333333']]) {
+      const own = { cookie: o.ownerCookie, csrf: o.ownerCsrf };
+      // 毎回同じ状態から始める（全種別を有効・チャンネル未設定）
+      for (const et of ['inventory.loan_created', 'inventory.loan_returned', 'inventory.correction_created']) {
+        await o.apiCall('PUT', `/admin/notifications/settings/${et}`, { body: { enabled: true, discordChannelId: '' }, ...own });
+      }
+      // 一般メンバーには設定が見えず、権限が無い案内が出る
+      const mctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const mp = await mctx.newPage();
+      await login(mp, o.memberLogin, o.memberPass);
+      await mp.goto(`${adminUrl}/admin/notifications`);
+      await mp.locator('.notice.error').waitFor();
+      check(`[${label}] 一般メンバーには通知の設定が出ず、権限が無い案内が出る`, /権限がありません/.test(await mp.locator('.notice.error').innerText()) && (await mp.locator('li.setting').count()) === 0);
+      await mctx.close();
+
+      const ctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const page = await ctx.newPage();
+      await login(page, o.ownerLogin, o.ownerPass);
+      await page.goto(`${adminUrl}/admin/inventory`);
+      await page.getByRole('link', { name: '通知の設定' }).click();
+      await page.waitForURL('**/admin/notifications');
+      await page.locator('li.setting').first().waitFor();
+      check(`[${label}] 通知の設定に3種別が出る`, (await page.locator('li.setting').count()) === 3);
+      const row = page.locator('li.setting[data-event="inventory.loan_created"]');
+      check(`[${label}] 変更が無いあいだは「保存する」が押せない`, await row.getByRole('button', { name: '保存する' }).isDisabled());
+      check(`[${label}] チャンネル未設定の案内が出る`, /送信待ちとして溜まります/.test(await row.innerText()));
+      // 数字以外のIDはAPIが拒否し、案内が出る
+      await row.getByLabel('送信先のチャンネルID').fill('abc');
+      await row.getByRole('button', { name: '保存する' }).click();
+      await page.locator('.notice.error').waitFor();
+      check(`[${label}] 数字以外のチャンネルIDは保存できず、案内が出る`, /数字だけ/.test(await page.locator('.notice.error').innerText()));
+      await row.getByLabel('送信先のチャンネルID').fill(ch);
+      await row.getByRole('button', { name: '保存する' }).click();
+      await page.locator('.notice.success').filter({ hasText: '設定を保存しました' }).waitFor();
+      check(`[${label}] 保存すると「保存する」が押せなくなる`, await row.getByRole('button', { name: '保存する' }).isDisabled());
+      // Botが無い環境の接続テストは、設定が必要な旨を案内する
+      await row.getByRole('button', { name: '接続テスト' }).click();
+      await page.locator('.notice.error').filter({ hasText: 'Botが設定されていません' }).waitFor();
+      check(`[${label}] Bot未設定の接続テストは案内が出る（送信はされない）`, true);
+      // OFFにして保存 → 再読み込みしても保持される
+      const row2 = page.locator('li.setting[data-event="inventory.loan_returned"]');
+      await row2.getByLabel('この通知を送る').uncheck();
+      await row2.getByRole('button', { name: '保存する' }).click();
+      await page.locator('.notice.success').filter({ hasText: '設定を保存しました' }).waitFor();
+      await page.reload();
+      await page.locator('li.setting').first().waitFor();
+      check(`[${label}] 設定が再読み込み後も保持される`, (await page.locator('li.setting[data-event="inventory.loan_created"]').getByLabel('送信先のチャンネルID').inputValue()) === ch && !(await page.locator('li.setting[data-event="inventory.loan_returned"]').getByLabel('この通知を送る').isChecked()));
+      check(`[${label}] 通知の設定に横溢れがない・操作対象が44px以上`, (await overflowOf(page)) <= 0 && (await smallOf(page)) === 0, `overflow=${await overflowOf(page)} small=${await smallOf(page)}`);
+
+      // 送信の状況: 送信待ち（貸出の通知が溜まっている）と、止まった通知の再送
+      if (o.dbExec) {
+        o.dbExec(`INSERT INTO notification_outbox (event_type, dedupe_key, payload_json, status, attempts, last_error) VALUES ('inventory.loan_created', 'e2e-dead-${label}', '{"v":1,"itemName":"確認用"}', 'dead', 8, 'Discordのサーバーエラー（HTTP 503）（再試行の上限）')`);
+        await page.reload();
+        await page.locator('li.setting').first().waitFor();
+        await page.getByLabel('表示する状態').selectOption('dead');
+        const dead = page.locator(`li.item[data-delivery][data-status="dead"]`).filter({ hasText: 'HTTP 503' });
+        await dead.first().waitFor();
+        check(`[${label}] 失敗して停止した通知に、失敗の要約と「再送する」が出る（本文は出ない）`, (await dead.first().getByRole('button', { name: '再送する' }).count()) === 1 && !(await page.locator('main').innerText()).includes('確認用'));
+        if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-notifications.png`), fullPage: true });
+        await dead.first().getByRole('button', { name: '再送する' }).click();
+        await page.locator('.notice.success').filter({ hasText: '再送待ちに戻しました' }).waitFor();
+        await page.locator('li.item[data-delivery][data-status="dead"]').filter({ hasText: 'HTTP 503' }).first().waitFor({ state: 'detached' });
+        await page.getByLabel('表示する状態').selectOption('pending');
+        await page.locator('li.item[data-delivery][data-status="pending"]').first().waitFor();
+        check(`[${label}] 再送すると停止の一覧から消え、送信待ちに戻る`, (await page.locator('li.item[data-delivery][data-status="pending"]').count()) >= 1);
+      }
       await ctx.close();
     }
     // 権限が無い人（一般メンバー）にはAPIが拒否し、画面は案内を表示する

@@ -75,6 +75,8 @@ export async function submitToken(kind: "accept-invite" | "reset-password", toke
 export function describe(e: unknown): string {
   const err = e as Partial<ApiError>;
   if (err?.status === 429) return "試行が多すぎます。しばらくしてからお試しください。";
+  // Bot未設定の503は「混み合っている」ではなく、設定が必要という案内そのものを出す
+  if (err?.code === "BOT_NOT_CONFIGURED" && err.message) return err.message;
   if (err?.status === 503) return "混み合っています。しばらくしてからお試しください。";
   if (err?.message) return err.message;
   return "通信に失敗しました。もう一度お試しください。";
@@ -242,4 +244,18 @@ export async function createCorrection(key: string, b: { targetType: "loan" | "r
   const r = await call("POST", "/admin/inventory/corrections", b, { "Idempotency-Key": key });
   if (r.status !== 200 && r.status !== 201) throw toError(r);
   return r.json as { replayed: boolean; itemOutstanding: number; itemAvailable: number };
+}
+
+// --- 通知の設定（Admin/Owner。権限はAPIが強制する）---
+export type NotificationSetting = { eventType: string; label: string; enabled: boolean; discordChannelId: string | null; updatedAt: string };
+export type Delivery = { id: string; eventType: string; label: string; status: "pending" | "sent" | "dead"; attempts: number; nextAttemptAt: string; lastError: string | null; createdAt: string; sentAt: string | null };
+export const listNotificationSettings = async () => ok<{ items: NotificationSetting[] }>(await call("GET", "/admin/notifications/settings"), 200);
+export const putNotificationSetting = async (eventType: string, enabled: boolean, discordChannelId: string) =>
+  ok<NotificationSetting>(await call("PUT", `/admin/notifications/settings/${encodeURIComponent(eventType)}`, { enabled, discordChannelId }), 200);
+export const testNotification = async (discordChannelId: string) => ok<{ ok: boolean }>(await call("POST", "/admin/notifications/test", { discordChannelId }), 200);
+export const listDeliveries = async (status?: string) =>
+  ok<{ items: Delivery[] }>(await call("GET", `/admin/notifications/deliveries?limit=50${status ? `&status=${status}` : ""}`), 200);
+export async function retryDelivery(id: string): Promise<void> {
+  const r = await call("POST", `/admin/notifications/deliveries/${id}/retry`);
+  if (r.status !== 204) throw toError(r);
 }
