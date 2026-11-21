@@ -92,6 +92,13 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
   - `nuctl media-verify`: DBの行にファイルが無い／ファイルに行が無い／無効化済みなのにファイルが残る／想定外のファイルを報告する（何も消さない。食い違いがあれば終了コード1）。
   - `nuctl media-redact --id <uuid> --reason "<理由>"`: **本人情報を含む画像を誤ってアップロードした場合・個人情報削除の依頼**で使う。ファイルを消し、配信・新規参照・公開を止める（行と参照は監査のため残す。`audit_logs`に理由と実行したOSユーザーを記録）。公開中の記事がその画像を参照していれば、画像はすぐ404になり、記事は画像が欠けた状態になる（記事側の修正は別途）。redactedな画像を参照する版は公開できない。
 - 公開画像は**長期キャッシュ・静的コピーをしない**: `/api/v1/public/media/*`は`Cache-Control: no-cache`（強いETag）。Nginxの`proxy_cache`・Next.jsの画像最適化キャッシュ・静的書き出しに焼き込むと、公開停止・redact後も画像が残るため、公式サイト側（P3-04）でもこの方針を守る。
+### 既存記事の移行と投稿者名（P3-04a・D14）
+
+- `nuctl import-legacy --content-dir <dir> --inventory <inventory.json> --as <ownerのログインID> [--apply]`（既定はdry-run）。運用者がサーバー上で手動で実行する（workflowから呼ばない。`check.mjs`が禁止）。`api`イメージは`content/`を含まないため**読み取り専用でマウント**する: `docker compose run --rm --no-deps -v "$PWD/apps/web/content:/content:ro" -v "$PWD/docs/legacy-baseline/inventory.json:/inventory.json:ro" --entrypoint /nuctl api import-legacy --content-dir /content --inventory /inventory.json --as <オーナー> [--apply]`。ゴールデン（`docs/legacy-baseline/`）と食い違えば何も書かずに失敗する。再実行は冪等（既存の記事は触らない）。
+- **投稿者名は`legacy_authors`にだけ置き、記事の版・監査ログ・Discordには入れない**。移行直後はすべて公開許可が**未確認**で、公開APIの`author`は「nu_digital」。名前の公開は、管理者が本人の許可を確認して記録した後だけ（P3-04a-2の管理画面）。ユーザーへの紐付けは公開可否と独立で、表示名での自動紐付けはしない。
+- 取り下げ: `docs/legacy-baseline/takedown.json`に載せた記事は移行しない（災害復旧後の再実行でも再公開されない）。
+- **ロールバック**: 移行は追加のみ。誤りは記事を公開停止する（`unpublish`）。CMS更新後に静的イメージへ戻さない（更新が失われ、取り下げ済みの内容が復活し得る）。
+
 - 色: ICCプロファイルは破棄するため、Display P3の写真はsRGBとして表示され彩度が落ちる（暫定）。
 
 ## Discord通知workerの運用（P2-04）

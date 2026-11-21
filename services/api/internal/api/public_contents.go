@@ -27,7 +27,18 @@ import (
 const anonymousMember = "匿名のメンバー"
 
 // publicMetadataKeys は公開APIに出すメタデータ。sourceId・sourceUrl（移行元の情報）は出さない。
-var publicMetadataKeys = map[string]bool{"category": true, "excerpt": true, "image": true, "author": true}
+// **投稿者（author）はここに含めない**: 名前は版に保存せず、legacy_authorsから配信のたびに解決して`author`で返す（D14）。
+var publicMetadataKeys = map[string]bool{"category": true, "excerpt": true, "image": true}
+
+// defaultAuthor は、投稿者の公開が許可されていない（未確認・撤回・個人情報削除・未設定）ときに表示する名前（D14）。
+const defaultAuthor = "nu_digital"
+
+func authorOf(name string) string {
+	if name == "" {
+		return defaultAuthor
+	}
+	return name
+}
 
 type publicDate struct {
 	Label               string  `json:"label"`
@@ -37,11 +48,13 @@ type publicDate struct {
 }
 
 type publicItem struct {
-	Type     string            `json:"type"`
-	Section  string            `json:"section"`
-	Slug     string            `json:"slug"`
-	Title    string            `json:"title"`
-	Summary  string            `json:"summary"`
+	Type    string `json:"type"`
+	Section string `json:"section"`
+	Slug    string `json:"slug"`
+	Title   string `json:"title"`
+	Summary string `json:"summary"`
+	// Author は解決済みの投稿者名（公開が許可された投稿者の名前、それ以外は「nu_digital」）。
+	Author   string            `json:"author"`
 	Metadata map[string]string `json:"metadata"`
 	Date     publicDate        `json:"date"`
 	// CoverURL はカバー画像の公開URL（無ければ省略）。公開中の版が参照している間だけ配信される。
@@ -140,7 +153,7 @@ func (s *server) getPublicContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := publicDetail{
-		publicItem: publicItem{Type: c.Type, Section: c.Section, Slug: c.Slug, Title: c.Title, Summary: c.Summary, Metadata: publicMeta(c.MetadataJson),
+		publicItem: publicItem{Type: c.Type, Section: c.Section, Slug: c.Slug, Title: c.Title, Summary: c.Summary, Author: authorOf(c.AuthorName), Metadata: publicMeta(c.MetadataJson),
 			Date: publicDateOf(c.DateLabel, c.DateKind, c.SortDate, c.SortDateIsEstimated), CoverURL: coverURL(c.CoverPublicID)},
 		Markdown: c.Markdown, Contributors: make([]publicContributor, 0, len(cs)),
 	}
@@ -199,7 +212,7 @@ func (s *server) listPublicContents(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]publicItem, 0, len(rows))
 	for _, x := range rows {
-		items = append(items, publicItem{Type: x.Type, Section: x.Section, Slug: x.Slug, Title: x.Title, Summary: x.Summary, Metadata: publicMeta(x.MetadataJson),
+		items = append(items, publicItem{Type: x.Type, Section: x.Section, Slug: x.Slug, Title: x.Title, Summary: x.Summary, Author: authorOf(x.AuthorName), Metadata: publicMeta(x.MetadataJson),
 			Date: publicDateOf(x.DateLabel, x.DateKind, x.SortDate, x.SortDateIsEstimated), CoverURL: coverURL(x.CoverPublicID)})
 	}
 	writePublicJSON(w, r, map[string]any{"items": items, "nextCursor": next})

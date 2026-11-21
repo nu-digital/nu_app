@@ -28,6 +28,7 @@ export function policyErrors(pr) {
 export function workflowPolicyErrors(file, content) {
   const errors = [];
   if (/recover-owner/.test(content)) errors.push(`${file}: 緊急復旧(recover-owner)をworkflowから実行してはいけません`);
+  if (/import-legacy/.test(content)) errors.push(`${file}: 既存記事の移行(import-legacy)をworkflowから実行してはいけません（運用者が手動で、本番では確認のうえ実行する）`);
   if (/media-(gc|redact|verify)/.test(content)) errors.push(`${file}: 画像の運用コマンド(media-gc・media-redact・media-verify)をworkflowから実行してはいけません`);
   return errors;
 }

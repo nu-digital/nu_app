@@ -2,8 +2,8 @@
 SELECT gen_random_uuid();
 
 -- name: CreateContent :one
-INSERT INTO contents (id, type, section, slug, creator_user_id, working_revision_id)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO contents (id, type, section, slug, creator_user_id, working_revision_id, legacy_author_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
 -- name: InsertContentRevision :one
@@ -114,9 +114,12 @@ RETURNING id;
 -- name: GetPublicContent :one
 SELECT c.type, c.section, c.slug, r.id AS revision_id, r.title, r.summary, r.markdown, r.metadata_json,
        r.date_label, r.date_kind, r.sort_date, r.sort_date_is_estimated,
-       COALESCE(cm.public_id, '')::text AS cover_public_id
+       COALESCE(cm.public_id, '')::text AS cover_public_id,
+       -- 投稿者名は、公開が許可済み（かつ削除されていない）ときだけ。それ以外は空（=サイトは「nu_digital」）。版には依存しない
+       COALESCE(CASE WHEN la.publication_state = 'permitted' AND la.erased_at IS NULL THEN la.source_name END, '')::text AS author_name
 FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
 LEFT JOIN media_assets cm ON cm.id = r.cover_media_id AND cm.redacted_at IS NULL
+LEFT JOIN legacy_authors la ON la.id = c.legacy_author_id
 WHERE c.section = $1 AND c.slug = $2 AND c.archived_at IS NULL;
 
 -- 並び順は日付の新しい順（日付不明は最後）。カーソルは (並び用の日付, id)。
@@ -124,9 +127,11 @@ WHERE c.section = $1 AND c.slug = $2 AND c.archived_at IS NULL;
 SELECT c.id, c.type, c.section, c.slug, r.title, r.summary, r.metadata_json,
        r.date_label, r.date_kind, r.sort_date, r.sort_date_is_estimated,
        COALESCE(r.sort_date, DATE '0001-01-01')::date AS order_date,
-       COALESCE(cm.public_id, '')::text AS cover_public_id
+       COALESCE(cm.public_id, '')::text AS cover_public_id,
+       COALESCE(CASE WHEN la.publication_state = 'permitted' AND la.erased_at IS NULL THEN la.source_name END, '')::text AS author_name
 FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
 LEFT JOIN media_assets cm ON cm.id = r.cover_media_id AND cm.redacted_at IS NULL
+LEFT JOIN legacy_authors la ON la.id = c.legacy_author_id
 WHERE c.archived_at IS NULL
   AND (sqlc.narg('section')::text IS NULL OR c.section = sqlc.narg('section')::text)
   AND (sqlc.narg('before_date')::date IS NULL OR (COALESCE(r.sort_date, DATE '0001-01-01'), c.id) < (sqlc.narg('before_date')::date, sqlc.narg('before_id')::uuid))

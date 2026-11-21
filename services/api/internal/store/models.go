@@ -34,6 +34,7 @@ type Content struct {
 	ArchivedAt          pgtype.Timestamptz
 	CreatedAt           pgtype.Timestamptz
 	UpdatedAt           pgtype.Timestamptz
+	LegacyAuthorID      pgtype.UUID
 }
 
 type ContentCollaborator struct {
@@ -160,6 +161,21 @@ type InventoryUnit struct {
 	CurrentLoanID pgtype.UUID
 	ArchivedAt    pgtype.Timestamptz
 	CreatedAt     pgtype.Timestamptz
+}
+
+type LegacyAuthor struct {
+	ID               pgtype.UUID
+	SourceName       string
+	PublicationState string
+	ConfirmedBy      pgtype.UUID
+	ConfirmedAt      pgtype.Timestamptz
+	ConfirmNote      pgtype.Text
+	WithdrawnAt      pgtype.Timestamptz
+	LinkedUserID     pgtype.UUID
+	LinkedBy         pgtype.UUID
+	LinkedAt         pgtype.Timestamptz
+	ErasedAt         pgtype.Timestamptz
+	CreatedAt        pgtype.Timestamptz
 }
 
 type MediaAsset struct {

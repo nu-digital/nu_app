@@ -3,6 +3,7 @@
 //	nuctl bootstrap-owner --login-id <id> --display-name <name> [--token-ttl 24h]
 //	nuctl recover-owner --login-id <id> --confirm-login-id <id> --approver-note "<本人確認と承認の記録>"
 //	nuctl media-gc | media-verify | media-redact（画像の運用。docs/OPERATIONS.md）
+//	nuctl import-legacy（既存記事の移行。docs/OPERATIONS.md）
 //
 // 初期Ownerの作成は1回だけ。招待tokenは標準出力へ一度だけ表示する（ログに出さない・保存しない）。
 package main
@@ -28,6 +29,9 @@ func main() {
 func run(ctx context.Context, args []string, getenv func(string) string, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "recover-owner" {
 		return runRecover(ctx, args[1:], getenv, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "import-legacy" {
+		return runImportLegacy(ctx, args[1:], getenv, stdout, stderr)
 	}
 	if len(args) > 0 && (args[0] == "media-gc" || args[0] == "media-verify" || args[0] == "media-redact") {
 		return runMedia(ctx, args[0], args[1:], getenv, stdout, stderr)

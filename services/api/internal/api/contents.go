@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/nu-digital/nu_app/services/api/internal/authz"
+	"github.com/nu-digital/nu_app/services/api/internal/cmsrules"
 	"github.com/nu-digital/nu_app/services/api/internal/httpx"
 	"github.com/nu-digital/nu_app/services/api/internal/mdcheck"
 	"github.com/nu-digital/nu_app/services/api/internal/store"
@@ -124,93 +125,37 @@ type contentView struct {
 // ---- 入力の検査 ----
 
 // editableMetadata は誰でも書ける項目、restrictedMetadata は移行ツールとEditor以上だけが書ける項目。
-// 後者は、他人の名前を載せる（D08の結合を通らない）・画像の差し替えなどを防ぐ。
+// 後者は、画像の差し替えなどを防ぐ。**投稿者名（author）は版に保存しない**（D14。legacy_authorsで管理し、公開APIが配信時に解決する）。
 var (
 	editableMetadata   = map[string]bool{"category": true, "excerpt": true}
-	restrictedMetadata = map[string]bool{"author": true, "image": true, "sourceId": true, "sourceUrl": true}
+	restrictedMetadata = map[string]bool{"image": true, "sourceId": true, "sourceUrl": true}
 
-	imagePathRe = regexp.MustCompile(`^/images/[A-Za-z0-9._/-]{1,200}$`)
-	sourceIDRe  = regexp.MustCompile(`^[A-Za-z0-9._/-]{1,200}$`)
-	sourceURLRe = regexp.MustCompile(`^https://[^\s<>"]{1,480}$`)
-	slugRe      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`)
-	urlLikeRe   = regexp.MustCompile(`(?i)(https?:|www\.)`)
+	slugRe    = cmsrules.SlugRe
+	urlLikeRe = regexp.MustCompile(`(?i)(https?:|www\.)`)
 )
 
-func hasControl(s string, allowNewline bool) bool {
-	for _, r := range s {
-		if r == '\n' && allowNewline {
-			continue
-		}
-		if r < 0x20 || r == 0x7f || r == ' ' || r == ' ' {
-			return true
-		}
-	}
-	return false
-}
+var hasControl = cmsrules.HasControl
 
 // checkFields は認可の前に行える安い検査（長さ・形式）。Markdownの検査（重い）は含まない。
 func checkFields(f *contentFields) error {
-	f.Title = strings.TrimSpace(f.Title)
-	f.Summary = strings.TrimSpace(f.Summary)
-	if f.Title == "" || utf8.RuneCountInString(f.Title) > 200 || hasControl(f.Title, false) {
-		return invalid("タイトルは1〜200文字で、改行を含めないでください")
+	t, sm, err := cmsrules.CheckText(f.Title, f.Summary, f.Markdown, mdcheck.MaxBytes)
+	if err != nil {
+		return invalid(err.Error())
 	}
-	if utf8.RuneCountInString(f.Summary) > 500 || hasControl(f.Summary, true) {
-		return invalid("要約は500文字までです")
-	}
-	if len(f.Markdown) > mdcheck.MaxBytes {
-		return invalid("本文が大きすぎます（256KiBまで）")
-	}
+	f.Title, f.Summary = t, sm
 	if f.Date != nil {
-		d := f.Date
-		d.Label = strings.TrimSpace(d.Label)
-		if utf8.RuneCountInString(d.Label) > 100 || hasControl(d.Label, false) {
-			return invalid("日付の表示は100文字までです")
+		d := cmsrules.Date{Label: f.Date.Label, Kind: f.Date.Kind, SortDate: f.Date.SortDate}
+		if err := cmsrules.CheckDate(&d); err != nil {
+			return invalid(err.Error())
 		}
-		switch d.Kind {
-		case "day", "month", "range", "unknown":
-		default:
-			return invalid("日付の種類が正しくありません")
-		}
-		if d.SortDate != nil {
-			if _, err := time.Parse("2006-01-02", *d.SortDate); err != nil {
-				return invalid("並び替え用の日付は YYYY-MM-DD で指定してください")
-			}
-		}
-		if d.Kind != "unknown" && d.SortDate == nil {
-			return invalid("日付の種類がunknown以外のときは、並び替え用の日付が必要です")
-		}
+		f.Date.Label = d.Label
 	}
 	return nil
 }
 
 func validMetadataValue(key, v string) error {
-	bad := func(msg string) error { return invalid(msg) }
-	switch key {
-	case "category":
-		if v == "" || utf8.RuneCountInString(v) > 30 || hasControl(v, false) {
-			return bad("カテゴリは1〜30文字で入力してください")
-		}
-	case "excerpt":
-		if utf8.RuneCountInString(v) > 300 || hasControl(v, true) {
-			return bad("抜粋は300文字までです")
-		}
-	case "author":
-		if v == "" || utf8.RuneCountInString(v) > 64 || hasControl(v, false) || strings.ContainsAny(v, "<>@") {
-			return bad("投稿者の表示が正しくありません")
-		}
-	case "image":
-		if !imagePathRe.MatchString(v) || strings.Contains(v, "..") {
-			return bad("画像はこのサイトの /images/ のパスだけ指定できます")
-		}
-	case "sourceId":
-		if !sourceIDRe.MatchString(v) {
-			return bad("sourceIdの形式が正しくありません")
-		}
-	case "sourceUrl":
-		if !sourceURLRe.MatchString(v) {
-			return bad("sourceUrlはhttpsのURLにしてください")
-		}
+	if err := cmsrules.ValidMetadataValue(key, v); err != nil {
+		return invalid(err.Error())
 	}
 	return nil
 }
