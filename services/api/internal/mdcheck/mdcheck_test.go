@@ -119,3 +119,24 @@ func TestLegacyArticlesPass(t *testing.T) {
 		t.Errorf("元URLコメントのある記事 %d本（23本のはず）", withComment)
 	}
 }
+
+// 画像の抽出: 解決済みのImageノードだけが対象（コードブロック・通常のリンク・参照定義の未使用は含まない）。
+func TestMediaPublicIDsExtraction(t *testing.T) {
+	a, b, c := "AbCdEfGhIjKlMnOpQrStUv", "ZZZZZZZZZZZZZZZZZZZZZZ", "0123456789012345678901"
+	src := "![a](/api/v1/public/media/" + a + ")\n\n" +
+		"[リンクは参照ではない](/api/v1/public/media/" + b + ")\n\n" +
+		"```\n![コード](/api/v1/public/media/" + b + ")\n```\n\n" +
+		"![参照定義][r]\n\n[r]: /api/v1/public/media/" + c + "\n\n" +
+		"![重複](/api/v1/public/media/" + a + ")\n\n![既存の静的画像](/images/imported/x.webp)\n\n" +
+		"[未使用の定義]: /api/v1/public/media/" + b + "\n"
+	r := Check(src)
+	if len(r.Violations) != 0 {
+		t.Fatalf("違反: %v", r.Violations)
+	}
+	if len(r.MediaPublicIDs) != 2 || r.MediaPublicIDs[0] != a || r.MediaPublicIDs[1] != c {
+		t.Errorf("抽出（出現順・重複なし・参照定義を解決）: %v", r.MediaPublicIDs)
+	}
+	if r := Check("本文のみ"); len(r.MediaPublicIDs) != 0 {
+		t.Errorf("画像なし: %v", r.MediaPublicIDs)
+	}
+}

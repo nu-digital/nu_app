@@ -21,6 +21,7 @@ import (
 	"github.com/nu-digital/nu_app/services/api/internal/auth/session"
 	"github.com/nu-digital/nu_app/services/api/internal/authz"
 	"github.com/nu-digital/nu_app/services/api/internal/httpx"
+	"github.com/nu-digital/nu_app/services/api/internal/media"
 	"github.com/nu-digital/nu_app/services/api/internal/notify"
 	"github.com/nu-digital/nu_app/services/api/internal/platform/config"
 )
@@ -39,6 +40,13 @@ type Deps struct {
 	// Notifier はDiscordへ送る口（接続テスト用）。tokenが無い環境ではnil。
 	Notifier notify.Sender
 
+	// Media は画像の保存先（MEDIA_DIR）。nilならメディアのAPIは503。
+	Media *media.Store
+	// MediaLimits は取り込みの上限（ゼロ値なら既定）。
+	MediaLimits MediaLimits
+	// OnMediaDecode はテスト専用（本番ではnil）。同時デコードの枠を持っている間、入るとき(true)・出るとき(false)に呼ばれる。
+	OnMediaDecode func(enter bool)
+
 	// BeforeOwnerCount はテスト専用のフック（本番ではnil）。最後のOwnerの判定の直前に呼ばれ、競合を再現するために使う。
 	BeforeOwnerCount func()
 	// BeforeInventoryCheck もテスト専用のフック（本番ではnil）。在庫の判定（残数・未返却数の確認）の直前に呼ばれる。
@@ -51,6 +59,7 @@ type server struct {
 	Deps
 	// saves はコンテンツの保存系の頻度制限（利用者ごと）。
 	saves *saveLimiter
+	media mediaState
 }
 
 // authCtx は検証済みセッション。
@@ -81,7 +90,8 @@ func New(d Deps) http.Handler {
 	if d.Now == nil {
 		d.Now = time.Now
 	}
-	s := &server{Deps: d, saves: newSaveLimiter()}
+	s := &server{Deps: d, saves: newSaveLimiter(saveMax)}
+	s.initMedia()
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /auth/login", s.login)
 	mux.HandleFunc("POST /auth/logout", s.logout)
@@ -112,6 +122,10 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("GET /admin/notifications/deliveries", s.listNotificationDeliveries)
 	mux.HandleFunc("POST /admin/notifications/deliveries/{id}/retry", s.retryNotificationDelivery)
 	mux.HandleFunc("POST /admin/notifications/test", s.testNotification)
+	mux.HandleFunc("POST /media", s.uploadMedia)
+	mux.HandleFunc("GET /media/{id}", s.getMedia)
+	mux.HandleFunc("GET /media/by-public/{publicId}", s.getMediaByPublic)
+	mux.HandleFunc("GET /public/media/{publicId}", s.getPublicMedia)
 	mux.HandleFunc("GET /members", s.listMembers)
 	mux.HandleFunc("GET /members/{id}", s.getMember)
 	mux.HandleFunc("GET /admin/users/{id}/private-profile", s.getPrivateProfile)
@@ -162,6 +176,12 @@ func (s *server) recoverer(next http.Handler) http.Handler {
 // bodyAndType は本文サイズを制限し、本文を持つ状態変更リクエストはJSONのみ受け付ける。
 func (s *server) bodyAndType(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/media" {
+			// 画像のアップロードだけは、生のバイト列（JSON以外）と大きな本文を受ける。上限・形式の検査はハンドラー側
+			r.Body = http.MaxBytesReader(w, r.Body, media.MaxBytes(media.CMS)+4096)
+			next.ServeHTTP(w, r)
+			return
+		}
 		if httpx.IsUnsafe(r.Method) && r.ContentLength != 0 {
 			if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(strings.ToLower(ct), "application/json") {
 				httpx.Error(w, r, http.StatusUnsupportedMediaType, "UNSUPPORTED_MEDIA_TYPE", "JSONで送信してください")

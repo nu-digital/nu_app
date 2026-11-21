@@ -24,8 +24,12 @@ export function policyErrors(pr) {
 
 // Ownerの緊急復旧(recover-owner)は、運用責任者がサーバー上で手動で実行する手順であり、
 // GitHub Actionsのworkflow（デプロイ等）から呼んではならない（D05。docs/OPERATIONS.md）。
+// 画像の運用コマンド(media-gc・media-redact・media-verify)も、運用者が手動で実行する（削除・無効化を自動化しない）。
 export function workflowPolicyErrors(file, content) {
-  return /recover-owner/.test(content) ? [`${file}: 緊急復旧(recover-owner)をworkflowから実行してはいけません`] : [];
+  const errors = [];
+  if (/recover-owner/.test(content)) errors.push(`${file}: 緊急復旧(recover-owner)をworkflowから実行してはいけません`);
+  if (/media-(gc|redact|verify)/.test(content)) errors.push(`${file}: 画像の運用コマンド(media-gc・media-redact・media-verify)をworkflowから実行してはいけません`);
+  return errors;
 }
 
 export function forbiddenPath(file) {

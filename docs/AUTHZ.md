@@ -71,8 +71,9 @@
 | `public.contents.list` | GET | `/public/contents` | 誰でも（匿名可）。トークン検証はハンドラー側 |
 | `public.contents.get` | GET | `/public/contents/{section}/{slug}` | 誰でも（匿名可）。トークン検証はハンドラー側 |
 | `media.upload` | POST | `/media` | 有効なユーザー（Member以上） |
-| `media.get` | GET | `/media/{id}` | アップロード者 / Editor / Admin / Owner |
-| `public.media.get` | GET | `/public/media/{opaqueId}` | 誰でも（匿名可）。トークン検証はハンドラー側 |
+| `media.get` | GET | `/media/{id}` | アップロード者 / その画像を参照するコンテンツの作者・共同編集者 / Editor / Admin / Owner（それ以外は存在しないのと同じ404） |
+| `media.get_by_public` | GET | `/media/by-public/{publicId}` | 同上（本文のURLからの下書きプレビュー用） |
+| `public.media.get` | GET | `/public/media/{publicId}` | 誰でも（匿名可）。認証情報は見ない。**公開中の版が参照している画像だけ**をハンドラーが判定する（それ以外は同じ404） |
 | `dashboard.feed` | GET | `/dashboard/feed` | 有効なユーザー（Member以上） |
 | `admin.notifications.settings.get` | GET | `/admin/notifications/settings` | Admin / Owner |
 | `admin.notifications.settings.update` | PUT | `/admin/notifications/settings/{eventType}` | Admin / Owner |

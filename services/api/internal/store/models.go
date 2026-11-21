@@ -162,6 +162,28 @@ type InventoryUnit struct {
 	CreatedAt     pgtype.Timestamptz
 }
 
+type MediaAsset struct {
+	ID         pgtype.UUID
+	PublicID   string
+	StorageKey string
+	MimeType   string
+	ByteSize   int64
+	Width      int32
+	Height     int32
+	Sha256     string
+	Purpose    string
+	UploadedBy pgtype.UUID
+	CreatedAt  pgtype.Timestamptz
+	RedactedAt pgtype.Timestamptz
+}
+
+type MediaReference struct {
+	MediaID   pgtype.UUID
+	OwnerType string
+	OwnerID   pgtype.UUID
+	Purpose   string
+}
+
 type NotificationOutbox struct {
 	ID            pgtype.UUID
 	EventType     string

@@ -21,6 +21,7 @@ import (
 	"github.com/nu-digital/nu_app/services/api/internal/auth/password"
 	"github.com/nu-digital/nu_app/services/api/internal/auth/ratelimit"
 	"github.com/nu-digital/nu_app/services/api/internal/auth/session"
+	"github.com/nu-digital/nu_app/services/api/internal/media"
 	"github.com/nu-digital/nu_app/services/api/internal/notify"
 	"github.com/nu-digital/nu_app/services/api/internal/platform/config"
 	"github.com/nu-digital/nu_app/services/api/internal/store"
@@ -39,14 +40,18 @@ type env struct {
 	hook    func()
 	invHook func()
 	cmsHook func()
-	cfg     config.Config
-	t       *testing.T
-	pool    *pgxpool.Pool
-	h       http.Handler
-	logs    *bytes.Buffer
-	limiter *ratelimit.Limiter
-	clock   *time.Time
-	hasher  *password.Hasher
+	// メディア（画像）。mediaを設定してからe.h = e.build()する。nilならMEDIA_DIR未設定の状態
+	media    *media.Store
+	mlimits  api.MediaLimits
+	onDecode func(bool)
+	cfg      config.Config
+	t        *testing.T
+	pool     *pgxpool.Pool
+	h        http.Handler
+	logs     *bytes.Buffer
+	limiter  *ratelimit.Limiter
+	clock    *time.Time
+	hasher   *password.Hasher
 	// notifier は接続テスト用のDiscord送信（nilならBot未設定）。
 	notifier notify.Sender
 }
@@ -80,7 +85,7 @@ func (e *env) build() http.Handler {
 		Log:              slog.New(slog.NewTextHandler(e.logs, nil)),
 		Now:              func() time.Time { return *e.clock },
 		Notifier:         e.notifier,
-		BeforeOwnerCount: e.hook, BeforeInventoryCheck: e.invHook, BeforeContentSave: e.cmsHook,
+		BeforeOwnerCount: e.hook, BeforeInventoryCheck: e.invHook, BeforeContentSave: e.cmsHook, Media: e.media, MediaLimits: e.mlimits, OnMediaDecode: e.onDecode,
 	})
 }
 

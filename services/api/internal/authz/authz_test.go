@@ -99,7 +99,8 @@ var wantNoRelation = map[string][]string{
 	"contents.publish":              editorUp,
 	"contents.unpublish":            editorUp,
 	// 他人が上げた画像
-	"media.get": editorUp,
+	"media.get":           editorUp,
+	"media.get_by_public": editorUp,
 }
 
 var (
@@ -161,6 +162,10 @@ func TestRelations(t *testing.T) {
 		{"media.get", "member", Resource{IsUploader: true}, true},
 		{"media.get", "member", Resource{}, false},
 		{"media.get", "disabled", Resource{IsUploader: true}, false},
+		{"media.get", "member", Resource{IsMediaContentMember: true}, true},
+		{"media.get_by_public", "member", Resource{IsMediaContentMember: true}, true},
+		{"media.get_by_public", "member", Resource{}, false},
+		{"media.get", "disabled", Resource{IsMediaContentMember: true}, false},
 		// 権限昇格の防止: Adminは管理者権限を持つ対象に対して停止・URL発行ができない
 		{"admin.users.status", "admin", Resource{TargetIsAdmin: true}, false},
 		{"admin.users.status", "admin", Resource{TargetIsOwner: true, TargetIsAdmin: true}, false},

@@ -13,6 +13,7 @@
 | sqlc | v1.31.1（`db/sqlc.yaml`、`scripts/sqlc.sh`でdigest固定イメージ） | [sqlc-dev/sqlc](https://github.com/sqlc-dev/sqlc/releases)の最新。生成コードは`services/api/internal/store`にコミットし、CIの`go / sqlc`が差分を検出 |
 | goose（Goライブラリ） | v3.30.1（`services/api`のテスト用） | 統合テストが本物のmigrationを適用するため。CLIと同じ版 |
 | goldmark | v1.8.7（`services/api/go.mod`。2026-10-30公開。P3-01a） | CMSのMarkdownを**ASTで検査**するため（正規表現でHTMLを検査しない）。CommonMark準拠でGFM拡張を公式に持つ。[リリース](https://github.com/yuin/goldmark/releases)の最新。脆弱性確認: 2026-11-21に`govulncheck`（v1.10.0）を`services/api`全体に実行し「No vulnerabilities found」（依存更新のたびに再実行する） |
+| golang.org/x/image | v0.47.0（`services/api/go.mod`。2026-10-09公開。P3-02a） | 画像のWebPデコード（`webp`）と縮小（`draw`のCatmullRom）。標準ライブラリにWebPデコーダー・高品質な縮小が無いため。最新はv0.48.0（2026-11-09公開）だが公開から日が浅いため1つ前を採用。脆弱性確認: 2026-11-21に`govulncheck`（v1.10.0）を`services/api`全体に再実行し「No vulnerabilities found」 |
 | golang.org/x/net | v0.62.0（`services/api/go.mod`。P3-01a） | `html`トークナイザーでMarkdown中の生HTMLを検査するため。最新はv0.63.0（2026-11-17公開）だが直後のため、1つ前を採用。脆弱性確認: 2026-11-21に`govulncheck`（v1.10.0）を`services/api`全体に実行し「No vulnerabilities found」（依存更新のたびに再実行する） |
 | 実行イメージ | `gcr.io/distroless/static-debian12:nonroot`（digest固定） | 静的バイナリのみを非rootで実行。シェル・パッケージ管理を持たず攻撃面が小さい |
 | 配信イメージ（web） | `nginxinc/nginx-unprivileged:1.30.6-alpine`（digest固定） | nginx stable 1.30系（[endoflife.date](https://endoflife.date/nginx)でサポート中）。1.30.7は同イメージ未公開のため1.30.6 |

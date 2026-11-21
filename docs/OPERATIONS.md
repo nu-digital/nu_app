@@ -77,9 +77,22 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 
 `nuctl bootstrap-owner`（APIイメージの`/nuctl`）が唯一の経路。公開Web/APIに入口はない。`bootstrap_state`（最大1行）の確保とユーザー作成を1トランザクションで行い、並行実行・再実行・別ログインIDでの再実行はすべて拒否する。招待tokenは一度だけ標準出力へ表示し、DBにはSHA-256のみ保存、監査にも残さない（有効期間の既定は24時間）。**本番での実行は、VPS契約・構築後に運用責任者が行う手順として別途定める（まだ実行しない）**。緊急復旧は別のCLI（P1-03）。
 
-## 画像処理の資源（D06）
+## 画像処理の資源（D06・P3-02）
 
-デコードの同時実行数を制限する（初期値は4GB環境での実測後に決めてここへ記録）。ピークメモリを実測し、他サービス（Go API、Next.js×2、PostgreSQL、Bot、Nginx）との同時稼働で収まることを確認する。
+- **同時デコード数は1**（`MediaLimits.DecodeSlots`の既定）。理由: 2026-11-21の実測（Go 1.27.4・`-race`なし・`go test -run TestWorstCaseMemory`）で、最悪ケースの20Mpx・16bit RGBA PNGの単体のピークのヒープが約564MiB（8bit RGBA PNGは約412MiB、baseline JPEG 20Mpxは約384MiB、10Mpxは約243MiB。処理時間は1〜2.6秒）。**2件同時だと約973〜1,055MiB（OSから取得約1.19GiB）**で、`GOMEMLIMIT=768MiB`を付けても抑えきれず、コンテナの`mem_limit`（1g）を超えるため、1にした。実測のコマンドは`services/api/internal/media/media_test.go`の`TestWorstCaseMemory`・`TestWorstCaseConcurrentMemory`（`MEDIA_MEM_TEST=1`で手動実行）。
+- 未実測: プログレッシブJPEG・インターレースPNG・CMYK JPEG（生成手段が標準ライブラリに無い）。**契約後に4GB VPSの実機で、実際の写真（特にプログレッシブJPEG・iPhoneのHEIC変換物等）で再実測する**。他サービス（Go API、Next.js×2、PostgreSQL、Bot、Nginx）との同時稼働でも収まるか確認する。
+- 受信中の件数は8（本文は最大10MiBずつメモリに置く＝最大約80MiB）。利用者ごとに同時1件・1分20回・1日200枚/200MiB。空きが1GiB未満なら507。
+- compose: `MEDIA_DIR=/data/media`（名前付きボリューム`media-data`。イメージの`/data`は`nonroot`所有）、`GOMEMLIMIT`（既定768MiB）、`mem_limit`（既定1g）。`.env`の`API_GOMEMLIMIT`・`API_MEM_LIMIT`で変更できる。
+
+### 画像の運用（P3-02）
+
+- 画像はVPSの永続ボリューム（`MEDIA_DIR`）に、**再エンコード後**の形で保存する。バックアップ（D04）は**DBとメディアを1組**で取る。容量は`nuctl media-verify`が報告する（有効な画像の件数・バイト数・保存先の空き）。**`MEDIA_DIR`の合計容量と空きを監視し、バックアップ7世代分の容量を見積もる**（利用者ごとの上限: 1日200枚・200MiB）。
+- 削除APIは無い。次の運用コマンドを、**運用者がサーバー上で手動で実行する**（GitHub Actionsのworkflowから呼ばない。`check.mjs`が禁止）:
+  - `nuctl media-gc [--older-than 24h] [--apply]`: 参照が無く24時間以上前の画像（アップロードしたが記事に使われなかったもの）を消す。既定はdry-run。`--older-than`は1時間以上。確認と削除は1文で行い、コミット後にファイルを消す。古い`tmp`も掃除する。
+  - `nuctl media-verify`: DBの行にファイルが無い／ファイルに行が無い／無効化済みなのにファイルが残る／想定外のファイルを報告する（何も消さない。食い違いがあれば終了コード1）。
+  - `nuctl media-redact --id <uuid> --reason "<理由>"`: **本人情報を含む画像を誤ってアップロードした場合・個人情報削除の依頼**で使う。ファイルを消し、配信・新規参照・公開を止める（行と参照は監査のため残す。`audit_logs`に理由と実行したOSユーザーを記録）。公開中の記事がその画像を参照していれば、画像はすぐ404になり、記事は画像が欠けた状態になる（記事側の修正は別途）。redactedな画像を参照する版は公開できない。
+- 公開画像は**長期キャッシュ・静的コピーをしない**: `/api/v1/public/media/*`は`Cache-Control: no-cache`（強いETag）。Nginxの`proxy_cache`・Next.jsの画像最適化キャッシュ・静的書き出しに焼き込むと、公開停止・redact後も画像が残るため、公式サイト側（P3-04）でもこの方針を守る。
+- 色: ICCプロファイルは破棄するため、Display P3の写真はsRGBとして表示され彩度が落ちる（暫定）。
 
 ## Discord通知workerの運用（P2-04）
 

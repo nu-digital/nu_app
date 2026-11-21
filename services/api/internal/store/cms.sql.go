@@ -258,8 +258,10 @@ func (q *Queries) GetContentRevisionByNo(ctx context.Context, arg GetContentRevi
 
 const getPublicContent = `-- name: GetPublicContent :one
 SELECT c.type, c.section, c.slug, r.id AS revision_id, r.title, r.summary, r.markdown, r.metadata_json,
-       r.date_label, r.date_kind, r.sort_date, r.sort_date_is_estimated
+       r.date_label, r.date_kind, r.sort_date, r.sort_date_is_estimated,
+       COALESCE(cm.public_id, '')::text AS cover_public_id
 FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
+LEFT JOIN media_assets cm ON cm.id = r.cover_media_id AND cm.redacted_at IS NULL
 WHERE c.section = $1 AND c.slug = $2 AND c.archived_at IS NULL
 `
 
@@ -281,6 +283,7 @@ type GetPublicContentRow struct {
 	DateKind            string
 	SortDate            pgtype.Date
 	SortDateIsEstimated bool
+	CoverPublicID       string
 }
 
 // 公開API。公開ポインタの版だけを返す（下書き・未公開・アーカイブ・存在しないものは同じ「行なし」）。
@@ -300,6 +303,7 @@ func (q *Queries) GetPublicContent(ctx context.Context, arg GetPublicContentPara
 		&i.DateKind,
 		&i.SortDate,
 		&i.SortDateIsEstimated,
+		&i.CoverPublicID,
 	)
 	return i, err
 }
@@ -320,8 +324,8 @@ func (q *Queries) InsertContentCollaborator(ctx context.Context, arg InsertConte
 }
 
 const insertContentRevision = `-- name: InsertContentRevision :one
-INSERT INTO content_revisions (id, content_id, revision_no, title, summary, markdown, metadata_json, date_label, date_kind, sort_date, sort_date_is_estimated, edited_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+INSERT INTO content_revisions (id, content_id, revision_no, title, summary, markdown, metadata_json, date_label, date_kind, sort_date, sort_date_is_estimated, edited_by, cover_media_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING id, content_id, revision_no, title, summary, markdown, cover_media_id, metadata_json, date_label, date_kind, sort_date, sort_date_is_estimated, edited_by, created_at
 `
 
@@ -338,6 +342,7 @@ type InsertContentRevisionParams struct {
 	SortDate            pgtype.Date
 	SortDateIsEstimated bool
 	EditedBy            pgtype.UUID
+	CoverMediaID        pgtype.UUID
 }
 
 func (q *Queries) InsertContentRevision(ctx context.Context, arg InsertContentRevisionParams) (ContentRevision, error) {
@@ -354,6 +359,7 @@ func (q *Queries) InsertContentRevision(ctx context.Context, arg InsertContentRe
 		arg.SortDate,
 		arg.SortDateIsEstimated,
 		arg.EditedBy,
+		arg.CoverMediaID,
 	)
 	var i ContentRevision
 	err := row.Scan(
@@ -607,8 +613,10 @@ func (q *Queries) ListContents(ctx context.Context, arg ListContentsParams) ([]L
 const listPublicContents = `-- name: ListPublicContents :many
 SELECT c.id, c.type, c.section, c.slug, r.title, r.summary, r.metadata_json,
        r.date_label, r.date_kind, r.sort_date, r.sort_date_is_estimated,
-       COALESCE(r.sort_date, DATE '0001-01-01')::date AS order_date
+       COALESCE(r.sort_date, DATE '0001-01-01')::date AS order_date,
+       COALESCE(cm.public_id, '')::text AS cover_public_id
 FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
+LEFT JOIN media_assets cm ON cm.id = r.cover_media_id AND cm.redacted_at IS NULL
 WHERE c.archived_at IS NULL
   AND ($1::text IS NULL OR c.section = $1::text)
   AND ($2::date IS NULL OR (COALESCE(r.sort_date, DATE '0001-01-01'), c.id) < ($2::date, $3::uuid))
@@ -636,6 +644,7 @@ type ListPublicContentsRow struct {
 	SortDate            pgtype.Date
 	SortDateIsEstimated bool
 	OrderDate           pgtype.Date
+	CoverPublicID       string
 }
 
 // 並び順は日付の新しい順（日付不明は最後）。カーソルは (並び用の日付, id)。
@@ -666,6 +675,7 @@ func (q *Queries) ListPublicContents(ctx context.Context, arg ListPublicContents
 			&i.SortDate,
 			&i.SortDateIsEstimated,
 			&i.OrderDate,
+			&i.CoverPublicID,
 		); err != nil {
 			return nil, err
 		}

@@ -39,6 +39,21 @@ type dateIn struct {
 	SortDate *string `json:"sortDate"`
 }
 
+// optUUID は「省略」「null（消す）」「値あり」を区別するJSONの値。
+type optUUID struct {
+	Set, Null bool
+	Val       string
+}
+
+func (o *optUUID) UnmarshalJSON(b []byte) error {
+	o.Set = true
+	if string(b) == "null" {
+		o.Null = true
+		return nil
+	}
+	return json.Unmarshal(b, &o.Val)
+}
+
 // contentFields は版の内容。作成と版の保存で共通。
 type contentFields struct {
 	Title    string             `json:"title"`
@@ -46,6 +61,8 @@ type contentFields struct {
 	Markdown string             `json:"markdown"`
 	Metadata map[string]*string `json:"metadata"`
 	Date     *dateIn            `json:"date"`
+	// CoverMediaID: カバー画像（アップロード済みの画像のid）。省略は維持、nullで消す。
+	CoverMediaID optUUID `json:"coverMediaId"`
 }
 
 type dateView struct {
@@ -68,6 +85,8 @@ type personView struct {
 }
 
 type revisionView struct {
+	// CoverMedia はカバー画像（無ければnull）。publicUrlは本文に書く公開URL（公開されるまで匿名には配信されない）。
+	CoverMedia   *mediaView        `json:"coverMedia"`
 	RevisionNo   int               `json:"revisionNo"`
 	Title        string            `json:"title"`
 	Summary      string            `json:"summary"`
@@ -250,6 +269,7 @@ type revData struct {
 	DateLabel, DateKind      string
 	SortDate                 pgtype.Date
 	Estimated                bool
+	Cover                    pgtype.UUID
 }
 
 func dateFromInput(d *dateIn, prev *store.ContentRevision) (label, kind string, sd pgtype.Date, est bool) {
@@ -289,14 +309,15 @@ func sameMetadata(a, b map[string]string) bool {
 
 func sameRevision(d revData, r store.ContentRevision) bool {
 	return d.Title == r.Title && d.Summary == r.Summary && d.Markdown == r.Markdown && d.DateLabel == r.DateLabel && d.DateKind == r.DateKind &&
-		d.SortDate == r.SortDate && d.Estimated == r.SortDateIsEstimated && sameMetadata(d.Metadata, decodeMetadata(r.MetadataJson))
+		d.SortDate == r.SortDate && d.Estimated == r.SortDateIsEstimated && d.Cover == r.CoverMediaID && sameMetadata(d.Metadata, decodeMetadata(r.MetadataJson))
 }
 
-// markdownError はMarkdownの検査結果を、利用者に見せてよい文言にまとめる（本文の内容は含めない）。
-func markdownError(src string) error {
-	vs := mdcheck.Validate(src)
+// checkMarkdown はMarkdownを検査し、画像の参照（public_id）を返す。違反は利用者に見せてよい文言にまとめる（本文の内容は含めない）。
+func checkMarkdown(src string) ([]string, error) {
+	res := mdcheck.Check(src)
+	vs := res.Violations
 	if len(vs) == 0 {
-		return nil
+		return res.MediaPublicIDs, nil
 	}
 	parts := make([]string, 0, 3)
 	for i, v := range vs {
@@ -306,7 +327,101 @@ func markdownError(src string) error {
 		}
 		parts = append(parts, v.String())
 	}
-	return invalid("本文に使えない記述があります: " + strings.Join(parts, " / "))
+	return nil, invalid("本文に使えない記述があります: " + strings.Join(parts, " / "))
+}
+
+// markdownError は検査だけ行う（画像の参照は使わない場合）。
+func markdownError(src string) error {
+	_, err := checkMarkdown(src)
+	return err
+}
+
+// maxMediaRefs は1つの版が参照できる画像の数（容量の水増し・掃除できない画像の積み上がりを防ぐ）。
+const maxMediaRefs = 100
+
+var errMediaNotFound = invalid("画像が見つかりません。アップロードし直してください")
+
+// resolveMedia は本文の画像（public_id）とカバー画像を検査して解決し、行を共有ロックする（孤児の掃除との競合を避ける）。
+// 参照できる画像: 存在し、redactedでなく、purpose=cmsで、(a)自分がアップロードした (b)このコンテンツの過去の版が既に参照している (c)Editor以上。
+// 条件に合わなければ、存在の有無を区別せず同じ422。
+func (s *server) resolveMedia(r *http.Request, q *store.Queries, a authCtx, contentID pgtype.UUID, publicIDs []string, cover optUUID, prevCover pgtype.UUID) (inline []pgtype.UUID, coverID pgtype.UUID, err error) {
+	ctx := r.Context()
+	coverID = prevCover
+	switch {
+	case cover.Set && cover.Null:
+		coverID = pgtype.UUID{}
+	case cover.Set:
+		var u pgtype.UUID
+		if e := u.Scan(cover.Val); e != nil || !u.Valid {
+			return nil, coverID, errMediaNotFound
+		}
+		coverID = u
+	}
+	if len(publicIDs)+1 > maxMediaRefs {
+		return nil, coverID, invalid("1つの版で使える画像は100枚までです")
+	}
+	editor := a.Identity.Subject().IsEditorPlus()
+	allowed := func(id pgtype.UUID, uploadedBy pgtype.UUID, purpose string, redacted pgtype.Timestamptz) (bool, error) {
+		if purpose != "cms" || redacted.Valid {
+			return false, nil
+		}
+		if editor || uploadedBy == a.Identity.UserID {
+			return true, nil
+		}
+		if contentID.Valid {
+			return q.MediaReferencedByContent(ctx, store.MediaReferencedByContentParams{MediaID: id, ContentID: contentID})
+		}
+		return false, nil
+	}
+	if len(publicIDs) > 0 {
+		rows, e := q.LockMediaByPublicIDs(ctx, publicIDs)
+		if e != nil {
+			return nil, coverID, e
+		}
+		if len(rows) != len(publicIDs) {
+			return nil, coverID, errMediaNotFound
+		}
+		for _, m := range rows {
+			ok, e := allowed(m.ID, m.UploadedBy, m.Purpose, m.RedactedAt)
+			if e != nil {
+				return nil, coverID, e
+			}
+			if !ok {
+				return nil, coverID, errMediaNotFound
+			}
+			inline = append(inline, m.ID)
+		}
+	}
+	if coverID.Valid {
+		rows, e := q.LockMediaByIDs(ctx, []pgtype.UUID{coverID})
+		if e != nil {
+			return nil, coverID, e
+		}
+		if len(rows) != 1 {
+			return nil, coverID, errMediaNotFound
+		}
+		ok, e := allowed(rows[0].ID, rows[0].UploadedBy, rows[0].Purpose, rows[0].RedactedAt)
+		if e != nil {
+			return nil, coverID, e
+		}
+		if !ok {
+			return nil, coverID, errMediaNotFound
+		}
+	}
+	return inline, coverID, nil
+}
+
+// writeMediaRefs は新しい版の画像参照（本文の画像=inline、カバー=cover）を追記する。版は不変なので参照も追記だけ。
+func writeMediaRefs(r *http.Request, q *store.Queries, revID pgtype.UUID, inline []pgtype.UUID, cover pgtype.UUID) error {
+	for _, id := range inline {
+		if err := q.InsertMediaReference(r.Context(), store.InsertMediaReferenceParams{MediaID: id, OwnerID: revID, Purpose: "inline"}); err != nil {
+			return err
+		}
+	}
+	if cover.Valid {
+		return q.InsertMediaReference(r.Context(), store.InsertMediaReferenceParams{MediaID: cover, OwnerID: revID, Purpose: "cover"})
+	}
+	return nil
 }
 
 // ---- 認可 ----
@@ -378,6 +493,11 @@ func toRevisionView(r store.ContentRevision, editedBy string, contribs []store.L
 	return v
 }
 
+func withCover(v revisionView, c *mediaView) revisionView {
+	v.CoverMedia = c
+	return v
+}
+
 // loadContentView は作業版・共同編集者などを組み立てる（閲覧権限は呼び出し元が確認済み）。
 func (s *server) loadContentView(r *http.Request, q *store.Queries, a authCtx, c store.Content, res authz.Resource, withHistory bool, rev *store.ContentRevision) (contentView, error) {
 	ctx := r.Context()
@@ -396,10 +516,17 @@ func (s *server) loadContentView(r *http.Request, q *store.Queries, a authCtx, c
 	if err != nil {
 		return contentView{}, err
 	}
+	var cover *mediaView
+	if rev.CoverMediaID.Valid {
+		if m, err := q.GetMediaAsset(ctx, rev.CoverMediaID); err == nil && !m.RedactedAt.Valid {
+			mv := toMediaView(m)
+			cover = &mv
+		}
+	}
 	v := contentView{
 		ID: c.ID.String(), Type: c.Type, Section: c.Section, Slug: c.Slug,
 		Creator:         personView{UserID: c.CreatorUserID.String(), DisplayName: s.displayName(ctx, q, c.CreatorUserID)},
-		WorkingRevision: toRevisionView(*rev, s.displayName(ctx, q, rev.EditedBy), contribs),
+		WorkingRevision: withCover(toRevisionView(*rev, s.displayName(ctx, q, rev.EditedBy), contribs), cover),
 		Collaborators:   []personView{},
 		CreatedAt:       c.CreatedAt.Time, UpdatedAt: c.UpdatedAt.Time,
 	}
@@ -466,10 +593,15 @@ func (s *server) createContent(w http.ResponseWriter, r *http.Request) {
 	var out contentView
 	err := s.inTx(r.Context(), func(q *store.Queries, tx pgx.Tx) error {
 		// 重い検査は、認証済み・入力の形式確認の後に行う
-		if err := markdownError(req.Markdown); err != nil {
+		mediaIDs, err := checkMarkdown(req.Markdown)
+		if err != nil {
 			return err
 		}
 		meta, err := mergeMetadata(req.Metadata, nil, editor)
+		if err != nil {
+			return err
+		}
+		inline, coverID, err := s.resolveMedia(r, q, a, pgtype.UUID{}, mediaIDs, req.CoverMediaID, pgtype.UUID{})
 		if err != nil {
 			return err
 		}
@@ -495,8 +627,11 @@ func (s *server) createContent(w http.ResponseWriter, r *http.Request) {
 		}
 		mj, _ := json.Marshal(meta)
 		rev, err := q.InsertContentRevision(r.Context(), store.InsertContentRevisionParams{ID: revID, ContentID: contentID, RevisionNo: 1, Title: req.Title, Summary: req.Summary, Markdown: req.Markdown,
-			MetadataJson: mj, DateLabel: label, DateKind: kind, SortDate: sd, SortDateIsEstimated: est, EditedBy: a.Identity.UserID})
+			MetadataJson: mj, DateLabel: label, DateKind: kind, SortDate: sd, SortDateIsEstimated: est, EditedBy: a.Identity.UserID, CoverMediaID: coverID})
 		if err != nil {
+			return err
+		}
+		if err := writeMediaRefs(r, q, revID, inline, coverID); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(r.Context(), `SET CONSTRAINTS contents_working_revision_fk, contents_published_revision_fk, content_revisions_content_id_fkey IMMEDIATE`); err != nil {
@@ -713,15 +848,20 @@ func (s *server) saveRevision(w http.ResponseWriter, r *http.Request) {
 			s.BeforeContentSave() // テスト専用: 全員が確認を終えた状態で止めて、ロックが無ければ必ず競合させる
 		}
 		// 認可と行ロックの後に、重い検査を行う
-		if err := markdownError(req.Markdown); err != nil {
+		mediaIDs, err := checkMarkdown(req.Markdown)
+		if err != nil {
 			return err
 		}
 		meta, err := mergeMetadata(req.Metadata, decodeMetadata(cur.MetadataJson), editor)
 		if err != nil {
 			return err
 		}
+		inline, coverID, err := s.resolveMedia(r, q, a, c.ID, mediaIDs, req.CoverMediaID, cur.CoverMediaID)
+		if err != nil {
+			return err
+		}
 		label, kind, sd, est := dateFromInput(req.Date, &cur)
-		d := revData{Title: req.Title, Summary: req.Summary, Markdown: req.Markdown, Metadata: meta, DateLabel: label, DateKind: kind, SortDate: sd, Estimated: est}
+		d := revData{Title: req.Title, Summary: req.Summary, Markdown: req.Markdown, Metadata: meta, DateLabel: label, DateKind: kind, SortDate: sd, Estimated: est, Cover: coverID}
 		res, err := contentResource(r, q, a, c)
 		if err != nil {
 			return err
@@ -731,8 +871,11 @@ func (s *server) saveRevision(w http.ResponseWriter, r *http.Request) {
 			out, err = s.loadContentView(r, q, a, c, res, false, &cur)
 			return err
 		}
-		newRev, err := s.insertNextRevision(r, q, a, c, cur, d, true)
+		newRev, err := s.insertNextRevision(r, q, a, c, cur, d, true, false)
 		if err != nil {
+			return err
+		}
+		if err := writeMediaRefs(r, q, newRev.ID, inline, coverID); err != nil {
 			return err
 		}
 		if err := s.auditContent(r, q, a, c.ID, "content.revision_saved", map[string]any{"revisionNo": newRev.RevisionNo}); err != nil {
@@ -753,17 +896,23 @@ func (s *server) saveRevision(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, status, out)
 }
 
-// insertNextRevision は新しい版を追加して作業版ポインタを進める（公開ポインタは変えない）。copyContributors=trueなら前の版の制作メンバーを引き継ぐ。
-func (s *server) insertNextRevision(r *http.Request, q *store.Queries, a authCtx, c store.Content, cur store.ContentRevision, d revData, copyContributors bool) (store.ContentRevision, error) {
+// insertNextRevision は新しい版を追加して作業版ポインタを進める（公開ポインタは変えない）。
+// copyContributors=trueなら前の版の制作メンバーを、copyRefs=trueなら前の版の画像参照を引き継ぐ（版を作る全経路で参照が欠けないように）。
+func (s *server) insertNextRevision(r *http.Request, q *store.Queries, a authCtx, c store.Content, cur store.ContentRevision, d revData, copyContributors, copyRefs bool) (store.ContentRevision, error) {
 	revID, err := q.NewUUID(r.Context())
 	if err != nil {
 		return store.ContentRevision{}, err
 	}
 	mj, _ := json.Marshal(d.Metadata)
 	rev, err := q.InsertContentRevision(r.Context(), store.InsertContentRevisionParams{ID: revID, ContentID: c.ID, RevisionNo: cur.RevisionNo + 1, Title: d.Title, Summary: d.Summary, Markdown: d.Markdown,
-		MetadataJson: mj, DateLabel: d.DateLabel, DateKind: d.DateKind, SortDate: d.SortDate, SortDateIsEstimated: d.Estimated, EditedBy: a.Identity.UserID})
+		MetadataJson: mj, DateLabel: d.DateLabel, DateKind: d.DateKind, SortDate: d.SortDate, SortDateIsEstimated: d.Estimated, EditedBy: a.Identity.UserID, CoverMediaID: d.Cover})
 	if err != nil {
 		return rev, err
+	}
+	if copyRefs {
+		if err := q.CopyMediaReferences(r.Context(), store.CopyMediaReferencesParams{ToRevisionID: revID, FromRevisionID: cur.ID}); err != nil {
+			return rev, err
+		}
 	}
 	if copyContributors {
 		if err := q.CopyWorkContributors(r.Context(), store.CopyWorkContributorsParams{ToRevisionID: revID, FromRevisionID: cur.ID}); err != nil {
@@ -1007,8 +1156,8 @@ func (s *server) putContributors(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		d := revData{Title: cur.Title, Summary: cur.Summary, Markdown: cur.Markdown, Metadata: decodeMetadata(cur.MetadataJson),
-			DateLabel: cur.DateLabel, DateKind: cur.DateKind, SortDate: cur.SortDate, Estimated: cur.SortDateIsEstimated}
-		newRev, err := s.insertNextRevision(r, q, a, c, cur, d, false)
+			DateLabel: cur.DateLabel, DateKind: cur.DateKind, SortDate: cur.SortDate, Estimated: cur.SortDateIsEstimated, Cover: cur.CoverMediaID}
+		newRev, err := s.insertNextRevision(r, q, a, c, cur, d, false, true)
 		if err != nil {
 			return err
 		}

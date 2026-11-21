@@ -44,6 +44,8 @@ type publicItem struct {
 	Summary  string            `json:"summary"`
 	Metadata map[string]string `json:"metadata"`
 	Date     publicDate        `json:"date"`
+	// CoverURL はカバー画像の公開URL（無ければ省略）。公開中の版が参照している間だけ配信される。
+	CoverURL string `json:"coverUrl,omitempty"`
 }
 
 type publicContributor struct {
@@ -104,6 +106,13 @@ func publicNotFound(w http.ResponseWriter, r *http.Request) {
 	httpx.Error(w, r, http.StatusNotFound, "NOT_FOUND", "見つかりません")
 }
 
+func coverURL(publicID string) string {
+	if publicID == "" {
+		return ""
+	}
+	return "/api/v1/public/media/" + publicID
+}
+
 func isNoRows(err error) bool { return errors.Is(err, pgx.ErrNoRows) }
 
 func validSection(s string) bool { return s == "blog" || s == "news" || s == "project" }
@@ -132,7 +141,7 @@ func (s *server) getPublicContent(w http.ResponseWriter, r *http.Request) {
 	}
 	out := publicDetail{
 		publicItem: publicItem{Type: c.Type, Section: c.Section, Slug: c.Slug, Title: c.Title, Summary: c.Summary, Metadata: publicMeta(c.MetadataJson),
-			Date: publicDateOf(c.DateLabel, c.DateKind, c.SortDate, c.SortDateIsEstimated)},
+			Date: publicDateOf(c.DateLabel, c.DateKind, c.SortDate, c.SortDateIsEstimated), CoverURL: coverURL(c.CoverPublicID)},
 		Markdown: c.Markdown, Contributors: make([]publicContributor, 0, len(cs)),
 	}
 	for _, x := range cs {
@@ -191,7 +200,7 @@ func (s *server) listPublicContents(w http.ResponseWriter, r *http.Request) {
 	items := make([]publicItem, 0, len(rows))
 	for _, x := range rows {
 		items = append(items, publicItem{Type: x.Type, Section: x.Section, Slug: x.Slug, Title: x.Title, Summary: x.Summary, Metadata: publicMeta(x.MetadataJson),
-			Date: publicDateOf(x.DateLabel, x.DateKind, x.SortDate, x.SortDateIsEstimated)})
+			Date: publicDateOf(x.DateLabel, x.DateKind, x.SortDate, x.SortDateIsEstimated), CoverURL: coverURL(x.CoverPublicID)})
 	}
 	writePublicJSON(w, r, map[string]any{"items": items, "nextCursor": next})
 }

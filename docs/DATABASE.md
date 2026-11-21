@@ -67,8 +67,8 @@
 
 | テーブル | 主要カラム | 制約・補足 |
 |---|---|---|
-| `media_assets` | `id`, `storage_key`, `visibility`, `mime_type`, `byte_size`, `width`, `height`, `purpose`, `uploaded_by`, `created_at` | private/public。mime_typeはimage/jpeg・png・webpのみ（CHECK）。purpose=avatar/inventory/cms。保存先への絶対パスはAPIで返さない。保存は再エンコード後の値（元ファイルのEXIFを保持しない） |
-| `media_references` | `media_id`, `owner_type`, `owner_id`, `purpose` | 公開済み画像の参照管理や安全な削除用 |
+| `media_assets` | `id`, `public_id`（128bit乱数・22文字。idから導けない。本文の公開URLに使う）, `storage_key`（相対キー。絶対パスはAPIに出さない）, `mime_type`（保存するのはjpeg/png）, `byte_size`, `width`, `height`（向き補正後）, `sha256`, `purpose`（avatar/inventory/cms）, `uploaded_by`, `created_at`, `redacted_at` | **`visibility`列は持たない**: 公開は「公開中の版が参照しているか」で毎回導く（P3-02）。保存は再エンコード後の値（元のEXIF等を保持しない）。`redacted_at`は本人情報を含む画像を`nuctl media-redact`で無効化した印（行と参照は残し、ファイルを消し、配信・参照・公開を止める） |
+| `media_references` | `media_id`（FK・RESTRICT）, `owner_type`（content_revision）, `owner_id`, `purpose`（cover/inline） | 版は不変なので、版への参照は追記専用（トリガー）。`content_revisions.cover_media_id`もFK |
 | `notification_settings` | `event_type`, `enabled`, `discord_channel_id`, `updated_by` | Adminが変更可能 |
 | `notification_outbox` | `id`, `event_type`, `dedupe_key`（1イベント1行・UNIQUE）, `payload_json`（機密を入れない）, `status`（pending/sent/dead）, `attempts`, `next_attempt_at`, `last_error`（要約のみ）, `created_at`, `sent_at` | DB処理と同一トランザクションで作成。チャンネル未設定の間はpendingで待機 |
 | `audit_logs` | `id`, `actor_user_id`, `action`, `target_type`, `target_id`, `summary_json`, `created_at` | 追記専用。トークン・パスワード・学生証番号の値を保存しない |

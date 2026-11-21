@@ -47,12 +47,22 @@ func (v Violation) String() string {
 var md = goldmark.New(goldmark.WithExtensions(extension.GFM))
 
 // Validate は検査し、違反の一覧を返す（空なら許可）。
-func Validate(src string) []Violation {
+func Validate(src string) []Violation { return Check(src).Violations }
+
+// Result は検査の結果。MediaPublicIDsは、本文の**画像**（解決済みのImageノード。参照定義を含む。コードブロックや通常のリンクは含まない）
+// が指すアップロード画像の public_id（出現順・重複なし）。
+type Result struct {
+	Violations     []Violation
+	MediaPublicIDs []string
+}
+
+// Check は検査し、違反と、画像の参照を返す。
+func Check(src string) Result {
 	if len(src) > MaxBytes {
-		return []Violation{{Message: "本文が大きすぎます（256KiBまで）"}}
+		return Result{Violations: []Violation{{Message: "本文が大きすぎます（256KiBまで）"}}}
 	}
 	b := []byte(src)
-	c := &checker{src: b}
+	c := &checker{src: b, seen: map[string]bool{}}
 	doc := md.Parser().Parse(text.NewReader(b))
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
@@ -92,13 +102,15 @@ func Validate(src string) []Violation {
 	if len(c.stack) > 0 && len(c.out) < maxViolations {
 		c.add(0, "閉じられていないHTMLタグがあります")
 	}
-	return c.out
+	return Result{Violations: c.out, MediaPublicIDs: c.media}
 }
 
 type checker struct {
 	src   []byte
 	out   []Violation
 	stack []string
+	media []string
+	seen  map[string]bool
 }
 
 func (c *checker) add(line int, msg string) {
@@ -168,6 +180,8 @@ var allowedTags = map[string]bool{"details": true, "summary": true, "div": true}
 
 // 開始タグの生テキストが取りうる形。トークナイザーは重複した属性を黙って捨てる（最初の値だけ残る）ため、
 // 検査が見ていない属性が無いことを、生テキストの形で確かめる。
+var mediaURLRe = regexp.MustCompile(`^/api/v1/public/media/([A-Za-z0-9_-]{22})$`)
+
 var (
 	plainTagRaw = regexp.MustCompile(`^<(details|summary|div)>$`)
 	dataDivRaw  = regexp.MustCompile(`^<div data-(youtube|video|carousel)="[^"<>&]*">$`)
@@ -246,7 +260,7 @@ func (c *checker) end(name string, line int) {
 	c.stack = c.stack[:len(c.stack)-1]
 }
 
-// normalizeURL は、ブラウザが解釈する前の姿に近づける: エンティティを解読し、空白・制御文字を除き、小文字にする。
+// normalizeURL は、ブラウザが解釈する前の姿に近づける: エンティティを解読し、空白・制御文字を除く（大文字小文字は保つ。スキームの判定はscheme()が小文字化して行う）。
 func normalizeURL(raw string) string {
 	s := raw
 	for i := 0; i < 3; i++ { // 二重のエンティティも解読
@@ -280,7 +294,15 @@ func (c *checker) link(raw string, image bool, line int) {
 		return
 	}
 	if image {
-		if !(strings.HasPrefix(s, "/images/") || strings.HasPrefix(s, "/api/v1/public/media/")) || strings.Contains(dec, "..") || strings.Contains(dec, `\`) {
+		if m := mediaURLRe.FindStringSubmatch(s); m != nil && dec == s {
+			// アップロードした画像（22文字のpublic_id。クエリ・フラグメント・%エンコード・末尾の/は許さない）
+			if !c.seen[m[1]] {
+				c.seen[m[1]] = true
+				c.media = append(c.media, m[1])
+			}
+			return
+		}
+		if !strings.HasPrefix(s, "/images/") || strings.Contains(dec, "..") || strings.Contains(dec, `\`) { // 既存記事の静的画像
 			c.add(line, "画像はこのサイトにアップロードしたものだけ使えます")
 		}
 		return

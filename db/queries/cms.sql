@@ -7,8 +7,8 @@ VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: InsertContentRevision :one
-INSERT INTO content_revisions (id, content_id, revision_no, title, summary, markdown, metadata_json, date_label, date_kind, sort_date, sort_date_is_estimated, edited_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+INSERT INTO content_revisions (id, content_id, revision_no, title, summary, markdown, metadata_json, date_label, date_kind, sort_date, sort_date_is_estimated, edited_by, cover_media_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING *;
 
 -- name: GetContent :one
@@ -113,16 +113,20 @@ RETURNING id;
 -- 公開API。公開ポインタの版だけを返す（下書き・未公開・アーカイブ・存在しないものは同じ「行なし」）。
 -- name: GetPublicContent :one
 SELECT c.type, c.section, c.slug, r.id AS revision_id, r.title, r.summary, r.markdown, r.metadata_json,
-       r.date_label, r.date_kind, r.sort_date, r.sort_date_is_estimated
+       r.date_label, r.date_kind, r.sort_date, r.sort_date_is_estimated,
+       COALESCE(cm.public_id, '')::text AS cover_public_id
 FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
+LEFT JOIN media_assets cm ON cm.id = r.cover_media_id AND cm.redacted_at IS NULL
 WHERE c.section = $1 AND c.slug = $2 AND c.archived_at IS NULL;
 
 -- 並び順は日付の新しい順（日付不明は最後）。カーソルは (並び用の日付, id)。
 -- name: ListPublicContents :many
 SELECT c.id, c.type, c.section, c.slug, r.title, r.summary, r.metadata_json,
        r.date_label, r.date_kind, r.sort_date, r.sort_date_is_estimated,
-       COALESCE(r.sort_date, DATE '0001-01-01')::date AS order_date
+       COALESCE(r.sort_date, DATE '0001-01-01')::date AS order_date,
+       COALESCE(cm.public_id, '')::text AS cover_public_id
 FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
+LEFT JOIN media_assets cm ON cm.id = r.cover_media_id AND cm.redacted_at IS NULL
 WHERE c.archived_at IS NULL
   AND (sqlc.narg('section')::text IS NULL OR c.section = sqlc.narg('section')::text)
   AND (sqlc.narg('before_date')::date IS NULL OR (COALESCE(r.sort_date, DATE '0001-01-01'), c.id) < (sqlc.narg('before_date')::date, sqlc.narg('before_id')::uuid))

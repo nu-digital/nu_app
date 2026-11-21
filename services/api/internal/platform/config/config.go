@@ -29,6 +29,8 @@ type Config struct {
 	// DiscordBotToken はDiscord Botのtoken（秘密）。環境変数 DISCORD_BOT_TOKEN からだけ読む。
 	// 空ならDiscordへ送るworkerを起動せず、通知はoutboxに溜まる。ログ・DB・エラー文言に出さない。
 	DiscordBotToken string
+	// MediaDir は画像の保存先（永続ボリューム。絶対パス）。空ならメディアのAPIは503。Git・イメージの外に置く。
+	MediaDir string
 }
 
 // Load は環境変数を読む。DATABASE_URL と APP_BASE_URL は必須（未設定なら起動しない）。
@@ -72,6 +74,10 @@ func Load(getenv func(string) string) (Config, error) {
 			return Config{}, fmt.Errorf("API_TRUSTED_PROXY_CIDRS が不正です: %q", part)
 		}
 		c.TrustedProxies = append(c.TrustedProxies, p)
+	}
+	c.MediaDir = strings.TrimSpace(getenv("MEDIA_DIR"))
+	if c.MediaDir != "" && !strings.HasPrefix(c.MediaDir, "/") {
+		return Config{}, errors.New("MEDIA_DIR は絶対パスで指定してください")
 	}
 	c.DiscordBotToken = strings.TrimSpace(getenv("DISCORD_BOT_TOKEN"))
 	for _, r := range c.DiscordBotToken {
