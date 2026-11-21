@@ -60,7 +60,7 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] キーボードだけでログインできる`, true);
       const h1 = await page.getByRole('heading', { level: 1 }).innerText();
       check(`[${label}] ランチャーに表示名が出る`, h1.includes(o.memberName), h1);
-      check(`[${label}] 全員共通のカードが5枚あり、未実装の2つ（物品・記事と作品）は「準備中」`, (await page.locator('.cards li').count()) === 5 && (await page.getByText('準備中').count()) === 2);
+      check(`[${label}] 全員共通のカードが5枚あり、未実装の1つ（記事と作品）は「準備中」で、物品は開ける`, (await page.locator('.cards li').count()) === 5 && (await page.getByText('準備中').count()) === 1);
       const broken = await page.evaluate(() => [...document.images].filter((i) => !i.complete || i.naturalWidth === 0).map((i) => i.getAttribute('src')));
       check(`[${label}] 画像（ロゴ・団体写真）がすべて読み込まれる`, broken.length === 0, broken.join(','));
       const wrapped = await page.getByRole('button', { name: 'ログアウト' }).evaluate((el) => el.getBoundingClientRect().height <= 60);
@@ -220,7 +220,7 @@ export async function runAdminUiE2E(o) {
     }
     // プロフィール・メンバー・個人情報（PC・スマホ・320px）
     const overflowOf = (page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    const smallOf = (page) => page.locator('button, a.btn, input:not([type=hidden]), select, textarea, summary').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 44; }).length);
+    const smallOf = (page) => page.locator('button, a.btn, input:not([type=hidden]):not([type=checkbox]), label:has(input[type=checkbox]), select, textarea, summary').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 44; }).length);
     for (const [label, width, height] of [['pc', 1440, 900], ['sp', 390, 844], ['narrow', 320, 640]]) {
       const pid = `ui.${label}.prof`, pname = `プロフィール確認(${label})`, ppass = 'ui-profile-passphrase-1';
       const created = await o.apiCall('POST', '/admin/users', { body: { loginId: pid, displayName: `仮名(${label})` }, cookie: o.ownerCookie, csrf: o.ownerCsrf });
@@ -342,6 +342,104 @@ export async function runAdminUiE2E(o) {
       await vp.locator('li.user').first().waitFor();
       check(`[${label}] 停止・削除したメンバーは現役のメンバー一覧に出ない`, (await vp.locator(`li.user[data-name="${pname}"]`).count()) === 0 && (await vp.locator('li.user[data-name="退会メンバー"]').count()) === 0);
       await vctx.close();
+    }
+    // 物品（一覧・詳細・貸出・代理/部分返却・貸出中・履歴。PC・スマホ・320px）
+    for (const [label, width, height] of [['pc', 1440, 900], ['sp', 390, 844], ['narrow', 320, 640]]) {
+      const own = { cookie: o.ownerCookie, csrf: o.ownerCsrf };
+      const mk = async (id, name) => {
+        const c = await o.apiCall('POST', '/admin/users', { body: { loginId: id, displayName: name }, ...own });
+        await o.apiCall('POST', '/auth/accept-invite', { body: { token: c.json.url.split('#token=')[1], password: 'ui-inventory-passphrase-1' } });
+      };
+      const aId = `ui.${label}.inva`, bId = `ui.${label}.invb`, aName = `借り手A(${label})`, bName = `借り手B(${label})`;
+      await mk(aId, aName);
+      await mk(bId, bName);
+      const cable = `HDMIケーブル(${label})`, pico = `Pico(${label})`;
+      const ci = await o.apiCall('POST', '/inventory/items', { body: { name: cable, category: 'ケーブル', location: '部室の棚', mode: 'quantity', totalQuantity: 5 }, ...own });
+      const pi = await o.apiCall('POST', '/inventory/items', { body: { name: pico, category: 'マイコン', location: '部室の箱', mode: 'individual' }, ...own });
+      await o.apiCall('POST', `/inventory/items/${pi.json.id}/units`, { body: { assetTag: `PICO-${label}-01` }, ...own });
+      await o.apiCall('POST', `/inventory/items/${pi.json.id}/units`, { body: { assetTag: `PICO-${label}-02` }, ...own });
+
+      const ctxA = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const pa = await ctxA.newPage();
+      await login(pa, aId, 'ui-inventory-passphrase-1');
+      await pa.getByRole('link', { name: /^物品/ }).click();
+      await pa.waitForURL('**/inventory');
+      await pa.locator(`a.item-card[data-name="${cable}"]`).waitFor();
+      check(`[${label}] 物品一覧に物品が出て、残数が見える`, /残り 5 \/ 5/.test(await pa.locator(`a.item-card[data-name="${cable}"]`).innerText()));
+      check(`[${label}] 物品一覧に横溢れがない`, (await overflowOf(pa)) <= 0, `overflow=${await overflowOf(pa)}`);
+      check(`[${label}] 物品一覧の操作対象が44px以上`, (await smallOf(pa)) === 0, `small=${await smallOf(pa)}`);
+      if (o.shotsDir) await pa.screenshot({ path: join(o.shotsDir, `${label}-inventory.png`), fullPage: true });
+      await pa.getByLabel('物品を探す').fill('Pico');
+      await pa.getByRole('button', { name: '絞り込む' }).click();
+      await pa.locator(`a.item-card[data-name="${pico}"]`).waitFor();
+      check(`[${label}] 検索で絞り込める`, (await pa.locator(`a.item-card[data-name="${cable}"]`).count()) === 0);
+      await pa.getByLabel('物品を探す').fill('');
+      await pa.getByRole('button', { name: '絞り込む' }).click();
+      await pa.locator(`a.item-card[data-name="${cable}"]`).waitFor();
+
+      // 数量管理: 2個借りる → 残り3
+      await pa.locator(`a.item-card[data-name="${cable}"]`).click();
+      await pa.getByRole('heading', { level: 1, name: cable }).waitFor();
+      await pa.getByLabel('借りる数').fill('2');
+      await pa.getByRole('button', { name: '借りる', exact: true }).click();
+      await pa.locator('.notice.success').filter({ hasText: '残りは3個' }).waitFor();
+      check(`[${label}] 2個借りると残りが3になる`, /残り 3/.test(await pa.locator('.stock').innerText()));
+      check(`[${label}] 詳細に横溢れがない`, (await overflowOf(pa)) <= 0, `overflow=${await overflowOf(pa)}`);
+      check(`[${label}] 詳細の操作対象が44px以上`, (await smallOf(pa)) === 0, `small=${await smallOf(pa)}`);
+      if (o.shotsDir) await pa.screenshot({ path: join(o.shotsDir, `${label}-inventory-detail.png`), fullPage: true });
+
+      // 別の人（B）が残り3個を借りて、残り0なら借りられない。Aの分を代理で一部返却する
+      const ctxB = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const pb = await ctxB.newPage();
+      await login(pb, bId, 'ui-inventory-passphrase-1');
+      await pb.goto(`${adminUrl}/inventory/${ci.json.id}`);
+      await pb.getByLabel('借りる数').fill('3');
+      await pb.getByRole('button', { name: '借りる', exact: true }).click();
+      await pb.locator('.notice.success').filter({ hasText: '残りは0個' }).waitFor();
+      check(`[${label}] 残り0になると借りるボタンが出ず、案内が出る`, (await pb.getByRole('button', { name: '借りる', exact: true }).count()) === 0 && /借りられる数がありません/.test(await pb.locator('main').innerText()));
+      const aRow = pb.locator('li.item').filter({ hasText: aName });
+      await aRow.waitFor();
+      await aRow.getByLabel(/返却数/).fill('1');
+      await aRow.getByRole('button', { name: '返却する' }).click();
+      await pb.locator('.notice.success').filter({ hasText: '1個返却しました' }).waitFor();
+      check(`[${label}] 他人の貸出を代理で一部返却でき、残りが1になる`, /残り 1/.test(await pb.locator('.stock').innerText()) && /1個/.test(await pb.locator('li.item').filter({ hasText: aName }).innerText()));
+
+      // 個体管理: Aが個体1を借りる。同じ個体は他の人に借りるボタンが出ない
+      await pa.goto(`${adminUrl}/inventory/${pi.json.id}`);
+      const unit1 = pa.locator(`li.item[data-tag="PICO-${label}-01"]`);
+      await unit1.getByRole('button', { name: 'この個体を借りる' }).click();
+      await pa.locator('.notice.success').filter({ hasText: `PICO-${label}-01 を借りました` }).waitFor();
+      await pb.goto(`${adminUrl}/inventory/${pi.json.id}`);
+      const u1b = pb.locator(`li.item[data-tag="PICO-${label}-01"]`);
+      await u1b.waitFor();
+      check(`[${label}] 貸出中の個体は借りた人が見え、借りるボタンが出ない`, (await u1b.getByRole('button').count()) === 0 && (await u1b.innerText()).includes(aName) && (await pb.locator(`li.item[data-tag="PICO-${label}-02"]`).getByRole('button', { name: 'この個体を借りる' }).count()) === 1);
+
+      // 貸出中の一覧: 「自分だけ」と返却
+      await pa.goto(`${adminUrl}/inventory/loans`);
+      await pa.locator('li.item[data-loan]').first().waitFor();
+      const allCount = await pa.locator('li.item[data-loan]').count();
+      await pa.getByLabel('自分が借りているものだけ').check();
+      await pa.locator('li.item[data-loan]').filter({ hasText: '（あなた）' }).first().waitFor();
+      await pa.locator('li.item[data-loan]').filter({ hasText: bName }).first().waitFor({ state: 'detached' });
+      const mineCount = await pa.locator('li.item[data-loan]').count();
+      check(`[${label}] 貸出中の一覧で「自分だけ」に絞れ、経過日数が出る`, mineCount >= 1 && mineCount < allCount && /1日目|日目/.test(await pa.locator('li.item[data-loan]').first().innerText()), `all=${allCount} mine=${mineCount}`);
+      check(`[${label}] 貸出中の一覧に横溢れがない`, (await overflowOf(pa)) <= 0, `overflow=${await overflowOf(pa)}`);
+      check(`[${label}] 貸出中の一覧の操作対象が44px以上`, (await smallOf(pa)) === 0, `small=${await smallOf(pa)}`);
+      if (o.shotsDir) await pa.screenshot({ path: join(o.shotsDir, `${label}-inventory-loans.png`), fullPage: true });
+      await pa.locator('li.item[data-loan]').filter({ hasText: `PICO-${label}-01` }).getByRole('button', { name: '返却する' }).click();
+      await pa.locator('.notice.success').filter({ hasText: '返却しました' }).waitFor();
+      await pa.locator('li.item[data-loan]').filter({ hasText: `PICO-${label}-01` }).first().waitFor({ state: 'detached' });
+      check(`[${label}] 貸出中の一覧から個体を返却すると一覧から消える`, (await pa.locator('li.item[data-loan]').filter({ hasText: `PICO-${label}-01` }).count()) === 0);
+
+      // 履歴
+      await pa.goto(`${adminUrl}/inventory/history`);
+      await pa.locator('li.item[data-kind]').first().waitFor();
+      const htext = await pa.locator('main').innerText();
+      check(`[${label}] 履歴に貸出・返却（代理返却は登録者つき）が出る`, htext.includes(`${bName}さんが${cable}を3個借りました`) && htext.includes(`返却を登録した人: ${bName}さん`), htext.slice(0, 300));
+      check(`[${label}] 履歴に横溢れがない`, (await overflowOf(pa)) <= 0, `overflow=${await overflowOf(pa)}`);
+      if (o.shotsDir) await pa.screenshot({ path: join(o.shotsDir, `${label}-inventory-history.png`), fullPage: true });
+      await ctxA.close();
+      await ctxB.close();
     }
     // 権限が無い人（一般メンバー）にはAPIが拒否し、画面は案内を表示する
     {

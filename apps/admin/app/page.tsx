@@ -9,7 +9,7 @@ import { describe, fetchMe, logout, type Me } from "@/lib/api";
 // 実装前のものは「準備中」と明示して押せないようにする。
 type AppDef = { id: string; title: string; description: string; href?: string };
 const APPS: AppDef[] = [
-  { id: "inventory", title: "物品", description: "団体の機材を探して、貸出・返却を記録します。" },
+  { id: "inventory", title: "物品", description: "団体の機材を探して、貸出・返却を記録します。", href: "/inventory" },
   { id: "articles", title: "記事・作品", description: "活動報告や作品紹介を書いて、公開します。" },
   { id: "members", title: "メンバー", description: "メンバーを探して、プロフィールを見ます。", href: "/members" },
   { id: "profile", title: "プロフィール", description: "自分の表示名や公開する内容を設定します。", href: "/profile" },
