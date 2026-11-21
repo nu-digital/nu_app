@@ -113,6 +113,13 @@ export function repositoryErrors(repositoryRoot = root) {
       if (!/^[\w-]+\/[\w-]+@[a-f0-9]{40}$/.test(match[1])) errors.push('外部Actionは完全なSHAで固定してください。');
     }
   }
+  // 公開サイトと管理画面のプレビューの許可リストは、バイト単位で同一でなければならない（p3-web.md §3）
+  const shared = ['apps/web/lib/markdown-sanitize.mjs', 'apps/admin/lib/markdown-sanitize.mjs'].map(f => resolve(repositoryRoot, f));
+  if (shared.every(f => existsSync(f))) {
+    if (!readFileSync(shared[0]).equals(readFileSync(shared[1]))) errors.push('apps/web/lib と apps/admin/lib の markdown-sanitize.mjs は同一の内容にしてください（許可リストの食い違いを防ぐため）。');
+  } else if (shared.some(f => existsSync(f))) {
+    errors.push('markdown-sanitize.mjs は apps/web/lib と apps/admin/lib の両方に置いてください。');
+  }
   return errors;
 }
 

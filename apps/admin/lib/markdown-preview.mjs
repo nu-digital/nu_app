@@ -7,81 +7,15 @@
 //
 // 許可・拒否の事例集 services/api/internal/mdcheck/testdata/corpus.json を、Go（mdcheck）とこのファイルのテストの両方で回す。
 import rehypeRaw from "rehype-raw";
-import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 
-const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
-const MEDIA_SRC = /^\/api\/v1\/public\/media\/[A-Za-z0-9_-]{22}$/;
+import { sanitizePlugins, sanitizeSchema, rehypeSafeUrls, rehypeSingleDataAttr, YOUTUBE_ID } from "./markdown-sanitize.mjs";
 
-/** @type {import('hast-util-sanitize').Schema} */
-export const sanitizeSchema = {
-  ...defaultSchema,
-  tagNames: [
-    "h1", "h2", "h3", "h4", "h5", "h6", "p", "br", "hr", "blockquote", "pre", "code", "em", "strong", "del",
-    "a", "img", "ul", "ol", "li", "input", "table", "thead", "tbody", "tfoot", "tr", "th", "td",
-    "details", "summary", "div",
-  ],
-  attributes: {
-    a: ["href"],
-    img: ["src", "alt"],
-    input: [["type", "checkbox"], ["disabled", true], "checked"],
-    th: ["align"],
-    td: ["align"],
-    code: [["className", /^language-[\w-]+$/]],
-    // 子なしの埋め込みの目印。値は検査済みのものだけ（YouTubeは11桁のID）
-    div: [["dataYoutube", YOUTUBE_ID], ["dataVideo", "featured"], ["dataCarousel", "overview"]],
-  },
-  protocols: { href: ["http", "https", "mailto"], src: [] },
-  required: { input: { type: "checkbox", disabled: true } },
-  // ソース内のid/nameは許さない（属性自体を許可していない）
-  clobber: [],
-  ancestors: { li: ["ol", "ul"], tbody: ["table"], thead: ["table"], tfoot: ["table"], td: ["table"], th: ["table"], tr: ["table"] },
-};
-
-function hrefOk(v) {
-  return /^https?:\/\//i.test(v) || /^mailto:/i.test(v) || /^#/.test(v) || (/^\/(?![/\\])/.test(v) && !/\.\./.test(v));
-}
-function srcOk(v) {
-  return (/^\/images\/[^\s"'<>\\]+$/.test(v) && !v.includes("..")) || MEDIA_SRC.test(v);
-}
-
-/**
- * サニタイズの後に、URLをもう一段厳しく絞る（プロトコル相対`//`・バックスラッシュ・パス移動を落とす。
- * 画像は /images/ とアップロード画像だけ）。拒否したものは属性ごと外す。
- */
-export function rehypeSafeUrls() {
-  return (tree) => {
-    const walk = (node) => {
-      if (node.type === "element" && node.properties) {
-        if (node.tagName === "a" && typeof node.properties.href === "string" && !hrefOk(node.properties.href)) delete node.properties.href;
-        if (node.tagName === "img" && (typeof node.properties.src !== "string" || !srcOk(node.properties.src))) delete node.properties.src;
-      }
-      for (const c of node.children ?? []) walk(c);
-    };
-    walk(tree);
-  };
-}
-
-/**
- * 子なしの埋め込みの目印（data-youtube / data-video / data-carousel）は、サーバーの検査と同じく**ちょうど1つ**だけ許す。
- * 2つ以上ある div は、目印をすべて外して属性なしの div にする（許可リストは各属性を個別に許すため、ここで揃える）。
- */
-export function rehypeSingleDataAttr() {
-  return (tree) => {
-    const walk = (node) => {
-      if (node.type === "element" && node.tagName === "div" && node.properties) {
-        const keys = ["dataYoutube", "dataVideo", "dataCarousel"].filter((k) => node.properties[k] !== undefined);
-        if (keys.length > 1) for (const k of keys) delete node.properties[k];
-      }
-      for (const c of node.children ?? []) walk(c);
-    };
-    walk(tree);
-  };
-}
+export { sanitizeSchema, rehypeSafeUrls, rehypeSingleDataAttr };
 
 export const remarkPlugins = [remarkGfm];
 /** react-markdown と、テストのunifiedパイプラインで共通に使う（rehype-rawの後にサニタイズ）。 */
-export const rehypePlugins = [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeSafeUrls, rehypeSingleDataAttr];
+export const rehypePlugins = [rehypeRaw, ...sanitizePlugins];
 
 /**
  * プレビュー専用のURL変換。下書きの画像は公開されるまで匿名には配信されないため、

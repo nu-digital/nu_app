@@ -4,11 +4,13 @@ import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import { withBasePath } from "@/lib/paths";
 import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
+import type { PluggableList } from "unified";
 import { getBlogFeed, type ContentPost } from "@/lib/markdown";
 import ContentCard from "@/components/content/ContentCard";
 import YouTubeEmbed from "@/components/ui/YouTubeEmbed";
 import { getYouTubeVideoIds } from "@/lib/youtube";
 import { formatArticleDate, rehypeArticleGallery } from "@/lib/content-presentation.mjs";
+import { sanitizePlugins } from "@/lib/markdown-sanitize.mjs";
 import ArticleMedia from "@/components/content/ArticleMedia";
 import ImageCarousel from "@/components/ui/ImageCarousel";
 import { featuredVideo, overviewSlides } from "@/data/site";
@@ -54,7 +56,7 @@ export default function ContentArticle({ post }: ContentArticleProps) {
               </section>
             )}
             <div className="article-body prose prose-blue max-w-none text-base leading-[1.95] prose-headings:tracking-tight prose-a:text-[var(--brand-blue)] prose-pre:bg-slate-950">
-              <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeArticleGallery]} remarkPlugins={[remarkGfm]} urlTransform={(url) => withBasePath(defaultUrlTransform(url))}
+              <ReactMarkdown rehypePlugins={[rehypeRaw, ...sanitizePlugins, rehypeArticleGallery as PluggableList[number]]} remarkPlugins={[remarkGfm]} urlTransform={(url) => withBasePath(defaultUrlTransform(url))}
                 components={{
                   div: ({ node, children, ...props }) => node?.properties?.dataCarousel === "overview" ? (
                     <div className="not-prose my-8 bg-[var(--brand-blue)] p-4 text-white sm:p-6">
