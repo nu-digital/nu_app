@@ -52,3 +52,10 @@ UPDATE users SET status = 'active', activated_at = $2 WHERE id = $1 AND status =
 
 -- name: GetDisplayName :one
 SELECT display_name FROM profiles WHERE user_id = $1;
+
+-- name: PeekToken :one
+-- 消費せずに、有効なトークンの持ち主と状態を確認する（方針検証のためログインIDが必要）。使用の確保は ConsumeToken がアトミックに行う。
+SELECT t.user_id, u.login_id, u.status
+FROM one_time_tokens t
+JOIN users u ON u.id = t.user_id
+WHERE t.token_hash = $1 AND t.purpose = $2 AND t.used_at IS NULL AND t.revoked_at IS NULL AND t.expires_at > $3;

@@ -177,6 +177,33 @@ func (q *Queries) ListUserRoles(ctx context.Context, userID pgtype.UUID) ([]stri
 	return items, nil
 }
 
+const peekToken = `-- name: PeekToken :one
+SELECT t.user_id, u.login_id, u.status
+FROM one_time_tokens t
+JOIN users u ON u.id = t.user_id
+WHERE t.token_hash = $1 AND t.purpose = $2 AND t.used_at IS NULL AND t.revoked_at IS NULL AND t.expires_at > $3
+`
+
+type PeekTokenParams struct {
+	TokenHash []byte
+	Purpose   string
+	ExpiresAt pgtype.Timestamptz
+}
+
+type PeekTokenRow struct {
+	UserID  pgtype.UUID
+	LoginID string
+	Status  string
+}
+
+// 消費せずに、有効なトークンの持ち主と状態を確認する（方針検証のためログインIDが必要）。使用の確保は ConsumeToken がアトミックに行う。
+func (q *Queries) PeekToken(ctx context.Context, arg PeekTokenParams) (PeekTokenRow, error) {
+	row := q.db.QueryRow(ctx, peekToken, arg.TokenHash, arg.Purpose, arg.ExpiresAt)
+	var i PeekTokenRow
+	err := row.Scan(&i.UserID, &i.LoginID, &i.Status)
+	return i, err
+}
+
 const revokeActiveTokens = `-- name: RevokeActiveTokens :execrows
 UPDATE one_time_tokens SET revoked_at = now()
 WHERE user_id = $1 AND used_at IS NULL AND revoked_at IS NULL AND ($2::text = '' OR purpose = $2)
