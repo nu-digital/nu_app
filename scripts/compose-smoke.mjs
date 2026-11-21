@@ -117,7 +117,7 @@ try {
       const post = (base, body, ct = 'image/png') => fetch(`${base}/api/v1/media?purpose=cms`, { method: 'POST', headers: { 'content-type': ct, origin, cookie, 'x-csrf-token': csrf }, body });
       let r = await post(`http://127.0.0.1:${api}`, big);
       const direct = await r.json().catch(() => ({}));
-      check('メディア: APIへ直接、約9MBの画像をアップロードできる（再エンコードされる）', r.status === 201 && direct.mimeType === 'image/png' && direct.width === 1500, `status=${r.status}`);
+      check('メディア: APIへ直接、約9MBの画像をアップロードできる（再エンコードされる）', r.status === 201 && direct.mimeType === 'image/webp' && direct.width === 1500, `status=${r.status}`);
       r = await post(`http://127.0.0.1:${admin}`, big);
       const viaProxy = await r.json().catch(() => ({}));
       check('メディア: adminの中継経由でも約9MBの画像をアップロードできる', r.status === 201 && viaProxy.publicId?.length === 22, `status=${r.status}`);
@@ -132,7 +132,7 @@ try {
       r = await get(`http://127.0.0.1:${api}`, `/api/v1/public/media/${direct.publicId}`, false);
       check('メディア: 参照されていない画像は匿名に配信されない（404）', r.status === 404, `status=${r.status}`);
       r = await get(`http://127.0.0.1:${api}`, `/api/v1/media/${direct.id}`);
-      check('メディア: アップロード者は認証つきで取得でき、nosniff・privateのヘッダー', r.status === 200 && r.headers.get('content-type') === 'image/png' && r.headers.get('x-content-type-options') === 'nosniff' && /no-store/.test(r.headers.get('cache-control') ?? ''), `status=${r.status}`);
+      check('メディア: アップロード者は認証つきで取得でき、nosniff・privateのヘッダー', r.status === 200 && r.headers.get('content-type') === 'image/webp' && r.headers.get('x-content-type-options') === 'nosniff' && /no-store/.test(r.headers.get('cache-control') ?? ''), `status=${r.status}`);
       x = await call('POST', '/contents', { body: { type: 'article', section: 'blog', slug: 'smoke-media', title: '画像つきの記事(架空)', markdown: `![x](/api/v1/public/media/${direct.publicId})`, coverMediaId: viaProxy.id }, cookie, csrf });
       check('メディア: 画像を本文とカバーで参照する記事を作れる', x.status === 201, `status=${x.status}`);
       const cid = x.json?.id;
@@ -140,7 +140,7 @@ try {
       check('メディア: 記事を公開できる', x.status === 200, `status=${x.status}`);
       r = await get(`http://127.0.0.1:${api}`, `/api/v1/public/media/${direct.publicId}`, false);
       const pubBody = Buffer.from(await r.arrayBuffer());
-      check('メディア: 公開後は匿名に配信される（画像として読めてCORPはcross-origin）', r.status === 200 && pubBody.subarray(1, 4).toString() === 'PNG' && r.headers.get('cross-origin-resource-policy') === 'cross-origin', `status=${r.status}`);
+      check('メディア: 公開後は匿名に配信される（画像として読めてCORPはcross-origin）', r.status === 200 && pubBody.subarray(0, 4).toString() === 'RIFF' && pubBody.subarray(8, 12).toString() === 'WEBP' && r.headers.get('cross-origin-resource-policy') === 'cross-origin', `status=${r.status}`);
       // 永続ボリューム: APIコンテナを再起動しても画像が残る
       const restart = compose('restart', 'api');
       for (let i = 0; i < 40; i++) { if ((await get(`http://127.0.0.1:${api}`, '/healthz', false).catch(() => ({ status: 0 }))).status === 200) break; await new Promise(res => setTimeout(res, 1000)); }
