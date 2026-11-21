@@ -20,6 +20,7 @@ import (
 	"github.com/nu-digital/nu_app/services/api/internal/auth/password"
 	"github.com/nu-digital/nu_app/services/api/internal/auth/ratelimit"
 	"github.com/nu-digital/nu_app/services/api/internal/auth/session"
+	"github.com/nu-digital/nu_app/services/api/internal/media"
 	"github.com/nu-digital/nu_app/services/api/internal/notify"
 	"github.com/nu-digital/nu_app/services/api/internal/platform/config"
 	"github.com/nu-digital/nu_app/services/api/internal/platform/httpserver"
@@ -72,6 +73,18 @@ func run(log *slog.Logger) error {
 		log.Warn("DISCORD_BOT_TOKENが未設定のため、Discord通知workerは起動しません（通知はoutboxに溜まります）")
 	}
 
+	// 画像の保存先。MEDIA_DIRが無ければメディアのAPIは503（起動は妨げない）。
+	var mediaStore *media.Store
+	if cfg.MediaDir != "" {
+		mediaStore, err = media.OpenStore(cfg.MediaDir)
+		if err != nil {
+			return err
+		}
+		defer mediaStore.Close()
+	} else {
+		log.Warn("MEDIA_DIRが未設定のため、画像のアップロード・配信は無効です")
+	}
+
 	// /healthz・/readyz（インフラ用）と /api/v1（認証付きAPI）を1つのサーバーで提供する。
 	root := http.NewServeMux()
 	root.Handle("/api/v1/", http.StripPrefix("/api/v1", api.New(api.Deps{
@@ -83,6 +96,7 @@ func run(log *slog.Logger) error {
 		Limiter:  ratelimit.New(ratelimit.DefaultConfig, nil),
 		Log:      log,
 		Notifier: sender,
+		Media:    mediaStore,
 	})))
 	root.Handle("/", httpserver.New(pool, cfg.ReadyTimeout))
 

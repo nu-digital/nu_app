@@ -145,6 +145,7 @@ actor/borrower はクライアント入力を信用せず、セッションの�
 - `POST /contents`: `{type, section, slug, title, summary?, markdown, metadata?, date?}` → 201（版1）。slug重複は409 `SLUG_TAKEN`。入力不正・Markdown検査の違反は422（本文の内容は応答に含めない）。`metadata`は`category`・`excerpt`（誰でも）と`author`・`image`・`sourceId`・`sourceUrl`（Editor以上のみ。Memberは403）。
 - `GET /contents`: `limit`（≤100）・`cursor`・`section`・`mine=true`。編集できる人（作者・共同編集者・Editor以上）には作業版の値、**それ以外には公開中のものの公開版の値だけ**。
 - `GET /contents/{id}`（`?revision=N`で過去の版）: 作者・共同編集者・Editor以上。**関係が無い人は、存在しないIDと同じ404**。
+- 画像（P3-02a）: 版の保存・作成に`coverMediaId`（アップロード済みの画像のid。省略は維持、`null`で消す）。本文のMarkdownの画像のURLは`/api/v1/public/media/`に22文字の`publicId`を続けた形（それだけ。クエリ・%エンコード・外部URLは422）。参照できるのは、存在し、無効化されておらず、(a)自分がアップロードした (b)そのコンテンツの過去の版が参照している (c)Editor以上、のどれか。違えば存在を区別しない同じ422。1つの版で100枚まで。版を作る全経路（制作メンバーの変更を含む）で画像参照は引き継がれる。公開の直前に、本文の画像と保存済みの参照の一致・無効化されていないことを再確認する（422）。版の表示に`coverMedia`。公開APIの項目に`coverUrl`。
 - `POST /contents/{id}/revisions`: `baseRevision`必須。古ければ409 `REVISION_CONFLICT`（`current`に現在の作業版）。内容が同じなら200（版は増えない）。公開版は変わらない。
 - `PUT /contents/{id}/collaborators`: `{userIds}`の全件置き換え（作者・Editor以上。共同編集者は403）。新しく加えられるのは有効なユーザーだけ。上限20。
 - `PUT /contents/{id}/contributors`: `{baseRevision, contributors:[{userId, roleLabel}]}`。作品だけ。制作メンバーは**版ごと**で、変更は新しい版になる。停止・退会済みのユーザーも登録できる。公開クレジットの同意は変えない。
@@ -181,9 +182,10 @@ Markdownは許可リスト方式でサニタイズする。生のiframe/script/v
 
 | Method | Path | 権限 | 動作 |
 |---|---|---|---|
-| POST | `/media` | Member | 指定用途(`purpose`=avatar/inventory/cms)の画像アップロード、非公開で保存。JPEG/PNG/WebPのみ。avatar≤5MiB、他≤10MiB。デコード前に寸法を検査（≤2,000万画素・各辺≤10,000px）。実体検査・アニメーション/SVG拒否・向き補正・縮小(avatar長辺≤512px、他≤2,560px、拡大しない)・再エンコード・EXIF除去。同時処理数を制限し超過は429/503で再試行を案内。不正入力は400/413/415/422（TESTING参照） |
-| GET | `/media/{id}` | 画像所有者・必要権限 | 非公開画像の認可付き配信 |
-| GET | `/public/media/{opaqueId}` | Public | 公開されている画像のみ |
+| POST | `/media` | Member | 画像のアップロード（クエリ`purpose`が必須。**生のバイト列**。`Content-Type: image/jpeg|png|webp|application/octet-stream`）。P3-02aは`purpose=cms`のみ（avatar/inventoryは422。P3-02b）。形式は**中身で判定**（JPEG・PNG・WebPのみ。SVG・GIF等は415）。上限10MiB（超過は読み切らず413）・各辺10,000px・2,000万画素（**デコード前に**拒否）・アニメーション不可。**検査→縮小（長辺2,560px。拡大しない）→向き補正→再エンコード**で、EXIF・GPS・ICC・末尾の付加データは残らない（出力はJPEG/PNG）。利用者ごとに1分20回・同時1件・1日200枚/200MiB（429）、空き容量不足は507、混雑は503＋`Retry-After`。201 `{id, publicId, publicUrl:"/api/v1/public/media/<publicId>", url:"/api/v1/media/<id>", width, height, mimeType, byteSize, purpose}`（保存先のパスは返さない。`publicUrl`は公開中の版が参照するまで匿名には配信されない） |
+| GET | `/media/{id}` | アップロード者・参照するコンテンツの作者/共同編集者・Editor以上 | 認可つき配信。`Cache-Control: private, no-store`・`nosniff`・`CSP: sandbox`。権限が無い・存在しない・無効化済みは同じ404 |
+| GET | `/media/by-public/{publicId}` | 同上 | 本文のURL（`publicId`）からの下書きプレビュー用の認可つき配信 |
+| GET | `/public/media/{publicId}` | Public | **公開中の版が参照している画像だけ**（導出。公開停止で即座に404）。匿名・認証情報を見ない。強いETag・`Cache-Control: no-cache`・`CORP: cross-origin`。参照が無い・未公開・redacted・存在しないは同じ404 |
 | GET | `/dashboard/feed` | Member | CMS公開・アプリ更新等のイベント |
 | GET | `/admin/notifications/settings` | Admin | イベント種別と通知先チャンネル一覧 |
 | PUT | `/admin/notifications/settings/{eventType}` | Admin | `{enabled, discordChannelId?}`。ON/OFFと送信チャンネル変更（数字5〜25桁。空/nullで未設定＝送信せず待機）。未知の種別は404、入力不正は422。監査ログに変更の事実だけ残す |

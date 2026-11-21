@@ -86,7 +86,11 @@ func (s *server) publishContent(w http.ResponseWriter, r *http.Request) {
 			out, err = s.loadContentView(r, q, a, c, res, false, &work)
 			return err
 		}
-		if err := markdownError(work.Markdown); err != nil { // 公開の直前にも検査する（多層防御）
+		mediaIDs, err := checkMarkdown(work.Markdown) // 公開の直前にも検査する（多層防御）
+		if err != nil {
+			return err
+		}
+		if err := s.recheckMedia(r, q, work, mediaIDs); err != nil {
 			return err
 		}
 		if err := q.SetPublishedRevision(r.Context(), store.SetPublishedRevisionParams{ID: c.ID, PublishedRevisionID: work.ID, UpdatedAt: pgtype.Timestamptz{Time: s.Now(), Valid: true}}); err != nil {
@@ -164,4 +168,37 @@ func (s *server) unpublishContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, out)
+}
+
+// recheckMedia は公開の直前に、その版の画像参照を再確認する: 本文から抽出した画像と保存済みの参照が一致し、
+// カバーの参照があり、どれも存在してredactedでないこと。
+func (s *server) recheckMedia(r *http.Request, q *store.Queries, work store.ContentRevision, mediaIDs []string) error {
+	refs, err := q.ListRevisionMedia(r.Context(), work.ID)
+	if err != nil {
+		return err
+	}
+	inline := map[string]bool{}
+	coverOK := !work.CoverMediaID.Valid
+	for _, m := range refs {
+		if m.RedactedAt.Valid {
+			return invalid("削除された画像が含まれています。画像を差し替えてから公開してください")
+		}
+		switch m.RefPurpose {
+		case "inline":
+			inline[m.PublicID] = true
+		case "cover":
+			if m.ID == work.CoverMediaID {
+				coverOK = true
+			}
+		}
+	}
+	if len(inline) != len(mediaIDs) || !coverOK {
+		return invalid("画像の参照が一致しません。保存し直してから公開してください")
+	}
+	for _, id := range mediaIDs {
+		if !inline[id] {
+			return invalid("画像の参照が一致しません。保存し直してから公開してください")
+		}
+	}
+	return nil
 }

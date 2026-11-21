@@ -58,3 +58,8 @@ docker compose --env-file .env -f infrastructure/compose.yaml run --rm --no-deps
 - DBパスワードに記号を使うとDSNが壊れる。英数字と`- _ . ~`だけにする。
 - 一部サービスだけ作り直す: `docker compose --env-file .env -f infrastructure/compose.yaml up --build -d <service>`。
 - migrationは`migrate`サービスが起動時に`up`を実行する（再実行は安全）。スキーマはP1以降。
+
+## 画像（メディア）
+
+- composeのAPIは`MEDIA_DIR=/data/media`（名前付きボリューム`media-data`）に、再エンコード後の画像を保存する。ローカルでAPIを直接起動する場合は`MEDIA_DIR`に絶対パスを指定する（未設定ならアップロード・配信は503）。ボリュームを消すと画像も消える（`docker compose down -v`に注意）。
+- 運用コマンド: `docker compose run --rm --no-deps --entrypoint /nuctl api media-verify`（`media-gc`・`media-redact`も同様。docs/OPERATIONS.md）。

@@ -21,7 +21,7 @@
  },
  {
   "name": "自サイトの画像",
-  "markdown": "![alt](/images/imported/img-1.webp) ![m](/api/v1/public/media/abc123)",
+  "markdown": "![alt](/images/imported/img-1.webp) ![m](/api/v1/public/media/AbCdEfGhIjKlMnOpQrStUv)",
   "ok": true
  },
  {
@@ -353,5 +353,50 @@
   "name": "属性値が単一引用符",
   "markdown": "<div data-youtube='ZEguS-om_Ec'></div>",
   "ok": false
+ },
+ {
+  "name": "アップロード画像のpublic_idが短い",
+  "markdown": "![x](/api/v1/public/media/abc)",
+  "ok": false
+ },
+ {
+  "name": "アップロード画像のpublic_idが長い",
+  "markdown": "![x](/api/v1/public/media/AbCdEfGhIjKlMnOpQrStUv0)",
+  "ok": false
+ },
+ {
+  "name": "アップロード画像にクエリ",
+  "markdown": "![x](/api/v1/public/media/AbCdEfGhIjKlMnOpQrStUv?x=1)",
+  "ok": false
+ },
+ {
+  "name": "アップロード画像にフラグメント",
+  "markdown": "![x](/api/v1/public/media/AbCdEfGhIjKlMnOpQrStUv#a)",
+  "ok": false
+ },
+ {
+  "name": "アップロード画像の末尾スラッシュ",
+  "markdown": "![x](/api/v1/public/media/AbCdEfGhIjKlMnOpQrStUv/)",
+  "ok": false
+ },
+ {
+  "name": "アップロード画像の%エンコード",
+  "markdown": "![x](/api/v1/public/media/%%41bCdEfGhIjKlMnOpQrStUv)",
+  "ok": false
+ },
+ {
+  "name": "アップロード画像に使えない文字",
+  "markdown": "![x](/api/v1/public/media/AbCdEfGhIjKlMnOpQrSt.v)",
+  "ok": false
+ },
+ {
+  "name": "認証つきの画像URLは本文に書けない",
+  "markdown": "![x](/api/v1/media/AbCdEfGhIjKlMnOpQrStUv)",
+  "ok": false
+ },
+ {
+  "name": "コードブロックの中のURLは画像ではない",
+  "markdown": "```\n![x](https://tracker.example/p.png)\n```",
+  "ok": true
  }
 ]

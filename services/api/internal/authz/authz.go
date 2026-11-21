@@ -68,6 +68,8 @@ type Resource struct {
 	IsCollaborator bool
 	// IsUploader: 画像のアップロード者。
 	IsUploader bool
+	// IsMediaContentMember: その画像を（いずれかの版が）参照しているコンテンツの作者または共同編集者（下書きのプレビュー用）。
+	IsMediaContentMember bool
 	// TargetIsAdmin / TargetIsOwner: 対象ユーザーが管理者権限を持つ（Ownerは両方true）。
 	TargetIsAdmin bool
 	TargetIsOwner bool
@@ -104,6 +106,7 @@ var (
 	author       relation = func(r Resource) bool { return r.IsAuthor }
 	collaborator relation = func(r Resource) bool { return r.IsCollaborator }
 	uploader     relation = func(r Resource) bool { return r.IsUploader }
+	mediaContent relation = func(r Resource) bool { return r.IsMediaContentMember }
 )
 
 // Decision は判断結果。
@@ -248,8 +251,9 @@ var table = []Action{
 
 	// 5. メディア・通知・ダッシュボード
 	{"media.upload", "POST", "/media", anyMember},
-	{"media.get", "GET", "/media/{id}", rule{roles: editorPlus, relations: []relation{uploader}}},
-	{"public.media.get", "GET", "/public/media/{opaqueId}", pub},
+	{"media.get", "GET", "/media/{id}", rule{roles: editorPlus, relations: []relation{uploader, mediaContent}}},
+	{"media.get_by_public", "GET", "/media/by-public/{publicId}", rule{roles: editorPlus, relations: []relation{uploader, mediaContent}}},
+	{"public.media.get", "GET", "/public/media/{publicId}", pub},
 	{"dashboard.feed", "GET", "/dashboard/feed", anyMember},
 	{"admin.notifications.settings.get", "GET", "/admin/notifications/settings", adminOnly},
 	{"admin.notifications.settings.update", "PUT", "/admin/notifications/settings/{eventType}", adminOnly},

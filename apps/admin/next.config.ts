@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
   // Dockerイメージを小さくするため、必要なファイルだけを.next/standaloneへ出力する。
   output: "standalone",
   poweredByHeader: false,
+  // 画像のアップロード（最大10MiB）をAPIへ中継できるように、中継の本文サイズの上限（既定10MiB）を引き上げる。
+  // 上限の検査・形式の検査はAPI側で行う。
+  experimental: { proxyClientMaxBodySize: "12mb" },
   async rewrites() {
     return [{ source: "/api/v1/:path*", destination: `${apiInternal}/api/v1/:path*` }];
   },

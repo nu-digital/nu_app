@@ -108,3 +108,15 @@ func containsAny(s string, subs ...string) bool {
 	}
 	return false
 }
+
+func TestMediaDir(t *testing.T) {
+	if c, err := Load(env(with(nil))); err != nil || c.MediaDir != "" {
+		t.Fatalf("未設定は空: %v %q", err, c.MediaDir)
+	}
+	if c, err := Load(env(with(map[string]string{"MEDIA_DIR": " /data/media "}))); err != nil || c.MediaDir != "/data/media" {
+		t.Fatalf("%v %q", err, c.MediaDir)
+	}
+	if _, err := Load(env(with(map[string]string{"MEDIA_DIR": "relative/dir"}))); err == nil {
+		t.Error("相対パスを受け付けた")
+	}
+}

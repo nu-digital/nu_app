@@ -49,6 +49,13 @@ services:
       API_TRUSTED_PROXY_CIDRS: ${API_TRUSTED_PROXY_CIDRS:-172.16.0.0/12}
       # Discord Botのtoken（秘密）。未設定ならDiscord通知workerは起動せず、通知はoutboxに溜まる。値は.env（Git外）にだけ書く。
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      # 画像の保存先（永続ボリューム）。画像は再エンコード後のもの。Git・イメージの外。全ファイルが非公開で、公開はAPIの判定で決まる
+      MEDIA_DIR: /data/media
+      # デコード時のメモリのソフト上限（コンテナのmem_limitより低くしてGCを促し、OOMでプロセスが落ちる前に抑える）
+      GOMEMLIMIT: ${API_GOMEMLIMIT:-768MiB}
+    mem_limit: ${API_MEM_LIMIT:-1g}
+    volumes:
+      - media-data:/data/media
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
 
@@ -77,3 +84,4 @@ services:
 
 volumes:
   db-data:
+  media-data:
