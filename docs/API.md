@@ -150,6 +150,14 @@ actor/borrower はクライアント入力を信用せず、セッションの�
 - `PUT /contents/{id}/contributors`: `{baseRevision, contributors:[{userId, roleLabel}]}`。作品だけ。制作メンバーは**版ごと**で、変更は新しい版になる。停止・退会済みのユーザーも登録できる。公開クレジットの同意は変えない。
 - 保存系（作成・版の保存・共同編集者・制作メンバー）は利用者ごとに1分60回まで（429）。
 
+**P3-01bで実装した契約（暫定採用 DECISIONS P3-01-3）**
+
+- `POST /contents/{id}/publish`: `{revisionNo}`必須（Editor以上。**存在確認の前に403**）。作業版と違えば409 `REVISION_CONFLICT`。公開の直前にMarkdownを再検査（422）。同じ版の再公開は200で何もしない。通知`content.published`をoutboxへ。
+- `POST /contents/{id}/unpublish`: Editor以上。公開中でなければ200で何もしない。作業版・履歴は残る。
+- `GET /public/contents`（`section`・`limit`≤100・`cursor`）: 匿名。**公開版だけ**。日付の新しい順（日付不明は最後）。`{items:[{type,section,slug,title,summary,metadata{category,excerpt,image,author},date{label,kind,sortDate,sortDateIsEstimated}}],nextCursor}`。
+- `GET /public/contents/{section}/{slug}`: 匿名。上記＋`markdown`と`contributors:[{displayName,roleLabel}]`。未公開・存在しないものは同じ404。制作メンバーの`displayName`は、公開クレジットに同意中のメンバーだけ表示名、それ以外は「匿名のメンバー」（ID・氏名は出さない。名前は版に保存せず配信ごとに解決）。強いETagと`Cache-Control: no-cache`（If-None-Matchで304）。認証情報で応答は変わらない。
+- `GET /me/profile`・`GET /members/{id}`に`works`（制作実績: `{section,slug,title,roles[]}`）。本人には常に、他のメンバーには公開クレジットの同意が続いている間だけ。
+
 編集保存例:
 
 ```json

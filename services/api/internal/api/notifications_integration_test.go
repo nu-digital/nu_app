@@ -171,8 +171,8 @@ func TestNotificationSettingsAPI(t *testing.T) {
 		}
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &list)
-	if rec.Code != 200 || len(list.Items) != 3 || !list.Items[0].Enabled || list.Items[0].DiscordChannelID != nil || list.Items[0].Label == "" {
-		t.Fatalf("一覧（初期は3種別・有効・チャンネル未設定）: %d %s", rec.Code, rec.Body.String())
+	if rec.Code != 200 || len(list.Items) != 4 || !list.Items[0].Enabled || list.Items[0].DiscordChannelID != nil || list.Items[0].Label == "" {
+		t.Fatalf("一覧（初期は4種別・有効・チャンネル未設定）: %d %s", rec.Code, rec.Body.String())
 	}
 	for name, body := range map[string]string{"enabled無し": `{}`, "数字以外のチャンネル": `{"enabled":true,"discordChannelId":"abc"}`, "短すぎる": `{"enabled":true,"discordChannelId":"12"}`, "未知のフィールド": `{"enabled":true,"x":1}`} {
 		if rec := e.as(admin, "PUT", "/admin/notifications/settings/"+et, body); rec.Code != 422 && rec.Code != 400 {

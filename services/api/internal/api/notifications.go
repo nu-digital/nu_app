@@ -23,6 +23,7 @@ const (
 	EventLoanCreated       = "inventory.loan_created"
 	EventLoanReturned      = "inventory.loan_returned"
 	EventCorrectionCreated = "inventory.correction_created"
+	EventContentPublished  = "content.published"
 )
 
 // NotificationPayload は通知本文の材料。**機密を入れない**（学生証番号・大学メール・氏名・最寄り駅・token・訂正の理由）。
@@ -76,6 +77,7 @@ var eventLabels = map[string]string{
 	EventLoanCreated:       "物品の貸出",
 	EventLoanReturned:      "物品の返却",
 	EventCorrectionCreated: "物品の記録の訂正",
+	EventContentPublished:  "記事・作品の公開",
 }
 
 func toSettingView(r store.NotificationSetting) settingView {

@@ -79,6 +79,12 @@ func Format(eventType, id string, payloadJSON []byte) (string, error) {
 			what = fmt.Sprintf("数量を%+d訂正しました", p.Delta)
 		}
 		msg = fmt.Sprintf("【訂正】%sさんが%sの%sの%s", clean(p.Actor, 64), item, target, what)
+	case "content.published":
+		kind := "記事"
+		if p.Target == "project" {
+			kind = "作品"
+		}
+		msg = fmt.Sprintf("【公開】%s「%s」を公開しました", kind, clean(p.ItemName, 200))
 	default:
 		return "", fmt.Errorf("未対応の通知種別です")
 	}

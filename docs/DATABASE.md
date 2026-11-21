@@ -52,7 +52,7 @@
 | `contents` | `id`, `type`, `section`, `slug`, `creator_user_id`, `working_revision_id`, `published_revision_id`, `archived_at` | type=article/project。section=blog/news/project等。section+slug UNIQUE |
 | `content_revisions` | `id`, `content_id`, `revision_no`, `title`, `summary`, `markdown`, `cover_media_id`, `metadata_json`, `edited_by`, `created_at` | 保存ごとに不変の版。content_id+revision_no UNIQUE |
 | `content_collaborators` | `content_id`, `user_id`, `added_by`, `added_at` | 記事作成者が指定。Editor/Adminは指定不要で全件編集可 |
-| `work_contributors` | `id`, `content_id`, `user_id`, `role_label`, `sort_order`, `added_by` | 作品typeのみ。**制作メンバー登録のみ**（編集権限者が操作）。公開クレジット可否は`public_credit_consents`（本人のみ変更）で別管理。名前はrevisionに焼き込まず配信時に解決 |
+| `work_contributors` | `id`, `content_id`, **`revision_id`（版ごと。変更は新しい版）**, `user_id`, `role_label`, `sort_order`, `added_by` | 作品typeのみ。**制作メンバー登録のみ**（編集権限者が操作）。公開クレジット可否は`public_credit_consents`（本人のみ変更）で別管理。名前はrevisionに焼き込まず配信時に解決 |
 | `content_publication_events` | `id`, `content_id`, `revision_id`, `actor_user_id`, `event_type`, `created_at` | publish/unpublish履歴 |
 
 `working_revision_id` / `published_revision_id` は同一 `content_id` に属することをサービス層・可能ならDB制約/triggerで検証。公開前は `published_revision_id IS NULL`。公開記事を書き換えても公開ポインタは変えない。

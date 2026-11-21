@@ -36,6 +36,33 @@ func (q *Queries) ActiveUserIDs(ctx context.Context, ids []pgtype.UUID) ([]pgtyp
 	return items, nil
 }
 
+const actorRolesForShare = `-- name: ActorRolesForShare :many
+SELECT ur.role FROM user_roles ur JOIN users u ON u.id = ur.user_id
+WHERE ur.user_id = $1 AND u.status = 'active'
+FOR SHARE OF ur, u
+`
+
+// 公開・公開停止。書き込みのTx内でEditor以上かを読み直す（降格との競合を避けるため行を共有ロックする）。
+func (q *Queries) ActorRolesForShare(ctx context.Context, userID pgtype.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, actorRolesForShare, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var role string
+		if err := rows.Scan(&role); err != nil {
+			return nil, err
+		}
+		items = append(items, role)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const copyWorkContributors = `-- name: CopyWorkContributors :exec
 INSERT INTO work_contributors (content_id, revision_id, user_id, role_label, sort_order, added_by)
 SELECT src.content_id, $1::uuid, src.user_id, src.role_label, src.sort_order, src.added_by
@@ -229,6 +256,54 @@ func (q *Queries) GetContentRevisionByNo(ctx context.Context, arg GetContentRevi
 	return i, err
 }
 
+const getPublicContent = `-- name: GetPublicContent :one
+SELECT c.type, c.section, c.slug, r.id AS revision_id, r.title, r.summary, r.markdown, r.metadata_json,
+       r.date_label, r.date_kind, r.sort_date, r.sort_date_is_estimated
+FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
+WHERE c.section = $1 AND c.slug = $2 AND c.archived_at IS NULL
+`
+
+type GetPublicContentParams struct {
+	Section string
+	Slug    string
+}
+
+type GetPublicContentRow struct {
+	Type                string
+	Section             string
+	Slug                string
+	RevisionID          pgtype.UUID
+	Title               string
+	Summary             string
+	Markdown            string
+	MetadataJson        []byte
+	DateLabel           string
+	DateKind            string
+	SortDate            pgtype.Date
+	SortDateIsEstimated bool
+}
+
+// 公開API。公開ポインタの版だけを返す（下書き・未公開・アーカイブ・存在しないものは同じ「行なし」）。
+func (q *Queries) GetPublicContent(ctx context.Context, arg GetPublicContentParams) (GetPublicContentRow, error) {
+	row := q.db.QueryRow(ctx, getPublicContent, arg.Section, arg.Slug)
+	var i GetPublicContentRow
+	err := row.Scan(
+		&i.Type,
+		&i.Section,
+		&i.Slug,
+		&i.RevisionID,
+		&i.Title,
+		&i.Summary,
+		&i.Markdown,
+		&i.MetadataJson,
+		&i.DateLabel,
+		&i.DateKind,
+		&i.SortDate,
+		&i.SortDateIsEstimated,
+	)
+	return i, err
+}
+
 const insertContentCollaborator = `-- name: InsertContentCollaborator :exec
 INSERT INTO content_collaborators (content_id, user_id, added_by) VALUES ($1, $2, $3)
 `
@@ -298,6 +373,31 @@ func (q *Queries) InsertContentRevision(ctx context.Context, arg InsertContentRe
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const insertPublicationEvent = `-- name: InsertPublicationEvent :one
+INSERT INTO content_publication_events (content_id, revision_id, actor_user_id, event_type)
+VALUES ($1, $2, $3, $4)
+RETURNING id
+`
+
+type InsertPublicationEventParams struct {
+	ContentID   pgtype.UUID
+	RevisionID  pgtype.UUID
+	ActorUserID pgtype.UUID
+	EventType   string
+}
+
+func (q *Queries) InsertPublicationEvent(ctx context.Context, arg InsertPublicationEventParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, insertPublicationEvent,
+		arg.ContentID,
+		arg.RevisionID,
+		arg.ActorUserID,
+		arg.EventType,
+	)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const insertWorkContributor = `-- name: InsertWorkContributor :exec
@@ -504,6 +604,159 @@ func (q *Queries) ListContents(ctx context.Context, arg ListContentsParams) ([]L
 	return items, nil
 }
 
+const listPublicContents = `-- name: ListPublicContents :many
+SELECT c.id, c.type, c.section, c.slug, r.title, r.summary, r.metadata_json,
+       r.date_label, r.date_kind, r.sort_date, r.sort_date_is_estimated,
+       COALESCE(r.sort_date, DATE '0001-01-01')::date AS order_date
+FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
+WHERE c.archived_at IS NULL
+  AND ($1::text IS NULL OR c.section = $1::text)
+  AND ($2::date IS NULL OR (COALESCE(r.sort_date, DATE '0001-01-01'), c.id) < ($2::date, $3::uuid))
+ORDER BY COALESCE(r.sort_date, DATE '0001-01-01') DESC, c.id DESC
+LIMIT $4
+`
+
+type ListPublicContentsParams struct {
+	Section    pgtype.Text
+	BeforeDate pgtype.Date
+	BeforeID   pgtype.UUID
+	Lim        int32
+}
+
+type ListPublicContentsRow struct {
+	ID                  pgtype.UUID
+	Type                string
+	Section             string
+	Slug                string
+	Title               string
+	Summary             string
+	MetadataJson        []byte
+	DateLabel           string
+	DateKind            string
+	SortDate            pgtype.Date
+	SortDateIsEstimated bool
+	OrderDate           pgtype.Date
+}
+
+// 並び順は日付の新しい順（日付不明は最後）。カーソルは (並び用の日付, id)。
+func (q *Queries) ListPublicContents(ctx context.Context, arg ListPublicContentsParams) ([]ListPublicContentsRow, error) {
+	rows, err := q.db.Query(ctx, listPublicContents,
+		arg.Section,
+		arg.BeforeDate,
+		arg.BeforeID,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublicContentsRow{}
+	for rows.Next() {
+		var i ListPublicContentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.Section,
+			&i.Slug,
+			&i.Title,
+			&i.Summary,
+			&i.MetadataJson,
+			&i.DateLabel,
+			&i.DateKind,
+			&i.SortDate,
+			&i.SortDateIsEstimated,
+			&i.OrderDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicContributors = `-- name: ListPublicContributors :many
+SELECT w.role_label,
+       COALESCE(CASE WHEN pc.user_id IS NOT NULL THEN p.display_name END, '')::text AS display_name
+FROM work_contributors w
+LEFT JOIN public_credit_consents pc ON pc.user_id = w.user_id AND pc.withdrawn_at IS NULL
+LEFT JOIN profiles p ON p.user_id = w.user_id
+WHERE w.revision_id = $1
+ORDER BY w.sort_order, w.id
+`
+
+type ListPublicContributorsRow struct {
+	RoleLabel   string
+	DisplayName string
+}
+
+// 公開版の制作メンバー。**表示名は、公開クレジットに同意中のメンバーだけ**返す（それ以外は空文字＝匿名）。
+// 名前は版に焼き込まず、配信のたびにここで解決する（D08）。表示名はプロフィールの表示名（氏名ではない）。
+func (q *Queries) ListPublicContributors(ctx context.Context, revisionID pgtype.UUID) ([]ListPublicContributorsRow, error) {
+	rows, err := q.db.Query(ctx, listPublicContributors, revisionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublicContributorsRow{}
+	for rows.Next() {
+		var i ListPublicContributorsRow
+		if err := rows.Scan(&i.RoleLabel, &i.DisplayName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublishedWorksOfUser = `-- name: ListPublishedWorksOfUser :many
+SELECT c.section, c.slug, r.title, array_agg(w.role_label ORDER BY w.sort_order, w.id)::text[] AS roles
+FROM contents c
+JOIN content_revisions r ON r.id = c.published_revision_id
+JOIN work_contributors w ON w.revision_id = c.published_revision_id AND w.user_id = $1
+WHERE c.type = 'project' AND c.archived_at IS NULL
+GROUP BY c.id, c.section, c.slug, r.title, r.sort_date
+ORDER BY r.sort_date DESC NULLS LAST, c.id
+`
+
+type ListPublishedWorksOfUserRow struct {
+	Section string
+	Slug    string
+	Title   string
+	Roles   []string
+}
+
+// プロフィールの制作実績（公開版が本人をクレジットしている作品）
+func (q *Queries) ListPublishedWorksOfUser(ctx context.Context, userID pgtype.UUID) ([]ListPublishedWorksOfUserRow, error) {
+	rows, err := q.db.Query(ctx, listPublishedWorksOfUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublishedWorksOfUserRow{}
+	for rows.Next() {
+		var i ListPublishedWorksOfUserRow
+		if err := rows.Scan(
+			&i.Section,
+			&i.Slug,
+			&i.Title,
+			&i.Roles,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listWorkContributors = `-- name: ListWorkContributors :many
 SELECT w.user_id, w.role_label, w.sort_order, COALESCE(p.display_name, '') AS display_name
 FROM work_contributors w LEFT JOIN profiles p ON p.user_id = w.user_id
@@ -552,6 +805,21 @@ func (q *Queries) NewUUID(ctx context.Context) (pgtype.UUID, error) {
 	var gen_random_uuid pgtype.UUID
 	err := row.Scan(&gen_random_uuid)
 	return gen_random_uuid, err
+}
+
+const setPublishedRevision = `-- name: SetPublishedRevision :exec
+UPDATE contents SET published_revision_id = $2, updated_at = $3 WHERE id = $1
+`
+
+type SetPublishedRevisionParams struct {
+	ID                  pgtype.UUID
+	PublishedRevisionID pgtype.UUID
+	UpdatedAt           pgtype.Timestamptz
+}
+
+func (q *Queries) SetPublishedRevision(ctx context.Context, arg SetPublishedRevisionParams) error {
+	_, err := q.db.Exec(ctx, setPublishedRevision, arg.ID, arg.PublishedRevisionID, arg.UpdatedAt)
+	return err
 }
 
 const setWorkingRevision = `-- name: SetWorkingRevision :exec

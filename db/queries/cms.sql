@@ -95,3 +95,57 @@ WHERE (v.can_edit OR c.published_revision_id IS NOT NULL)
   AND (sqlc.narg('before_at')::timestamptz IS NULL OR (c.updated_at, c.id) < (sqlc.narg('before_at')::timestamptz, sqlc.narg('before_id')::uuid))
 ORDER BY c.updated_at DESC, c.id DESC
 LIMIT @lim;
+
+-- 公開・公開停止。書き込みのTx内でEditor以上かを読み直す（降格との競合を避けるため行を共有ロックする）。
+-- name: ActorRolesForShare :many
+SELECT ur.role FROM user_roles ur JOIN users u ON u.id = ur.user_id
+WHERE ur.user_id = $1 AND u.status = 'active'
+FOR SHARE OF ur, u;
+
+-- name: SetPublishedRevision :exec
+UPDATE contents SET published_revision_id = $2, updated_at = $3 WHERE id = $1;
+
+-- name: InsertPublicationEvent :one
+INSERT INTO content_publication_events (content_id, revision_id, actor_user_id, event_type)
+VALUES ($1, $2, $3, $4)
+RETURNING id;
+
+-- 公開API。公開ポインタの版だけを返す（下書き・未公開・アーカイブ・存在しないものは同じ「行なし」）。
+-- name: GetPublicContent :one
+SELECT c.type, c.section, c.slug, r.id AS revision_id, r.title, r.summary, r.markdown, r.metadata_json,
+       r.date_label, r.date_kind, r.sort_date, r.sort_date_is_estimated
+FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
+WHERE c.section = $1 AND c.slug = $2 AND c.archived_at IS NULL;
+
+-- 並び順は日付の新しい順（日付不明は最後）。カーソルは (並び用の日付, id)。
+-- name: ListPublicContents :many
+SELECT c.id, c.type, c.section, c.slug, r.title, r.summary, r.metadata_json,
+       r.date_label, r.date_kind, r.sort_date, r.sort_date_is_estimated,
+       COALESCE(r.sort_date, DATE '0001-01-01')::date AS order_date
+FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
+WHERE c.archived_at IS NULL
+  AND (sqlc.narg('section')::text IS NULL OR c.section = sqlc.narg('section')::text)
+  AND (sqlc.narg('before_date')::date IS NULL OR (COALESCE(r.sort_date, DATE '0001-01-01'), c.id) < (sqlc.narg('before_date')::date, sqlc.narg('before_id')::uuid))
+ORDER BY COALESCE(r.sort_date, DATE '0001-01-01') DESC, c.id DESC
+LIMIT @lim;
+
+-- 公開版の制作メンバー。**表示名は、公開クレジットに同意中のメンバーだけ**返す（それ以外は空文字＝匿名）。
+-- 名前は版に焼き込まず、配信のたびにここで解決する（D08）。表示名はプロフィールの表示名（氏名ではない）。
+-- name: ListPublicContributors :many
+SELECT w.role_label,
+       COALESCE(CASE WHEN pc.user_id IS NOT NULL THEN p.display_name END, '')::text AS display_name
+FROM work_contributors w
+LEFT JOIN public_credit_consents pc ON pc.user_id = w.user_id AND pc.withdrawn_at IS NULL
+LEFT JOIN profiles p ON p.user_id = w.user_id
+WHERE w.revision_id = $1
+ORDER BY w.sort_order, w.id;
+
+-- プロフィールの制作実績（公開版が本人をクレジットしている作品）
+-- name: ListPublishedWorksOfUser :many
+SELECT c.section, c.slug, r.title, array_agg(w.role_label ORDER BY w.sort_order, w.id)::text[] AS roles
+FROM contents c
+JOIN content_revisions r ON r.id = c.published_revision_id
+JOIN work_contributors w ON w.revision_id = c.published_revision_id AND w.user_id = $1
+WHERE c.type = 'project' AND c.archived_at IS NULL
+GROUP BY c.id, c.section, c.slug, r.title, r.sort_date
+ORDER BY r.sort_date DESC NULLS LAST, c.id;

@@ -211,6 +211,14 @@ func TestFormat(t *testing.T) {
 	if !strings.Contains(got, "返却の記録を取り消しました") {
 		t.Errorf("取消: %q", got)
 	}
+	got, _ = Format("content.published", "id-6", mk(`{"v":1,"itemName":"展示会に参加しました","target":"article"}`))
+	if got != "【公開】記事「展示会に参加しました」を公開しました\n通知ID: id-6" {
+		t.Errorf("記事の公開: %q", got)
+	}
+	got, _ = Format("content.published", "id-7", mk(`{"v":1,"itemName":"作品","target":"project"}`))
+	if !strings.Contains(got, "作品「作品」を公開しました") {
+		t.Errorf("作品の公開: %q", got)
+	}
 	if _, err := Format("unknown", "x", mk(`{}`)); err == nil {
 		t.Error("未対応の種別を受け付けた")
 	}

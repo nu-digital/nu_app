@@ -26,6 +26,22 @@ type memberView struct {
 	SchoolYear  *int16  `json:"schoolYear"`
 }
 
+// memberWork は制作実績（公開版が本人をクレジットしている作品）。
+type memberWork struct {
+	Section string   `json:"section"`
+	Slug    string   `json:"slug"`
+	Title   string   `json:"title"`
+	Roles   []string `json:"roles"`
+}
+
+func toMemberWorks(rows []store.ListPublishedWorksOfUserRow) []memberWork {
+	out := make([]memberWork, 0, len(rows))
+	for _, w := range rows {
+		out = append(out, memberWork{Section: w.Section, Slug: w.Slug, Title: w.Title, Roles: w.Roles})
+	}
+	return out
+}
+
 type memberLink struct {
 	ID        string `json:"id"`
 	Label     string `json:"label"`
@@ -157,11 +173,22 @@ func (s *server) getMember(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, r)
 		return
 	}
+	// 制作実績: 他のメンバーには、本人の公開クレジットの同意が続いている間だけ見せる（同意と別にメンバー内へ参加を知らせない）
+	works := []memberWork{}
+	if cons, err := q.GetPublicCreditConsent(r.Context(), id); err == nil && !cons.WithdrawnAt.Valid {
+		rows, err := q.ListPublishedWorksOfUser(r.Context(), id)
+		if err != nil {
+			s.internal(w, r)
+			return
+		}
+		works = toMemberWorks(rows)
+	}
 	out := struct {
 		memberView
 		Links   []memberLink   `json:"links"`
 		Devices []memberDevice `json:"devices"`
-	}{memberView: memberView{ID: m.ID.String(), DisplayName: m.DisplayName, Bio: publicText(m.Bio, m.BioPublic), Faculty: publicText(m.Faculty, m.FacultyPublic), Department: publicText(m.Department, m.DepartmentPublic), SchoolYear: publicInt2(m.SchoolYear, m.SchoolYearPublic)},
+		Works   []memberWork   `json:"works"`
+	}{Works: works, memberView: memberView{ID: m.ID.String(), DisplayName: m.DisplayName, Bio: publicText(m.Bio, m.BioPublic), Faculty: publicText(m.Faculty, m.FacultyPublic), Department: publicText(m.Department, m.DepartmentPublic), SchoolYear: publicInt2(m.SchoolYear, m.SchoolYearPublic)},
 		Links: make([]memberLink, 0, len(links)), Devices: make([]memberDevice, 0, len(devs))}
 	for _, l := range links {
 		out.Links = append(out.Links, memberLink{ID: l.ID.String(), Label: l.Label, URL: l.Url, SortOrder: l.SortOrder})
