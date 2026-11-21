@@ -11,7 +11,7 @@
     "check": "node scripts/check.mjs && npm run web:lint && npm run web:typecheck && npm run admin:lint && npm run admin:typecheck",
     "test:unit": "node --test scripts/harness.test.mjs && npm run test:editor --prefix apps/web && node --test apps/web/scripts/content-presentation.test.mjs && node --test apps/web/lib/markdown-sanitize.test.mjs && node --test scripts/page-fingerprint.test.mjs",
     "build": "npm run web:build && npm run admin:build",
-    "web:e2e": "PLAYWRIGHT_DIR=${PLAYWRIGHT_DIR:-apps/web} node scripts/legacy-baseline-capture.mjs apps/web/out \"${E2E_OUT_DIR:-apps/web/.e2e-out}\"",
+    "web:e2e": "node scripts/legacy-baseline-capture.mjs",
     "admin:ci": "npm ci --prefix apps/admin",
     "admin:lint": "npm run lint --prefix apps/admin",
     "admin:typecheck": "npm run typecheck --prefix apps/admin",
@@ -21,6 +21,7 @@
     "dev:reset": "docker compose --env-file .env -f infrastructure/compose.yaml down -v",
     "compose:smoke": "node scripts/compose-smoke.mjs",
     "admin:test": "npm test --prefix apps/admin",
-    "web:goldens": "node scripts/legacy-goldens.mjs --check"
+    "web:goldens": "node scripts/legacy-goldens.mjs --check",
+    "web:site-check": "node scripts/web-site-check.mjs"
   }
 }

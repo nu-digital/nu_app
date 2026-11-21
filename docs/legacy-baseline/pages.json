@@ -442,7 +442,10 @@
      "text": "Web制作（ToDo・シラバス検索の試作）",
      "img": "/images/imported/img-3a21a5292a1b7db84148.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "84c3a1c55be1190065782069699cff60ed799d1088e0ac92c2adccb6d3111891",
+   "articleDomShaMasked": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "author": null
   },
   {
    "url": "/404/",
@@ -519,7 +522,10 @@
    "headings": [
     "This page could not be found."
    ],
-   "cards": []
+   "cards": [],
+   "mainDomShaMasked": "8daeead1f967068be1db8fc832457e9445b210f0809470ef9f124f9f16a3bed1",
+   "articleDomShaMasked": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "author": null
   },
   {
    "url": "/_not-found/",
@@ -596,7 +602,10 @@
    "headings": [
     "This page could not be found."
    ],
-   "cards": []
+   "cards": [],
+   "mainDomShaMasked": "8daeead1f967068be1db8fc832457e9445b210f0809470ef9f124f9f16a3bed1",
+   "articleDomShaMasked": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "author": null
   },
   {
    "url": "/blog/",
@@ -1400,7 +1409,10 @@
      "text": "2025.02.10ProductWeb制作（ToDo・シラバス検索の試作）Web制作を学び、ToDoリストやシラバス検索サイトを試作しました。",
      "img": "/images/imported/img-3a21a5292a1b7db84148.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "f4ad07a5fd803e4570819db6338769090188c5bf5e0d119807589ea37f6f68ad",
+   "articleDomShaMasked": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "author": null
   },
   {
    "url": "/blog/activity-2025-12-22-6db7c7/",
@@ -1547,7 +1559,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "dde565d99981658d8c68d40587ab96b15807c173643f3dc1bc369f28f9587593",
+   "articleDomShaMasked": "e47c26c652f4b453b9584e71672bf970933e6cb6121a1bd31ec8313da5beb427",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-01-20-2f9241/",
@@ -1719,7 +1734,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "276d73810e05b0c0f46c22880f68b998ea7c32e1fefe9eeaa61e2b853b52bce2",
+   "articleDomShaMasked": "1e4a1ec12cfa6c70eb58e67351aa74de122f46f8675f581d1800410d1b3da9f9",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-01-29-24a47f/",
@@ -1850,7 +1868,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "9c836c909ca423eea1dc3f2b48acbba233f87a40d9201750eaac639796cea56b",
+   "articleDomShaMasked": "1386ff78acf0e7571713c07e420f6407e56e618e263f77e82a388b25539f2311",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-04-11-fe646c/",
@@ -2002,7 +2023,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "bd3254190ebaeb2c55221760ca32c4d1653f7489452a89af2fa51a7c94c097a2",
+   "articleDomShaMasked": "5dae1059470a5a6c7ba0771395a3a50195e396642e50c62bead7e3c6a42bb6d1",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-05-28-f690fa/",
@@ -2161,7 +2185,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "7d26a658730e70763373cb485144c3083a0923e34260ab1b2e13ac0680b0a7f0",
+   "articleDomShaMasked": "b6e09d41981eff703d936a3276036a4406734d5f72cbd1b090d1d0948dd5b065",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-06-05-099b2b/",
@@ -2283,7 +2310,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "1c93772b34025d2703e7befe20727d191faf431639bedb224fb9e817775126b0",
+   "articleDomShaMasked": "e2e93245b3ac1a1f232f3839000114dc92b4626434b5f4dd36a02972016a8f1b",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-06-06-71597c/",
@@ -2405,7 +2435,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "272296d3971150a0226636104384bb859dd928d79ba81214956000c75c34d4a6",
+   "articleDomShaMasked": "68825f88303b29f76437d876c0e3dbcc728d7a715d0047e1d41797647bf04a20",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-06-08-a26f47/",
@@ -2527,7 +2560,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "9c204832ea83e9504fe49eb5f64520394d70c1e3ac456adb96cf7b9c2424451d",
+   "articleDomShaMasked": "d6647af43acffd931985b2cb585a83204d6b39cf45463140087738ed9b57cfbb",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-06-08-d62351/",
@@ -2649,7 +2685,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "20f3c75edad6216581f8a341821a076bc92e9e04eba7908e7039948440cb9690",
+   "articleDomShaMasked": "e1d66b03858b2a6abd73e20507453f6785eafdfd4ba0b5948cfd0f919b49ff4d",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-06-12-d3e961/",
@@ -2771,7 +2810,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "bc55c674b3a665e999ea0d18415d63517b8450c9c2829fb64ca234601fc275ab",
+   "articleDomShaMasked": "76e1015c0603ee167570a80ff89d962308e41759c42c34359efc05d3e20bb4a8",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-06-19-a9bc7b/",
@@ -2893,7 +2935,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "3c67bb76b9a04c540022c145a0af430d720e42d54633195d623527da1508c670",
+   "articleDomShaMasked": "fe9ffc6e3c29471981af28d3b576b69466426099a907f211513bc1f9f24cde0c",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-07-20-8c34f0/",
@@ -3063,7 +3108,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "c4e216f1836ce6adaff938f886bafafc4615de76d005ac97638c34d8631f5706",
+   "articleDomShaMasked": "ec308196560dba8979c9268438b3eaa77aabd08ef9f5bbea0394c46372c71c37",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-07-24-50e440/",
@@ -3215,7 +3263,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "e72a003e61682c8790c018437f10677d012c9d3801ad420ce33f36e4a738e1a7",
+   "articleDomShaMasked": "4bdc77347affa8807574d680c81ba7e9c4527b2222c0758908a6dcc816d15bf7",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-08-01-1cc8bf/",
@@ -3371,7 +3422,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "3a069bb6475940dd8797b33bde2f33d4ca4e3da0ed67134f9e107919ab213860",
+   "articleDomShaMasked": "6a3ffaa3937e942b659684c84a5764d5f769199918fece346b0ff8a730fdd9b9",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-08-03-cf9870/",
@@ -3514,7 +3568,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "60b9bacdc48af6aa77ac7f9131fa184613b0e0bc7c1d90e8a55df9a3c7106fe7",
+   "articleDomShaMasked": "36b723e903990f0a5c9e11260426186f11d0b339c29dff0e7395abffe12016b1",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-08-10-c49474/",
@@ -3637,7 +3694,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "a912c6c61fedf881e88f4075cd81769e727027cd47a08233395e26bac5f1e610",
+   "articleDomShaMasked": "ab00c4ca4dcf9968b603bfd43033f55405ba4922f689aedc88a3e282507fc998",
+   "author": "yurarara"
   },
   {
    "url": "/blog/activity-2026-08-13-9d5dc3/",
@@ -3785,7 +3845,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "63d8ee221445482ff93ca5144b9dbc96826089cbd098e912295b4dff81aea3aa",
+   "articleDomShaMasked": "fb6d4ae9f53943ce4dc6eed0bed168c6bb103fa36c3e39506cb97a410a9eb8ec",
+   "author": "yurarara"
   },
   {
    "url": "/blog/another/",
@@ -3933,7 +3996,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "ef5e002a74dc60da0e10eaea1a8fc791ed7b580ac381c225f445d2d90476a91b",
+   "articleDomShaMasked": "7f9979f844d9ddf022206e71eaf834c100b54fa265db1dfdaa5dfd47652c3703",
+   "author": "yurarara"
   },
   {
    "url": "/blog/bennkyou/",
@@ -4084,7 +4150,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "895489c6fc28d001f9eb996ec4943ddd16b9e6e3564426ec7f5e4b7de7fe0c23",
+   "articleDomShaMasked": "603f305ec0912b117cf4b3d3461c584e3ac1dc133b0dfa5000f9a6d59acf0145",
+   "author": "yurarara"
   },
   {
    "url": "/blog/booth/",
@@ -4227,7 +4296,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "4c851e20880e76341415a931e3788dc5a5f35a840306b76e0e4e9920f82dc20a",
+   "articleDomShaMasked": "2fb09d4383c7517dfc5a9a343e881a6064430b3eec4b21081b7dc91a3ced3912",
+   "author": "yurarara"
   },
   {
    "url": "/blog/busitu/",
@@ -4407,7 +4479,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "4d3809b8a7e63265da3e77594659f6cc1bde1c8e96a810f4c40bb6b0c69075dd",
+   "articleDomShaMasked": "40ba293ffe1b89ceb508d7dba136c644df4b9e085a3e6a02e1d1de66b9e98a0c",
+   "author": "yurarara"
   },
   {
    "url": "/blog/cedec-2026-scholarship/",
@@ -4553,7 +4628,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "62ac66ce93ff00e8d199b540c4245e4e83d3ff79f49e644510addc1150afa093",
+   "articleDomShaMasked": "17e840c0ad9f50a46456a271c6b6bf6dbfe2db8f822d0d41816a079b61b98aba",
+   "author": "yurarara"
   },
   {
    "url": "/blog/dg/",
@@ -4713,7 +4791,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "106e0fb7324adbfab8f07c9ddf7f87d3ae2ee4d5b21ffb3b1b8c3d49a79ae965",
+   "articleDomShaMasked": "deb110c4e8fe547bc48b6f7f7d32e761a96daa153462d7182e6f70a2e16ddb0e",
+   "author": "mizmelon"
   },
   {
    "url": "/blog/gamedan/",
@@ -4852,7 +4933,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "29190e6d52aad580f71085b91087153925d3132e3d8d8962681572c5a6ace694",
+   "articleDomShaMasked": "e1e4e35f9c459f37693db8267c9b124ff4f5dd5f9eae7592c1b46785026cc7fc",
+   "author": "yurarara"
   },
   {
    "url": "/blog/houkoku/",
@@ -5005,7 +5089,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "58d11fd83f240ac9968b5cca24bcb1333f6fd21c88fb9b1430db51c21d835a69",
+   "articleDomShaMasked": "bbf29337be7a699016f94de6e07a348fbdc35e23ace5c30dd3a03b453bb836d0",
+   "author": "yurarara"
   },
   {
    "url": "/blog/ibunya/",
@@ -5169,7 +5256,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "0935f72b55a7971851ad61568661d6a161e026a4078b6ed3115fcecd2485ac56",
+   "articleDomShaMasked": "e832956295fb798cd84e54f259bc7b2b5873232e0223958e3a8bfe97a3fe5fb7",
+   "author": "iwa"
   },
   {
    "url": "/blog/ivrc_dg/",
@@ -5327,7 +5417,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "aa1ea5ebb53d9d3161ac7e5c91ca76092f38cd84a1f217f323b319d872678f3c",
+   "articleDomShaMasked": "ff2339c8253daf5068aa792646da512dc9896d8e448e519fc8ec4e84c6ef9a40",
+   "author": "nu_digital"
   },
   {
    "url": "/blog/iwakenlab-5th-mini-exhibit/",
@@ -5484,7 +5577,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "d882edfbd0a815d60cef6c289836ee1c88fd516647f677a4d555d0ac8cba2b90",
+   "articleDomShaMasked": "23ba9ac559503167b9500b155e2e305c5a4193c443caa29ea2a22e97d7c8b5f1",
+   "author": "yurarara"
   },
   {
    "url": "/blog/kouryuu/",
@@ -5643,7 +5739,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "3c2ee96d9a30f9cc8d8d05db7ad50e8a5bb86153e7732ea136278525f5bc87a0",
+   "articleDomShaMasked": "3809e780dbe51c1b811de43c548f7e5e40b5c0f61321736adbb11b9782cbc715",
+   "author": "yurarara"
   },
   {
    "url": "/blog/kouryuu2026/",
@@ -5792,7 +5891,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "bf7c98a0dae55bcc4127820bc60b1ef24cebba30fbf741086ac64f97bdc381e8",
+   "articleDomShaMasked": "3bf8d19fbba94613303e512a5d5cfee13682042c4090c0a18310cb00476b2afe",
+   "author": "yurarara"
   },
   {
    "url": "/blog/metacms_article/",
@@ -5961,7 +6063,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "dcbf26d5585947664fb7364990fc9706a0d2d37bf9e6a2dfc54b3f09837c46ca",
+   "articleDomShaMasked": "8009fe7e34d0cfe8d8847363a9136d4ed649d55db7f45c853eb0a6332f3cea52",
+   "author": "yurarara"
   },
   {
    "url": "/blog/newDocument/",
@@ -6099,7 +6204,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "6c31447fb8ef77e2aabfb003e0f7a662032f6051a16753168a673402579014de",
+   "articleDomShaMasked": "0ee933b013d8bdcf1b07241b3236f13d425bc0723f6c031c65d19d9e476c9ad6",
+   "author": "yurarara"
   },
   {
    "url": "/blog/new_digital/",
@@ -6230,7 +6338,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "50b1cf0186fb3e497aeea211e0b498d1d3fceb31889536fe7aea8daf4f70acef",
+   "articleDomShaMasked": "f545d504c341497e2c88cd8ad0d118938e95fa067472b4a271be504e4cd60a2d",
+   "author": "nu_digital"
   },
   {
    "url": "/blog/nu.metasou/",
@@ -6368,7 +6479,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "a246c94305fff3226fcd0296e06f25941b14c837d9ea99ffec1ab8b7b244843a",
+   "articleDomShaMasked": "b4f56709e1f90736173c86441fccb327ada0edfed544f6f0f43e547881f08dfa",
+   "author": "yurarara"
   },
   {
    "url": "/blog/numa_koushuu/",
@@ -6515,7 +6629,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "66391d5f3f63db30cdcd9c0dc56c497717b0ca22fba1b903499394e956810f19",
+   "articleDomShaMasked": "cb0a1c6ae15ae46b3dde21260dd50b1a0341984f43b9a75e4f09d79068e9fac4",
+   "author": "yurarara"
   },
   {
    "url": "/blog/opencampus-surugadai-2026/",
@@ -6739,7 +6856,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "e57fcfb0a5ded893709e4b72319cb44db279acc454e8142b79b8eb974d558bed",
+   "articleDomShaMasked": "96beaed834ad725dde4e88762babdb72c23c711a1114b4f3dee358d2f0cd5c9e",
+   "author": "nu_digital"
   },
   {
    "url": "/blog/science/",
@@ -6902,7 +7022,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "a9967c664eec7febaa59c20d615ebebed2ed38abcd8dd6287c6aa8d27ea4731a",
+   "articleDomShaMasked": "a4e974b3f8d7c4263e2a3834497bfbd78d6bc791b8552e9a9d8923884123a578",
+   "author": "yurarara"
   },
   {
    "url": "/blog/sousaku/",
@@ -7085,7 +7208,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "2bd5a42cae557ced27469705ae9de7bad3789035ac3125094be060d6b37842c4",
+   "articleDomShaMasked": "e5ddf3cbfec07dcb7bfcb3c4e91376c9ab042e9b018656faa66bf188623298f8",
+   "author": "yurarara"
   },
   {
    "url": "/blog/student-vr-meetup-2026/",
@@ -7246,7 +7372,10 @@
      "text": "2026.08.13–22第5回 ゲームエフェクト会",
      "img": "/images/imported/img-b33c5f7a8f48e168fcec.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "c6edf8572f4b87910e0586e211306d4cbcb86120e1f927f87b44cce03d9d951e",
+   "articleDomShaMasked": "a20af437c15d71074e5a4179fa60dd3bbde214d6485298be97bef25c6bcdbb15",
+   "author": "yurarara"
   },
   {
    "url": "/blog/surugadai-ourisai-2026/",
@@ -7458,7 +7587,10 @@
      "text": "2026.08.13–22第5回 ゲームエフェクト会",
      "img": "/images/imported/img-b33c5f7a8f48e168fcec.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "001538b98df9eca4cc21cbc64774bb3aa7589a56d87f03ad6eb9fc1ac20e0e8a",
+   "articleDomShaMasked": "17ace01f5f9e96ccf0b130bf8ca9fb74a4c684a1911c17a3042fa8ac67e7c8f1",
+   "author": "yurarara"
   },
   {
    "url": "/blog/svrc/",
@@ -7597,7 +7729,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "7ac725f266bdea22a809eb2d12cefc0715083fa93e87a9b3b61db149d8bca21e",
+   "articleDomShaMasked": "cad8fdaac3101e1de29ad078d559240bdb01beba3abac2a1d45033b745c79663",
+   "author": "yurarara"
   },
   {
    "url": "/blog/vkasai/",
@@ -7750,7 +7885,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "39cf425315549bd1475845a1f15439d3def16d47e3cc2e9f4ce2e950d48ada42",
+   "articleDomShaMasked": "0701fe49bb6a220253194aa23d0032c91fcc40c202ce976e4b44ad7a3dcef0e0",
+   "author": "yurarara"
   },
   {
    "url": "/blog/vket/",
@@ -7885,7 +8023,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "fb1299338c8eb31f9a3a309d6ec7fde24d1d97ee765ad5989ac5c049a8d315c8",
+   "articleDomShaMasked": "bc02de655969cff15f58c3f3ee95055f8376875beeff10434999f4d1a300e120",
+   "author": "yurarara"
   },
   {
    "url": "/blog/vketReal/",
@@ -8028,7 +8169,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "af2ee6abe4e6dae3c32ae276de3cdf3261598739e67e7e1fbeb9fa836725df7b",
+   "articleDomShaMasked": "eb66c6a26f2f44769f55244b9821837214721a4160a4e606ca09a250f9ce330c",
+   "author": "yurarara"
   },
   {
    "url": "/blog/xr/",
@@ -8179,7 +8323,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "3cb7563c5cea860a2c9452e926c5280a8f4b9692c83e5fac10f876e631ccf865",
+   "articleDomShaMasked": "d0d0a48f7ab4316bb6de5bbc6521e8c065fb04d08dda23d7a0e3d03e05a3ae44",
+   "author": "yurarara"
   },
   {
    "url": "/news/",
@@ -8983,7 +9130,10 @@
      "text": "2025.02.10ProductWeb制作（ToDo・シラバス検索の試作）Web制作を学び、ToDoリストやシラバス検索サイトを試作しました。",
      "img": "/images/imported/img-3a21a5292a1b7db84148.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "f4ad07a5fd803e4570819db6338769090188c5bf5e0d119807589ea37f6f68ad",
+   "articleDomShaMasked": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "author": null
   },
   {
    "url": "/news/site-redesign/",
@@ -9126,7 +9276,10 @@
      "text": "2026.08.13–22第5回 ゲームエフェクト会",
      "img": "/images/imported/img-b33c5f7a8f48e168fcec.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "f908d12cd21bf63b10fd39b9c3de5586a213e899ddcf057bc751717b22cde0a6",
+   "articleDomShaMasked": "4712c527ede04177703f442ea6253e0423997df4a82b028443d357d93af3b8bf",
+   "author": "yurarara"
   },
   {
    "url": "/project/",
@@ -9424,7 +9577,10 @@
      "text": "2025.02.10ProductWeb制作（ToDo・シラバス検索の試作）Web制作を学び、ToDoリストやシラバス検索サイトを試作しました。",
      "img": "/images/imported/img-3a21a5292a1b7db84148.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "6443607d317cf57ea4f57c5926cc9316a86ad04e603832a14731d876eb76bb9d",
+   "articleDomShaMasked": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "author": null
   },
   {
    "url": "/project/demo-yura/",
@@ -9555,7 +9711,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "564736c1acf160ab3579071b0d80b4e1b50f4dff086eaabab0fda9b285d64527",
+   "articleDomShaMasked": "a42cf44604df5d8ea3c3c9350aeb78f52f0da7ede27912bb73d9018d4f8d7574",
+   "author": "nu_digital"
   },
   {
    "url": "/project/dimensions-gate/",
@@ -9803,7 +9962,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "e55bd59840831fe805a287ba539497ea922aa00f1337e37d6ed739646a13706e",
+   "articleDomShaMasked": "2479a3774db9ac73340e33eb1d0b4650db6bb74fde5f87fb306cf4aaf53137e9",
+   "author": "yurarara"
   },
   {
    "url": "/project/exhibition-game-launcher/",
@@ -9999,7 +10161,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "ba72c73f6ec209ef2f595d7ce7dd9cc4dafdf805336dd12707e136db1304c1b3",
+   "articleDomShaMasked": "95802eab7b1976d467201f6a201c00b44be4fbee368e1d0c714335e76bfb6fde",
+   "author": "yurarara"
   },
   {
    "url": "/project/fogland/",
@@ -10163,7 +10328,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "f22a214670901ae8e75c41a2bb945ebdbe4109dfae14140b4eaa02d9250e4f56",
+   "articleDomShaMasked": "8a1c3060c04f5ea1c2defc94742880d2e993d9f347dc60ad41bc3e2c2c265c69",
+   "author": "yurarara"
   },
   {
    "url": "/project/lbe-restaurant-simulator/",
@@ -10312,7 +10480,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "7d8a671fc36a489c6d99f6e4edbef0efc14402ea2b1ae648172f6144f079e207",
+   "articleDomShaMasked": "4dccf0cf327470c269d403c85e48c36270854c9ec141a90ddc861409dce2dfb6",
+   "author": "yurarara"
   },
   {
    "url": "/project/nu-bar/",
@@ -10447,7 +10618,10 @@
      "text": "2026.08.13–22第5回 ゲームエフェクト会",
      "img": "/images/imported/img-b33c5f7a8f48e168fcec.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "22b69a2bf7f04c2ef9a775d06f1ad4064d675f57d1008a665164705da50acb0c",
+   "articleDomShaMasked": "37ebef3da870d0f8046641d142d226f6e4ba67c1d303e2dfe5c5b10d4868bcc6",
+   "author": "nu_digital"
   },
   {
    "url": "/project/nu-room/",
@@ -10623,7 +10797,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "95c34edc8196689d3dc1fcb1a0e9f506fb2edf74fec2f93187ccd2ea9d05697a",
+   "articleDomShaMasked": "b0046eb4a227cd1bf9dac7f96bac7e489693d495970016041d7a785cf5a12889",
+   "author": "yurarara"
   },
   {
    "url": "/project/organization-website/",
@@ -10788,7 +10965,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "5e7f1bf3be0fb2922fd3b2dd1a3b5d4e898360841979a18ac93aee85d68ff085",
+   "articleDomShaMasked": "01af9c48cff7a20112515eb4636fa4cda12488781f17e89943f6dcda981f778e",
+   "author": "yurarara"
   },
   {
    "url": "/project/quick/",
@@ -10923,7 +11103,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "e8e08489243c58f128b5a574d94ba69f1124517cb47921e116c721c01adbcddc",
+   "articleDomShaMasked": "68f172d880dd1cb6ec3f6ed0e1d3484ae17aee8ed50bb98b3c34ccf82b848ff8",
+   "author": "nu_digital"
   },
   {
    "url": "/project/recall/",
@@ -11181,7 +11364,10 @@
      "text": "2026.08.13–22第5回 ゲームエフェクト会",
      "img": "/images/imported/img-b33c5f7a8f48e168fcec.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "34b6626f8d808841393f84d9a481d24bedd4f4c1636c163c323f094c92e99469",
+   "articleDomShaMasked": "5df03db03fe11b2c2266a4823f6b50ed8f87e710e3c97efa2d3bfb85d92c2437",
+   "author": "yurarara"
   },
   {
    "url": "/project/recruitment-poster/",
@@ -11320,7 +11506,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "f62b04a2c8287c9f1f74eb920cf0bbc45297b44ec7af025606e72540e06177c6",
+   "articleDomShaMasked": "8a4cfa61e95a4c9f29b4283dfa42a1eb71a1d01bbf91a987734323a01e91274b",
+   "author": "yurarara"
   },
   {
    "url": "/project/shadow-interaction/",
@@ -11479,7 +11668,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "4531e4517725122e5a205d7964b6f3934a8d018cd0c3c9ae941ffb6db7b90012",
+   "articleDomShaMasked": "77f4735490885e255f8e6d1af8fb7831dd5957a7aa340b95dda2c35c5ec9b7e2",
+   "author": "yurarara"
   },
   {
    "url": "/project/tokyo-open-data-guide/",
@@ -11656,7 +11848,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "c3b330c0409c3239acc2b75a3f9b40042f9187affc34f9cccabaa540106c1647",
+   "articleDomShaMasked": "31a72ac77584a393844ec90e3763f556cc6d143a9a83873d2d91ffc556a6d669",
+   "author": "yurarara"
   },
   {
    "url": "/project/uchatclient-1/",
@@ -11795,7 +11990,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "e6f1d89f2cc94883cab6bbe4dc81d7788181dfbcc4c525d87f4de8256c7edbbf",
+   "articleDomShaMasked": "2cd3bd5b43a2b5f75455b2f723fdabecc4fc7f2672ad3de656dff52b284d1201",
+   "author": "yurarara"
   },
   {
    "url": "/project/uchatclient-2/",
@@ -11940,7 +12138,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "f5794baa3580822e9f708148b4507b72b5f18128c2001c51218b3e08e2e07c78",
+   "articleDomShaMasked": "51cef6f75fd0ce62adadc4407760d8ddffd2d722a8fc885ce20cc93cbfdb95b1",
+   "author": "yurarara"
   },
   {
    "url": "/project/vkasai-booth/",
@@ -12094,7 +12295,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "6baeca89725d746731455d981728b0f00386c525bc977af203979e5fe68e0f88",
+   "articleDomShaMasked": "de24c0da1d4085e67d359815b47611802dd77a369e24cc3e2bc2fa264578d5ad",
+   "author": "yurarara"
   },
   {
    "url": "/project/vrc-airsoft/",
@@ -12218,7 +12422,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "ff8e58b07fa24443cbdb52b49a7300fce4ab39f136839ecbb2cdaef654a6cfcf",
+   "articleDomShaMasked": "7f51ee5664bd3f8f7805dc2c3a7211e1cc6d7a139402fde9e9076194a17ff965",
+   "author": "nu_digital"
   },
   {
    "url": "/project/vrc-prototypes-2025/",
@@ -12370,7 +12577,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "f0b611a4d8dd983a5d587850facf0bb263682e40153d199dfb77fbb88fc3ac03",
+   "articleDomShaMasked": "d5edf7aec6dcb2f340312b641ba6c35fb7cbb153fbfb9a5df6b2b2264fb8ea34",
+   "author": "yurarara"
   },
   {
    "url": "/project/vrc-prototypes-2026/",
@@ -12522,7 +12732,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "a087c4acf0513921ac4e7785566a47c1b529467cdd6ed6b8388dd2fd8a924d72",
+   "articleDomShaMasked": "b37dad6047b5a5facad42753457ede9d62922dc154c0a89d346bfef3a9bf5d95",
+   "author": "yurarara"
   },
   {
    "url": "/project/web-prototypes/",
@@ -12661,7 +12874,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "d1812751b5081036cee65cb8fb744d06686ae9b9f016ce46105d09e621a86574",
+   "articleDomShaMasked": "e46e1cd833c06f2cbe574a7a1a632408cef51c2d96cbf178a25abe504de2bb22",
+   "author": "yurarara"
   },
   {
    "url": "/project/world-hackathon-2-prototype/",
@@ -12823,7 +13039,10 @@
      "text": "2026.09.10ReCall",
      "img": "/images/imported/img-a537e2d36d5524465939.webp"
     }
-   ]
+   ],
+   "mainDomShaMasked": "6b777e724345c9dfbe7409d18dd295658728cd8d371353be1e3acc050b9968f0",
+   "articleDomShaMasked": "29940567886e443e363d39b76b5000acd4421ce497b8371bd36fdf846ba3f2bb",
+   "author": "yurarara"
   },
   {
    "url": "/terms/",
@@ -12888,7 +13107,10 @@
     "第3条 免責事項",
     "第4条 規約の変更"
    ],
-   "cards": []
+   "cards": [],
+   "mainDomShaMasked": "f6a7fb02ab04b1941c638de8e53e6c2fe76b6f6b23fb2fa91f3853ea219ffbc8",
+   "articleDomShaMasked": "715f57d07b50be0c82df6a86f8048af8f4b66dbe1443b6a9eb5f90684c1d5052",
+   "author": null
   }
  ],
  "variants": [

@@ -32,18 +32,20 @@ jobs:
       - run: npm run web:lint
       - run: npm run web:typecheck
       - run: npm run test:unit
+      # 公開コンテンツは公開API（Go）から描画時に取得する動的配信。CIでは擬似の公開API（scripts/mock-public-api.mjs）と組み合わせる
       - run: npm run web:build
-      # 移設前基準(inventory.json)とのルート・記事・画像の一致
-      - run: npm run web:verify
+        env:
+          API_INTERNAL_URL: http://127.0.0.1:18080
       # 移行CLIの正解（frontmatter・日付のゴールデン）が、記事の現状とずれていないこと
       - run: npm run web:goldens
-      # ブラウザー操作: 全ルート200・壊れた画像なし・ギャラリー(クリック/Enter/Space/左右/Esc/フォーカス復帰)・横溢れなし。
-      # 画面画像の一致は、フォント・Chromium版に依存するためCIでは判定せず、ローカルで基準画像と比較する(docs/legacy-baseline)。
       - run: npx playwright install --with-deps chromium
         working-directory: apps/web
-      - run: npm run web:e2e
+      # 起動したサイト（Next standalone）に対して: ①全ルート・記事・画像が移設前基準と一致 ②ブラウザー操作（全ルート200・壊れた画像なし・
+      # ギャラリー・横溢れなし）③基準との指紋の比較（意図した差は docs/legacy-baseline/known-diffs.json に理由つき）④APIが使えないとき5xx・no-store
+      # 画面画像の一致は、フォント・Chromium版に依存するためCIでは判定せず、ローカルで基準画像と比較する(docs/legacy-baseline)。
+      - run: npm run web:site-check
         env:
           PLAYWRIGHT_DIR: ${{ github.workspace }}/apps/web
           E2E_OUT_DIR: ${{ runner.temp }}/web-e2e
-      # コンテナイメージ（nginx-unprivilegedで静的配信）がbuildできること
+      # コンテナイメージ（Next standalone）がbuildできること
       - run: docker build -t nu_app-web:ci apps/web

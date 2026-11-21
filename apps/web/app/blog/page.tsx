@@ -1,8 +1,10 @@
 import ContentCard from "@/components/content/ContentCard";
 import { getBlogFeed } from "@/lib/markdown";
 
-export default function BlogPage() {
-  const latestPosts = getBlogFeed();
+export const dynamic = "force-dynamic";
+
+export default async function BlogPage() {
+  const latestPosts = await getBlogFeed();
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-14 md:py-20">

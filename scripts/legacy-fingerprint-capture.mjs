@@ -50,8 +50,10 @@ if (arg('out')) {
 }
 if (arg('compare')) {
   const baseline = JSON.parse(readFileSync(resolve(String(arg('compare'))), 'utf8'));
-  const known = arg('known') && arg('known') !== true ? JSON.parse(readFileSync(resolve(String(arg('known'))), 'utf8')) : [];
+  const knownRaw = arg('known') && arg('known') !== true ? JSON.parse(readFileSync(resolve(String(arg('known'))), 'utf8')) : [];
+  const known = knownRaw.map(k => (typeof k === 'string' ? k : `${k.url}|${k.field}`)); // 意図した差は {url, field, reason} で書く
   const diffs = compareFingerprints(baseline, result, known);
+  if (arg('dump')) writeFileSync(resolve(String(arg('dump'))), JSON.stringify(diffs, null, 1));
   if (diffs.length) {
     for (const d of diffs.slice(0, 40)) console.error(`差: ${d.url} [${d.field}] 基準=${JSON.stringify(d.baseline)?.slice(0, 80)} 実際=${JSON.stringify(d.actual)?.slice(0, 80)}`);
     console.error(`FAIL: 基準との差 ${diffs.length}件`);

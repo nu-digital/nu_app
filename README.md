@@ -30,8 +30,8 @@ node --test scripts/harness.test.mjs
 ```sh
 npm run web:ci        # npm ci（apps/web）
 npm run web:lint && npm run web:typecheck
-npm run build         # 静的出力: apps/web/out
-npm run web:verify    # 出力が移設前基準（docs/legacy-baseline）と一致するか
+API_INTERNAL_URL=http://127.0.0.1:18080 npm run build   # 動的配信（Next standalone。公開APIから描画時に取得。CIは擬似の公開APIを使う）
+npm run web:site-check   # 擬似の公開APIと組み合わせて起動し、移設前基準との一致・ブラウザー操作・指紋の比較を行う（要: Playwright）
 npm run test:unit     # 既存の単体テスト
 ```
 

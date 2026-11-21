@@ -5,12 +5,13 @@ import MotionReveal from "@/components/motion/MotionReveal";
 import { featuredProjects } from "@/data/site";
 import { getAllContent, getBlogFeed } from "@/lib/markdown";
 
-export default function BlogSection() {
-  const latestPosts = getBlogFeed(6);
+export default async function BlogSection() {
+  const latestPosts = await getBlogFeed(6);
+  const projects = await getAllContent("project");
   const featuredLinks = new Set(featuredProjects.map((project) => project.link));
   const products = [
     ...featuredProjects,
-    ...getAllContent("project")
+    ...projects
       .filter((project) => !featuredLinks.has(`/project/${project.slug}`))
       .map((project) => ({ title: project.title, image: project.image, link: `/project/${project.slug}` })),
   ];

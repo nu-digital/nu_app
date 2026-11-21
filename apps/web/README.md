@@ -13,7 +13,7 @@
 - **Project**：制作した作品の一覧・詳細。
 - **記事ページ**：写真を横並びに表示。クリックで拡大し、左右キーで移動、Escで閉じられます。
 
-Next.js / React / TypeScript / Tailwind CSS を使用し、GitHub Pages に静的サイトとして公開します。
+Next.js / React / TypeScript / Tailwind CSS を使用し、公開APIから描画時にコンテンツを取得する動的配信（Next standalone）です（以前はGitHub Pagesの静的サイト。移行の経緯は docs/design/p3-web.md）。`content/*.md` は移行の入力・ゴールデンの生成・擬似の公開API（scripts/mock-public-api.mjs）にだけ使います。
 
 ## はじめる
 

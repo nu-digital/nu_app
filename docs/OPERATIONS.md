@@ -109,3 +109,12 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 - 確認: `GET /admin/notifications/deliveries?status=pending|dead`。`dead`は恒久的な拒否（権限・チャンネルの誤り）か再試行の上限。原因を直してから`POST /admin/notifications/deliveries/{id}/retry`で再送する。
 - 重複: 障害の切り替わりで同じ通知が2回届くことがある（exactly-onceは保証しない）。本文の「通知ID」で同一かを確認できる。
 - tokenを漏らした疑いがあるときは、Discordの開発者ポータルでtokenを再生成し、`.env`を差し替えてAPIを再起動する。ログ・DB・APIの応答にtokenは出ない設計（テストで確認）。
+
+## 公式サイトの動的配信（P3-04b）
+
+- 公式サイト（`apps/web`）は、コンテンツを公開API（`API_INTERNAL_URL`。サーバー側のみ）から**描画時に取得**する（Next standalone。キャッシュしない）。撤回・個人情報削除（D08）は次のリクエストから反映される。**APIが落ちている間、コンテンツを使うページ（トップ含む）は5xx・`no-store`になる**（静的配信ではなくなった代償）。`/healthz/`はAPIに依存せず200を返す（コンテナの死活監視に使い、APIの障害でwebを再起動させない）。P4-01の死活監視には、API・webの両方のhealthzと、`/blog/`が200であることの監視を含める。
+- **プロキシ・CDNの要件（P4-01）**: HTMLと公開JSON（`/api/v1/public/contents*`）は**キャッシュしない**（秒単位のmicrocacheも不可）。アップロード画像は`/api/v1/public/media/<22文字>`の**GET・HEADだけ**をAPIへ中継し（`Cookie`・`Authorization`を外す・`proxy_cache`を使わない・`proxy_pass`はURIなし）、それ以外の`/api/v1/*`はサイトのホストから出さない。
+- **切り戻しは、API接続版の前のイメージへ**。静的イメージ（`content/*.md`の原文）へは戻さない（CMSで公開停止・修正した後に戻すと、消した内容が再び公開されるため）。
+- **検索エンジン**: 作品ページは`noarchive`。撤回・削除の依頼で検索結果に残る場合は、各検索エンジンの削除依頼（URL削除ツール）を使う。
+- 末尾スラッシュ: 標準のとおり、スラッシュ無しはスラッシュ付きへ308。ドットを含むslug（例: `/blog/nu.metasou/`）はNextがファイル扱いにして、スラッシュ無しのURLへ308する（内容は同じ）。
+- 検査（CI: `web / lint-typecheck-build`）: 擬似の公開APIと組み合わせて起動し、全ルート・記事・画像、ブラウザー操作、移設前基準との**指紋の比較**（意図した差は`docs/legacy-baseline/known-diffs.json`に理由つき。投稿者名を伏せたDOMのハッシュは基準と完全一致）、APIが使えないときの5xx・`no-store`を確認する。
