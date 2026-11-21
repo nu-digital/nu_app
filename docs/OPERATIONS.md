@@ -49,7 +49,7 @@
 
 - 頻度と保持: 毎日03:00(JST)、**成功した**バックアップを7世代保持。
 - 内容: DBとメディアを復元時に整合する一組（同一世代ID・同一マニフェスト）として扱う。
-- 方式（採用方針）: 短時間のメンテナンスモード（API書き込み拒否）中に`pg_dump`とメディアのスナップショットを取得し、再開する。作業領域に作成→チェックサム検証→世代として確定。初期は書き込み停止を許容し、簡潔さを優先。停止時間は実測して記録する。
+- 方式（暫定採用 P4-02-1。`infrastructure/backup/`）: **メンテナンスモード（書き込み停止）なしで、DB→メディアの順に取る**。`pg_dump -Fc`は一貫したスナップショットで、画像は「ファイルを先に書いてからDBの行を作る」ため、DBを先に取れば（メディアのファイル ⊇ DBの行）になり、復元後に「行はあるがファイルが無い」状態にならない（余ったファイルは`nuctl media-gc`が掃除）。作業領域（`.work-<世代ID>`）に作成→`pg_restore --list`・`tar -t`・`sha256sum -c`で検証→`COMPLETE`の印を付けて世代のディレクトリへrename→`LATEST`を更新。世代はUTC時刻のID、権限は700。
 - 失敗時: 失敗をDiscordの運用通知で知らせる。**既存の正常な世代は削除しない**。7世代超の古い世代は、新世代の確定・検証が成功した後にだけ削除する。
 - 容量: 実測し、不足する場合は**黙って世代数を減らさず**報告して判断を仰ぐ。
 - 復元検証: 公開前とバックアップ方式の変更時に、隔離環境へDB+メディアを復元して参照整合（`media_assets`↔ファイル、記事↔画像）を確認する。本番DB/volumeを復元検証に使わない。
@@ -131,3 +131,12 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 3. ユーザーを停止してから、個人情報の削除（`DELETE /admin/users/{id}/private-profile`）を実行する。公開クレジットの同意撤回・アバターの取り外し・紐付く既存記事の投稿者名の匿名化が連動する。
 4. アバターなどの画像を直ちに消す場合は`nuctl media-redact`。それ以外は`nuctl media-gc`（24時間後）。
 5. 公式サイトは次のリクエストから反映される（キャッシュしない）。検索エンジンに残る場合は、各検索エンジンの削除依頼を使う。
+
+### バックアップの運用手順（P4-02）
+
+- **配置**（VPS契約後）: リポジトリを`/srv/nu_app/`に置く（デプロイで更新）。`/etc/nu_app/backup.env`（権限600・root。Git外）に設定を書く: `BACKUP_ROOT=/srv/nu_app/backups`、`MEDIA_DIR=/srv/nu_app/media`、`COMPOSE_FILE`・`COMPOSE_ENV_FILE`・`COMPOSE_PROJECT`、`RETENTION=7`、`BACKUP_NOTIFY_WEBHOOK_URL`（Discordの運用チャンネルのWebhook。**秘密**）。`infrastructure/backup/systemd/nu-backup.{service,timer}`を`/etc/systemd/system/`へ置き、`systemctl enable --now nu-backup.timer`。毎日03:00(JST)に実行され、失敗は`journalctl -u nu-backup`とDiscordの通知に出る。
+- **手動実行**: `sudo systemctl start nu-backup.service`。同時実行はロック（`flock`）で防ぐ。空き容量が足りないときは（直前の世代の2倍または`MIN_FREE_MB`のうち大きい方）、**世代を黙って減らさず**失敗して通知する。
+- **復元検証**（公開前・方式の変更時・四半期に1回を推奨）: `POSTGRES_IMAGE=<本番のDBと同じイメージ> NUCTL_IMAGE=<本番のAPIイメージ> infrastructure/backup/restore-verify.sh [世代]`。**隔離した一時環境**（使い捨てのPostgreSQL・内部ネットワーク・一時ディレクトリ）に復元し、チェックサム・スキーマのバージョン・行数（users/contents/media_assets）・メディアのファイル数・`nuctl media-verify`による**行とファイルの参照整合**を確認する。本番のDB・メディアには触れない。
+- **実際の復旧**（障害時。手動。自動化しない）: 1) 利用者への影響を考えて`web`・`admin`・`api`・`bot`を止める 2) 空のDBを用意し`pg_restore --no-owner -d <db> db.dump`（`docker compose exec -T db pg_restore ...`） 3) `tar -xzf media.tar.gz -C /srv/nu_app/media`（所有者は`65532:65532`） 4) `nuctl media-verify`で整合を確認 5) 起動して`/healthz`・`/readyz`・公開サイトを確認。最大約24時間分の更新を失い得る（D04のリスク）。
+- **自動テスト**（CI `ops / backup-restore`、`scripts/backup-restore-test.sh`）: 成功・世代の保持（失敗で消さない／成功後に古いものだけ消す）・DB停止での失敗と通知（秘密を含まない）・壊れた世代の検出・行とファイルの食い違いの検出。
+- 未実測: 本番サイズでのバックアップ時間・容量（VPS契約後に実測して`MIN_FREE_MB`・容量の見積もりを見直す）。
