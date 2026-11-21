@@ -156,6 +156,8 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 8. 初期Owner作成: `docker compose ... run --rm --no-deps --entrypoint /nuctl api bootstrap-owner --login-id <ID> --display-name <名前>`（表示されるtokenを本人にだけ渡す）。既存記事の取り込みは前述の`import-legacy`（dry-runで確認してから`--apply`）。
 9. 公開前: `docs/TESTING.md`のP4の確認、バックアップの手動実行と`restore-verify.sh`、4GBでの実測（メモリ・CPU・ディスク）、`/healthz`・`/readyz`の監視の設定。
 
+**ログ**: Nginxのアクセスログ（`/var/log/nginx/nu_app.access.log`）は**クエリ文字列を残さない**（`$uri`）。Cookie・Authorization・本文は記録しない。招待・再設定のtokenはURLのフラグメント（`#token=`）で、そもそもサーバーへ送られない。アプリ（Go・Next）のログにパスワード・token・学生証番号・メール等を出さない（AGENTS.md。テストで確認済みの範囲は`docs/TESTING.md`）。ログのローテーション（logrotate・Dockerの`max-size`）と保持期間は、契約後の容量に合わせて運用責任者が決める。
+
 **Nginxの自動テスト**（CI `ops / nginx`、`scripts/nginx-test.sh`）: 使い捨てのNginxと擬似のバックエンドで、HTTP→HTTPS・公開ホストにAPIを出さない（画像の公開配信だけ）・GET/HEADだけ・Cookieを渡さない・X-Forwarded-Forの上書き・12MiB上限・ログインの回数制限・HSTS・キャッシュしない、を確認する。`nginx:1.30.6-alpine`（digest固定）で試験し、ホストのNginxはUbuntuのパッケージ（版は`nginx -v`で確認して記録）。CSP（Content-Security-Policy）は、Nextのインラインスクリプトに依存するため初期は付けない（導入時はnonce方式を別途検討）。
 
 ## デプロイ・切り戻し（P4-01b）
@@ -177,3 +179,18 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 4. 最初のデプロイは、承認者がワークフローの内容・SHAを確認して承認する。
 
 **自動テスト**（CI `ops / deploy-script`、`scripts/deploy-test.sh`: 偽のdocker・curl・gitで26項目）: 不正な引数の拒否・直列化・初回/通常の成功・取得失敗・バックアップ失敗・ヘルスチェック失敗での前版復帰・通知にsecretを含めない。`check.mjs`が、deployワークフローの「既定で無効・PRで動かない・本番のジョブに承認の環境」を検査する。
+
+## 管理者向け運用手順（索引）
+
+| やること | 手順 |
+|---|---|
+| ユーザーの発行 | 管理画面「ユーザー管理」→ユーザー作成→**招待URL（フラグメントのtoken）を本人にだけ**渡す。有効期限切れ・使用済みは再発行。tokenをチャットのログ・Discordに残さない |
+| 停止・再有効化 | 「ユーザー管理」で停止（既存セッションは即失効）。退会者の個人情報は、停止後に個人情報の削除（D08。前述「個人情報の削除の依頼があったとき」） |
+| Editor・Adminの付与 | Editorは管理者、Adminは**Ownerだけ**が付与・解除できる |
+| Ownerの引継ぎ | 現Ownerが申請（24時間の待機）→移譲先が承諾する二段階。Owner不在・不能のときの緊急復旧は`nuctl recover-owner`（サーバー上で運用者が手動。前述「Owner緊急復旧」） |
+| 既存記事の取り込み・投稿者の公開許可 | `nuctl import-legacy`（dry-run→`--apply`。前述）。投稿者名は、本人の許可を確認して管理画面「既存記事の投稿者」で記録するまで公開されない（D14） |
+| 画像の削除・個人情報を含む画像 | `nuctl media-gc`（参照の無い画像）・`media-redact`（直ちに止める）。前述 |
+| バックアップ・DB復元 | 前述「バックアップの運用手順」。復旧は`pg_restore`＋メディアの展開＋`media-verify` |
+| デプロイ・切り戻し | 前述「デプロイ・切り戻し」。GitHub Actionsの`deploy`（承認つき）。手でイメージを起動しない |
+| 証明書 | 自動更新（`certbot.timer`）。期限確認の通知（`nu-cert-check`）が来たら`certbot renew`・`nginx -t`・再読み込み |
+| 障害の最初の確認 | `docker compose -f /srv/nu_app/infrastructure/compose.prod.yaml ps`・`/healthz`・`/readyz`・`journalctl -u nu-backup`・Nginxのログ。APIが止まるとコンテンツのページは5xxになる（`/healthz/`は応答） |
