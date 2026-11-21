@@ -247,6 +247,24 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	return i, err
 }
 
+const getUserByLoginIDForUpdate = `-- name: GetUserByLoginIDForUpdate :one
+SELECT id, login_id, status, created_at, activated_at, disabled_at FROM users WHERE login_id = $1 FOR UPDATE
+`
+
+func (q *Queries) GetUserByLoginIDForUpdate(ctx context.Context, loginID string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByLoginIDForUpdate, loginID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.LoginID,
+		&i.Status,
+		&i.CreatedAt,
+		&i.ActivatedAt,
+		&i.DisabledAt,
+	)
+	return i, err
+}
+
 const getUserForUpdate = `-- name: GetUserForUpdate :one
 SELECT id, login_id, status, created_at, activated_at, disabled_at FROM users WHERE id = $1 FOR UPDATE
 `
@@ -309,6 +327,22 @@ func (q *Queries) HasRole(ctx context.Context, arg HasRoleParams) (bool, error) 
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const insertRecoveryEvent = `-- name: InsertRecoveryEvent :exec
+INSERT INTO emergency_recovery_events (executed_by_os_user, target_user_id, approver_note)
+VALUES ($1, $2, $3)
+`
+
+type InsertRecoveryEventParams struct {
+	ExecutedByOsUser string
+	TargetUserID     pgtype.UUID
+	ApproverNote     string
+}
+
+func (q *Queries) InsertRecoveryEvent(ctx context.Context, arg InsertRecoveryEventParams) error {
+	_, err := q.db.Exec(ctx, insertRecoveryEvent, arg.ExecutedByOsUser, arg.TargetUserID, arg.ApproverNote)
+	return err
 }
 
 const listIncomingOwnerTransfers = `-- name: ListIncomingOwnerTransfers :many

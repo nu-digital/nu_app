@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { policyErrors, forbiddenPath, linkErrors, repositoryErrors, root, siteContentPattern } from './check.mjs';
+import { policyErrors, forbiddenPath, linkErrors, repositoryErrors, root, siteContentPattern, workflowPolicyErrors } from './check.mjs';
 import { stopResult } from './claude-stop.mjs';
 
 test('Issue番号付きブランチと日本語タイトルを受け入れる', () => {
@@ -96,4 +96,10 @@ test('サイト本文の公開URLリンクだけをリンク検査から除外�
   assert.ok(!siteContentPattern.test('apps/web/README.md'));
   assert.ok(!siteContentPattern.test('docs/content/x.md'));
   assert.ok(!siteContentPattern.test('apps/web/docs/x.md'));
+});
+
+test('緊急復旧(recover-owner)をworkflowから実行することを禁止する', () => {
+  assert.equal(workflowPolicyErrors('.github/workflows/x.yml', 'run: npm test').length, 0);
+  assert.equal(workflowPolicyErrors('.github/workflows/x.yml', 'run: docker compose run api /nuctl bootstrap-owner').length, 0);
+  assert.equal(workflowPolicyErrors('.github/workflows/deploy.yml', 'run: ssh vps nuctl recover-owner --login-id x').length, 1);
 });

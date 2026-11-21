@@ -116,3 +116,10 @@ SELECT EXISTS (SELECT 1 FROM user_roles WHERE user_id = $1 AND role = $2);
 
 -- name: CountActiveOwners :one
 SELECT count(*) FROM user_roles r JOIN users u ON u.id = r.user_id WHERE r.role = 'owner' AND u.status = 'active';
+
+-- name: GetUserByLoginIDForUpdate :one
+SELECT * FROM users WHERE login_id = $1 FOR UPDATE;
+
+-- name: InsertRecoveryEvent :exec
+INSERT INTO emergency_recovery_events (executed_by_os_user, target_user_id, approver_note)
+VALUES ($1, $2, $3);
