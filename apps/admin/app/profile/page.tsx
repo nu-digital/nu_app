@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import AppShell from "@/components/AppShell";
+import ImageUploader from "@/components/ImageUploader";
 import Notice from "@/components/Notice";
 import {
-  addDevice, addLink, deleteDevice, deleteLink, describe, getMyProfile, patchDevice, patchLink, patchMyProfile, putConsent, putVisibility,
+  addDevice, addLink, clearAvatar, setAvatar, deleteDevice, deleteLink, describe, getMyProfile, patchDevice, patchLink, patchMyProfile, putConsent, putVisibility,
   type MyProfile, type Visibility,
 } from "@/lib/api";
 
@@ -71,6 +72,17 @@ function Profile() {
       <h1>プロフィール</h1>
       <p className="lead">表示名だけが必須です。そのほかの項目は入力しなくても、すべての機能を使えます。初期設定ではすべて非公開です。</p>
       {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
+
+      <section className="panel" aria-labelledby="avatar-title">
+        <h2 id="avatar-title">アバター</h2>
+        <p className="hint">メンバー一覧・プロフィールで、ログイン中のメンバーだけに表示されます（インターネットには公開されません）。顔が写った写真を使う場合は、公開してよいか確認してください。</p>
+        <ImageUploader
+          label="アバター" purpose="avatar" large currentId={p.avatarMediaId} busy={busy}
+          attach={async (id) => { await setAvatar(id); await reload(); }}
+          detach={async () => { await clearAvatar(); await reload(); }}
+          onError={(text) => setMsg({ kind: "error", text })} onDone={(text) => setMsg({ kind: "success", text })}
+        />
+      </section>
 
       <BasicSection key={JSON.stringify([p.displayName, p.bio, p.faculty, p.department, p.schoolYear, p.visibility])} p={p} busy={busy} run={run} />
       <PrivateSection key={JSON.stringify(p.private)} p={p} busy={busy} run={run} />

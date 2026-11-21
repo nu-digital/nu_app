@@ -45,6 +45,10 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | `GET /members/{id}` | – | 200 上記＋`links`・`devices`（メンバー内公開のみ） | 404（無効・招待中・存在しない・不正なID） |
 | `GET /admin/users/{id}/private-profile` | – | 200 `{id,loginId,displayName,private:{legalName,studentNumber,universityEmail,nearestStation}}`（Admin/Owner。**閲覧を監査に記録**、値は記録しない） | 403、404 |
 | `DELETE /admin/users/{id}/private-profile` | `{reason(必須・200字以内),anonymizeDisplayName?}` | 200 `{consentWithdrawn,displayNameAnonymized,linksDeleted,devicesDeleted}`（個人情報・プロフィール項目・リンク・機材・公開設定を削除、公開クレジット同意を撤回） | 409 `NOT_DISABLED`（**停止中のユーザーだけ**）、422、404 |
+| `PUT /me/profile/avatar` | `{mediaId}`（自分が`purpose=avatar`でアップロードした画像） | 204（アバターを設定。古い画像は参照が外れ、`media-gc`で消える） | 404/422 |
+| `DELETE /me/profile/avatar` | – | 204 | – |
+| `PUT /inventory/items/{id}/photo` | `{mediaId}`（Adminが`purpose=inventory`でアップロードした画像） | 204 | 403、404、422 |
+| `DELETE /inventory/items/{id}/photo` | – | 204 | 403、404 |
 | `GET /admin/legacy-authors` | – | 200 `{items:[{id,name,publicationState,confirmedAt,withdrawnAt,erased,linkedUserId,linkedDisplayName,contentCount}]}`（未確認が先頭。名前は管理者にだけ返す） | 403 |
 | `POST /admin/legacy-authors/{id}/permit` | `{note(必須・200字以内)}` | 204（本人の公開許可を確認して記録。確認者・日時を保存。紐付けは変えない） | 403、404、409 `ERASED`、422 |
 | `POST /admin/legacy-authors/{id}/withdraw` | – | 204（公開を止める。冪等） | 403、404 |
@@ -94,6 +98,10 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | GET | `/admin/users/{id}/private-profile` | Admin | 個人情報を閲覧（監査対象） |
 | DELETE | `/admin/users/{id}/private-profile` | Admin | 必要な個人情報を手動削除（確認・監査） |
 | GET | `/admin/legacy-authors` | Admin | 既存記事の投稿者の確認一覧 |
+| PUT | `/me/profile/avatar` | Member | アバターを設定 |
+| DELETE | `/me/profile/avatar` | Member | アバターを外す |
+| PUT | `/inventory/items/{id}/photo` | Admin | 物品の写真を設定 |
+| DELETE | `/inventory/items/{id}/photo` | Admin | 物品の写真を外す |
 | POST | `/admin/legacy-authors/{id}/permit` | Admin | 投稿者名の公開許可を確認して記録 |
 | POST | `/admin/legacy-authors/{id}/withdraw` | Admin | 投稿者名の公開を止める |
 | PUT | `/admin/legacy-authors/{id}/link` | Admin | 投稿者をユーザーIDで紐付ける |

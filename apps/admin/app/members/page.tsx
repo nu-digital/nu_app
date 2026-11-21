@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import AppShell from "@/components/AppShell";
 import Notice from "@/components/Notice";
+import MediaImg from "@/components/MediaImg";
 import { describe, listMembers, type Member } from "@/lib/api";
 
 export default function MembersPage() {
@@ -65,7 +66,10 @@ function Members() {
         <ul className="users">
           {items.map((m) => (
             <li key={m.id} className="user" data-name={m.displayName}>
-              <Link href={`/members/${m.id}`} className="member-link"><strong className="user-name">{m.displayName}</strong></Link>
+              <div className="member-row">
+                {m.avatarMediaId && <MediaImg className="avatar" id={m.avatarMediaId} lazy />}
+                <Link href={`/members/${m.id}`} className="member-link"><strong className="user-name">{m.displayName}</strong></Link>
+              </div>
               <div className="user-id">{[m.faculty, m.department, m.schoolYear ? `${m.schoolYear}年` : null].filter(Boolean).join(" ")}</div>
               {m.bio && <p className="bio">{m.bio}</p>}
             </li>

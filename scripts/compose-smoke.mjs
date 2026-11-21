@@ -105,7 +105,11 @@ try {
       const again = imp(['--apply']);
       check('移行: 再実行しても成功し、重複して作らない（冪等）', again.status === 0, `exit=${again.status} ${(again.stderr || '').slice(-300)}`);
       const bad = [];
-      for (const route of inv.routes.filter(x => !['/404/', '/_not-found/'].includes(x))) { const x = await get(web, route); if (x?.status !== 200) bad.push(`${route}:${x?.status}`); }
+      for (const route of inv.routes.filter(x => !['/404/', '/_not-found/'].includes(x))) {
+      let x = await get(web, route);
+      for (let t = 0; !x && t < 3; t++) { await new Promise(res => setTimeout(res, 1000)); x = await get(web, route); } // 接続の一時的な失敗だけ再試行する（ステータスは再試行しない）
+      if (x?.status !== 200) bad.push(`${route}:${x?.status}`);
+    }
       check(`web 全${inv.routes.length - 2}ルート200（実際の公開APIから描画）`, bad.length === 0, bad.slice(0, 3).join(','));
       const site = `http://127.0.0.1:${web}`;
       const ver = spawnSync('node', ['scripts/web-verify.mjs', site], { cwd: root, encoding: 'utf8' });

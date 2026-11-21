@@ -134,6 +134,7 @@ export async function setRole(userId: string, role: "editor" | "admin", enabled:
 export type Visibility = "private" | "members";
 
 export type MyProfile = {
+  avatarMediaId: string | null;
   displayName: string;
   bio: string | null;
   faculty: string | null;
@@ -151,6 +152,7 @@ export type Work = { section: string; slug: string; title: string; roles: string
 
 export type Member = {
   id: string;
+  avatarMediaId: string | null;
   displayName: string;
   bio: string | null;
   faculty: string | null;
@@ -196,7 +198,7 @@ export const deletePrivateProfile = async (id: string, reason: string, anonymize
 
 export type Item = {
   id: string; name: string; description: string; category: string; location: string; mode: "quantity" | "individual";
-  totalQuantity: number; outstanding: number; unitCount: number; available: number; archived?: boolean;
+  totalQuantity: number; outstanding: number; unitCount: number; available: number; archived?: boolean; photoMediaId: string | null;
 };
 export type ItemUnit = { id: string; assetTag: string; serialNumber: string | null; state: string; loaned: { borrowerDisplayName: string; since: string; elapsedDays: number } | null };
 export type ItemLoan = { id: string; borrowerDisplayName: string; quantity: number; borrowedAt: string; elapsedDays: number };
@@ -313,11 +315,11 @@ export function conflictRevision(e: unknown): ContentRevision | null {
 }
 
 /** 画像をアップロードする（生のバイト列。形式・大きさ・寸法の検査と再エンコードはAPIが行う）。 */
-export async function uploadMedia(file: File): Promise<MediaInfo> {
+export async function uploadMedia(file: File, purpose: "cms" | "avatar" | "inventory" = "cms"): Promise<MediaInfo> {
   const ct = file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/webp" ? file.type : "application/octet-stream";
   const headers: Record<string, string> = { "Content-Type": ct };
   if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
-  const res = await fetch("/api/v1/media?purpose=cms", { method: "POST", headers, body: file, credentials: "same-origin", cache: "no-store" });
+  const res = await fetch(`/api/v1/media?purpose=${purpose}`, { method: "POST", headers, body: file, credentials: "same-origin", cache: "no-store" });
   let json: unknown = null;
   try {
     json = JSON.parse(await res.text());
@@ -338,6 +340,15 @@ export async function putContributors(id: string, baseRevision: number, contribu
   if (r.status !== 200 && r.status !== 201) throw toError(r);
   return r.json as ContentDetail;
 }
+
+// ---- アバター・物品の写真（P3-02b） ----
+
+/** アバター・物品の写真の表示URL（ログイン中のメンバーだけが取得できる）。 */
+export const mediaUrl = (id: string) => `/api/v1/media/${encodeURIComponent(id)}`;
+export const setAvatar = async (mediaId: string) => { await ok<unknown>(await call("PUT", "/me/profile/avatar", { mediaId }), 204); };
+export const clearAvatar = async () => { await ok<unknown>(await call("DELETE", "/me/profile/avatar"), 204); };
+export const setItemPhoto = async (itemId: string, mediaId: string) => { await ok<unknown>(await call("PUT", `/inventory/items/${itemId}/photo`, { mediaId }), 204); };
+export const clearItemPhoto = async (itemId: string) => { await ok<unknown>(await call("DELETE", `/inventory/items/${itemId}/photo`), 204); };
 
 // ---- 既存記事の投稿者（D14） ----
 

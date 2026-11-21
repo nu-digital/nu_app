@@ -117,6 +117,10 @@ func (s *server) deletePrivateProfile(w http.ResponseWriter, r *http.Request) {
 		if err := q.ClearProfileExtras(r.Context(), target); err != nil {
 			return err
 		}
+		// アバター（顔写真になり得る）も外す。画像のファイルは参照が無くなるので`nuctl media-gc`が消す（急ぐ場合は`media-redact`）
+		if err := s.clearAvatar(r.Context(), q, target); err != nil {
+			return err
+		}
 		if out.Links, err = q.DeleteAllProfileLinks(r.Context(), target); err != nil {
 			return err
 		}

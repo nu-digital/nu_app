@@ -24,6 +24,8 @@ type memberView struct {
 	Faculty     *string `json:"faculty"`
 	Department  *string `json:"department"`
 	SchoolYear  *int16  `json:"schoolYear"`
+	// AvatarMediaID は現在のアバター。画像は GET /media/{id}（ログイン中のメンバーだけ）。
+	AvatarMediaID *string `json:"avatarMediaId"`
 }
 
 // memberWork は制作実績（公開版が本人をクレジットしている作品）。
@@ -138,8 +140,17 @@ func (s *server) listMembers(w http.ResponseWriter, r *http.Request) {
 		next = &c
 	}
 	items := make([]memberView, 0, len(rows))
+	ids := make([]pgtype.UUID, 0, len(rows))
 	for _, x := range rows {
-		items = append(items, memberView{ID: x.ID.String(), DisplayName: x.DisplayName, Bio: publicText(x.Bio, x.BioPublic), Faculty: publicText(x.Faculty, x.FacultyPublic), Department: publicText(x.Department, x.DepartmentPublic), SchoolYear: publicInt2(x.SchoolYear, x.SchoolYearPublic)})
+		ids = append(ids, x.ID)
+	}
+	avatars, err := s.avatarIDs(r.Context(), store.New(s.Pool), ids)
+	if err != nil {
+		s.internal(w, r)
+		return
+	}
+	for _, x := range rows {
+		items = append(items, memberView{AvatarMediaID: ptrOf(avatars, x.ID.String()), ID: x.ID.String(), DisplayName: x.DisplayName, Bio: publicText(x.Bio, x.BioPublic), Faculty: publicText(x.Faculty, x.FacultyPublic), Department: publicText(x.Department, x.DepartmentPublic), SchoolYear: publicInt2(x.SchoolYear, x.SchoolYearPublic)})
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": next})
 }
@@ -183,12 +194,17 @@ func (s *server) getMember(w http.ResponseWriter, r *http.Request) {
 		}
 		works = toMemberWorks(rows)
 	}
+	avatarOf, err := s.avatarIDs(r.Context(), q, []pgtype.UUID{id})
+	if err != nil {
+		s.internal(w, r)
+		return
+	}
 	out := struct {
 		memberView
 		Links   []memberLink   `json:"links"`
 		Devices []memberDevice `json:"devices"`
 		Works   []memberWork   `json:"works"`
-	}{Works: works, memberView: memberView{ID: m.ID.String(), DisplayName: m.DisplayName, Bio: publicText(m.Bio, m.BioPublic), Faculty: publicText(m.Faculty, m.FacultyPublic), Department: publicText(m.Department, m.DepartmentPublic), SchoolYear: publicInt2(m.SchoolYear, m.SchoolYearPublic)},
+	}{Works: works, memberView: memberView{AvatarMediaID: ptrOf(avatarOf, m.ID.String()), ID: m.ID.String(), DisplayName: m.DisplayName, Bio: publicText(m.Bio, m.BioPublic), Faculty: publicText(m.Faculty, m.FacultyPublic), Department: publicText(m.Department, m.DepartmentPublic), SchoolYear: publicInt2(m.SchoolYear, m.SchoolYearPublic)},
 		Links: make([]memberLink, 0, len(links)), Devices: make([]memberDevice, 0, len(devs))}
 	for _, l := range links {
 		out.Links = append(out.Links, memberLink{ID: l.ID.String(), Label: l.Label, URL: l.Url, SortOrder: l.SortOrder})

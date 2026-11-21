@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import AppShell from "@/components/AppShell";
 import Notice from "@/components/Notice";
+import MediaImg from "@/components/MediaImg";
 import { createLoan, describe, getItem, returnLoan, type ItemDetail } from "@/lib/api";
 
 export default function ItemPage() {
@@ -54,6 +55,7 @@ function Detail() {
     <main className="page">
       <p><Link href="/inventory">← 物品一覧へ</Link></p>
       <h1>{it.name}</h1>
+      {it.photoMediaId && <MediaImg className="photo" id={it.photoMediaId} alt={`${it.name}の写真`} />}
       <p className="meta">{[it.category, it.location].filter(Boolean).join(" ・ ")}</p>
       {it.description && <p className="bio">{it.description}</p>}
       {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}

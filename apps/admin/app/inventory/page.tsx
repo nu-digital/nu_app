@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import AppShell from "@/components/AppShell";
 import Notice from "@/components/Notice";
+import MediaImg from "@/components/MediaImg";
 import { describe, listItems, type Item } from "@/lib/api";
 
 export default function InventoryPage() {
@@ -84,7 +85,7 @@ function Inventory({ canManage }: { canManage: boolean }) {
             return (
               <li key={it.id}>
                 <Link className="item-card" href={`/inventory/${it.id}`} data-name={it.name}>
-                  <div className="thumb" aria-hidden="true">{it.name.slice(0, 1)}</div>
+                  <div className="thumb" aria-hidden="true">{it.photoMediaId ? <MediaImg id={it.photoMediaId} lazy /> : it.name.slice(0, 1)}</div>
                   <div className="item-body">
                     <h2>{it.name}</h2>
                     <p className="meta">{[it.category, it.location].filter(Boolean).join(" ・ ") || "　"}</p>

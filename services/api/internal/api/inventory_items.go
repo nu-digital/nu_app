@@ -31,6 +31,8 @@ type itemView struct {
 	UnitCount     int64  `json:"unitCount"`     // 個体管理のときの有効な個体数
 	Available     int64  `json:"available"`     // 借りられる数（数量管理=残数、個体管理=利用可能な個体数）
 	Archived      bool   `json:"archived"`
+	// PhotoMediaID は現在の写真。画像は GET /media/{id}（ログイン中のメンバーだけ）。
+	PhotoMediaID *string `json:"photoMediaId"`
 }
 
 type unitView struct {
@@ -67,6 +69,10 @@ func elapsedDays(since, now time.Time) int {
 func itemFrom(i store.InventoryItem, outstanding, unitCount int64) itemView {
 	v := itemView{ID: i.ID.String(), Name: i.Name, Description: i.Description, Category: i.Category, Location: i.Location, Mode: i.Mode,
 		TotalQuantity: i.TotalQuantity, Outstanding: outstanding, UnitCount: unitCount, Archived: i.ArchivedAt.Valid}
+	if i.CoverMediaID.Valid {
+		p := i.CoverMediaID.String()
+		v.PhotoMediaID = &p
+	}
 	if i.Mode == "quantity" {
 		v.Available = int64(i.TotalQuantity) - outstanding
 	}
@@ -386,8 +392,17 @@ func (s *server) listItems(w http.ResponseWriter, r *http.Request) {
 		next = &c
 	}
 	items := make([]itemView, 0, len(rows))
+	itemIDs := make([]pgtype.UUID, 0, len(rows))
 	for _, x := range rows {
-		v := itemView{ID: x.ID.String(), Name: x.Name, Description: x.Description, Category: x.Category, Location: x.Location, Mode: x.Mode,
+		itemIDs = append(itemIDs, x.ID)
+	}
+	photos, err := s.photoIDs(r.Context(), store.New(s.Pool), itemIDs)
+	if err != nil {
+		s.internal(w, r)
+		return
+	}
+	for _, x := range rows {
+		v := itemView{PhotoMediaID: ptrOf(photos, x.ID.String()), ID: x.ID.String(), Name: x.Name, Description: x.Description, Category: x.Category, Location: x.Location, Mode: x.Mode,
 			TotalQuantity: x.TotalQuantity, Outstanding: x.Outstanding, UnitCount: x.UnitCount, Available: x.Available}
 		items = append(items, v)
 	}
