@@ -83,6 +83,8 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("POST /admin/users/{id}/invite-link", s.inviteLink)
 	mux.HandleFunc("POST /admin/users/{id}/reset-link", s.resetLink)
 	mux.HandleFunc("PATCH /admin/users/{id}/status", s.setStatus)
+	mux.HandleFunc("PUT /admin/users/{id}/editor-role", s.editorRole)
+	mux.HandleFunc("PUT /owner/users/{id}/admin-role", s.adminRole)
 	// 未定義のパス・メソッドはJSONの404/405
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, http.StatusNotFound, "NOT_FOUND", "見つかりません")
