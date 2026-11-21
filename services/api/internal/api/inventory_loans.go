@@ -136,7 +136,17 @@ func (s *server) createLoan(w http.ResponseWriter, r *http.Request) {
 			}
 			out.Remaining = avail
 		}
-		return s.auditEvent(r.Context(), q, a.Identity.UserID, a.Identity.UserID, "inventory.loan_created", map[string]any{"itemId": itemID.String(), "loanId": loan.ID.String(), "quantity": qty})
+		if err := s.auditEvent(r.Context(), q, a.Identity.UserID, a.Identity.UserID, "inventory.loan_created", map[string]any{"itemId": itemID.String(), "loanId": loan.ID.String(), "quantity": qty}); err != nil {
+			return err
+		}
+		// 通知は業務と同じトランザクションでoutboxへ（送信はworker。Discordの障害は貸出に影響しない）
+		tag := ""
+		if unitID.Valid {
+			tag = s.unitTag(r, q, itemID, unitID)
+		}
+		rem := out.Remaining
+		return s.enqueueNotification(r.Context(), q, EventLoanCreated, "loan:"+loan.ID.String(), NotificationPayload{
+			ItemName: it.Name, AssetTag: tag, Quantity: int(qty), Borrower: s.displayName(r.Context(), q, a.Identity.UserID), Remaining: &rem})
 	})
 	if err != nil {
 		s.writeTxErr(w, r, err)
@@ -189,7 +199,8 @@ func (s *server) returnLoan(w http.ResponseWriter, r *http.Request) {
 			}
 			return err
 		}
-		if _, err := q.GetInventoryItemForUpdate(r.Context(), loan.ItemID); err != nil {
+		retItem, err := q.GetInventoryItemForUpdate(r.Context(), loan.ItemID)
+		if err != nil {
 			return err
 		}
 		if s.BeforeInventoryCheck != nil {
@@ -212,7 +223,8 @@ func (s *server) returnLoan(w http.ResponseWriter, r *http.Request) {
 		if qty > int(outstanding) {
 			return &errTx{http.StatusConflict, "EXCEEDS_OUTSTANDING", "未返却の数（" + strconv.Itoa(int(outstanding)) + "）を超えて返却できません"}
 		}
-		if _, err := q.CreateInventoryReturn(r.Context(), store.CreateInventoryReturnParams{LoanID: loanID, ActorUserID: a.Identity.UserID, Quantity: int32(qty), ReturnedAt: pgtype.Timestamptz{Time: s.Now(), Valid: true}}); err != nil {
+		ret, err := q.CreateInventoryReturn(r.Context(), store.CreateInventoryReturnParams{LoanID: loanID, ActorUserID: a.Identity.UserID, Quantity: int32(qty), ReturnedAt: pgtype.Timestamptz{Time: s.Now(), Valid: true}})
+		if err != nil {
 			return err
 		}
 		left := int(outstanding) - qty
@@ -222,7 +234,16 @@ func (s *server) returnLoan(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		out.LoanID, out.Returned, out.Outstanding = loanID.String(), int32(qty), left
-		return s.auditEvent(r.Context(), q, a.Identity.UserID, loan.BorrowerUserID, "inventory.loan_returned", map[string]any{"itemId": loan.ItemID.String(), "loanId": loanID.String(), "quantity": qty, "proxy": loan.BorrowerUserID != a.Identity.UserID})
+		if err := s.auditEvent(r.Context(), q, a.Identity.UserID, loan.BorrowerUserID, "inventory.loan_returned", map[string]any{"itemId": loan.ItemID.String(), "loanId": loanID.String(), "quantity": qty, "proxy": loan.BorrowerUserID != a.Identity.UserID}); err != nil {
+			return err
+		}
+		tag := ""
+		if loan.UnitID.Valid {
+			tag = s.unitTag(r, q, loan.ItemID, loan.UnitID)
+		}
+		return s.enqueueNotification(r.Context(), q, EventLoanReturned, "return:"+ret.ID.String(), NotificationPayload{
+			ItemName: retItem.Name, AssetTag: tag, Quantity: qty, Borrower: s.displayName(r.Context(), q, loan.BorrowerUserID),
+			Actor: s.displayName(r.Context(), q, a.Identity.UserID), Proxy: loan.BorrowerUserID != a.Identity.UserID})
 	})
 	if err != nil {
 		s.writeTxErr(w, r, err)
@@ -393,4 +414,13 @@ func reasonFor(admin bool, reason string) string {
 		return reason
 	}
 	return ""
+}
+
+// unitTag は個体の管理番号（通知本文用）。見つからなければ空。
+func (s *server) unitTag(r *http.Request, q *store.Queries, itemID, unitID pgtype.UUID) string {
+	u, err := q.GetInventoryUnitForUpdate(r.Context(), store.GetInventoryUnitForUpdateParams{ID: unitID, ItemID: itemID})
+	if err != nil {
+		return ""
+	}
+	return u.AssetTag
 }
