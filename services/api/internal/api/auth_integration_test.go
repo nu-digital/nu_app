@@ -38,6 +38,7 @@ var fastParams = password.Params{MemoryKiB: 64, Time: 1, Threads: 1, SaltLen: 16
 type env struct {
 	hook    func()
 	invHook func()
+	cmsHook func()
 	cfg     config.Config
 	t       *testing.T
 	pool    *pgxpool.Pool
@@ -79,7 +80,7 @@ func (e *env) build() http.Handler {
 		Log:              slog.New(slog.NewTextHandler(e.logs, nil)),
 		Now:              func() time.Time { return *e.clock },
 		Notifier:         e.notifier,
-		BeforeOwnerCount: e.hook, BeforeInventoryCheck: e.invHook,
+		BeforeOwnerCount: e.hook, BeforeInventoryCheck: e.invHook, BeforeContentSave: e.cmsHook,
 	})
 }
 

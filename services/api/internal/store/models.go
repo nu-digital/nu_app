@@ -23,6 +23,52 @@ type BootstrapState struct {
 	CompletedAt pgtype.Timestamptz
 }
 
+type Content struct {
+	ID                  pgtype.UUID
+	Type                string
+	Section             string
+	Slug                string
+	CreatorUserID       pgtype.UUID
+	WorkingRevisionID   pgtype.UUID
+	PublishedRevisionID pgtype.UUID
+	ArchivedAt          pgtype.Timestamptz
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+}
+
+type ContentCollaborator struct {
+	ContentID pgtype.UUID
+	UserID    pgtype.UUID
+	AddedBy   pgtype.UUID
+	AddedAt   pgtype.Timestamptz
+}
+
+type ContentPublicationEvent struct {
+	ID          pgtype.UUID
+	ContentID   pgtype.UUID
+	RevisionID  pgtype.UUID
+	ActorUserID pgtype.UUID
+	EventType   string
+	CreatedAt   pgtype.Timestamptz
+}
+
+type ContentRevision struct {
+	ID                  pgtype.UUID
+	ContentID           pgtype.UUID
+	RevisionNo          int32
+	Title               string
+	Summary             string
+	Markdown            string
+	CoverMediaID        pgtype.UUID
+	MetadataJson        []byte
+	DateLabel           string
+	DateKind            string
+	SortDate            pgtype.Date
+	SortDateIsEstimated bool
+	EditedBy            pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+}
+
 type EmergencyRecoveryEvent struct {
 	ID               pgtype.UUID
 	ExecutedByOsUser string
@@ -246,4 +292,14 @@ type UserRole struct {
 	Role       string
 	AssignedBy pgtype.UUID
 	AssignedAt pgtype.Timestamptz
+}
+
+type WorkContributor struct {
+	ID         pgtype.UUID
+	ContentID  pgtype.UUID
+	RevisionID pgtype.UUID
+	UserID     pgtype.UUID
+	RoleLabel  string
+	SortOrder  int32
+	AddedBy    pgtype.UUID
 }

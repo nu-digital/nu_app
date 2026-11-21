@@ -49,6 +49,11 @@ func (s Subject) has(r Role) bool {
 	return false
 }
 
+// IsEditorPlus はEditor・Admin・Ownerのいずれか（有効なユーザーのみ）。コンテンツの全件編集・公開の権限に当たる。
+func (s Subject) IsEditorPlus() bool {
+	return s.active() && (s.has(RoleEditor) || s.has(RoleAdmin) || s.has(RoleOwner))
+}
+
 // isAdmin はAdminまたはOwner（OwnerはAdminを内包）。
 func (s Subject) isAdmin() bool { return s.has(RoleAdmin) || s.has(RoleOwner) }
 
