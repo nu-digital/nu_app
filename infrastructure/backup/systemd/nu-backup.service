@@ -1,0 +1,12 @@
+[Unit]
+Description=nu_app バックアップ（DB+メディア。D04）
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# 設定（BACKUP_NOTIFY_WEBHOOK_URL等の秘密を含む）はGit外の環境ファイル。権限は600（root）
+EnvironmentFile=/etc/nu_app/backup.env
+ExecStart=/srv/nu_app/infrastructure/backup/backup.sh
+Nice=10
+IOSchedulingClass=idle

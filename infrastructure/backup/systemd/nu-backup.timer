@@ -1,0 +1,10 @@
+[Unit]
+Description=nu_app バックアップを毎日03:00(JST)に実行する
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Asia/Tokyo
+Persistent=true
+RandomizedDelaySec=0
+
+[Install]
+WantedBy=timers.target

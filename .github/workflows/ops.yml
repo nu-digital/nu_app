@@ -1,0 +1,26 @@
+name: ops
+
+on:
+  # baseがmain以外の積み重ねPRでもCIを実行する（docs/DEVELOPMENT.md「マージとレビューの運用」）
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ops-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backup:
+    name: ops / backup-restore
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      # バックアップ（DB+メディア・7世代・失敗通知）と、隔離環境への復元検証を、使い捨てのDBで実際に動かす（本番には何もしない）
+      - run: scripts/backup-restore-test.sh
