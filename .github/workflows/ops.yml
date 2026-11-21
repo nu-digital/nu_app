@@ -24,3 +24,18 @@ jobs:
           persist-credentials: false
       # バックアップ（DB+メディア・7世代・失敗通知）と、隔離環境への復元検証を、使い捨てのDBで実際に動かす（本番には何もしない）
       - run: scripts/backup-restore-test.sh
+
+  nginx:
+    name: ops / nginx
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      # 本番のNginx設定（infrastructure/nginx/nu_app.conf）を、使い捨てのNginxと擬似のバックエンドで実際に動かして確認する
+      - run: scripts/nginx-test.sh
+      # 本番のCompose（compose.prod.yaml）が、雛形の設定で有効であること
+      - run: docker compose --env-file .env.production.example -f infrastructure/compose.prod.yaml config -q
+        env:
+          NU_TAG: ci

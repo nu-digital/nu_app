@@ -1,0 +1,101 @@
+# 本番用Compose（VPS上で使う。**ビルドしない**: CIが作ったイメージ（タグ=コミットSHA）をpullして起動する）。
+# 使い方: docs/OPERATIONS.md「本番の構成と初回セットアップ」。設定・secretはGit外の `/srv/nu_app/.env` に書く（.env.production.example 参照）。
+# ポートはすべて127.0.0.1にだけbind（外へ出すのはホストのNginxだけ。D03）。`docker compose down -v` は本番で使わない。
+name: nu_app
+
+x-hardened: &hardened
+  restart: unless-stopped
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+
+services:
+  db:
+    image: postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc443676fc6c0fa90b9002d01537841e1a
+    <<: *hardened
+    # postgresイメージは初期化でユーザー切替を行うため、cap_dropは付けずno-new-privilegesのみ適用する
+    cap_drop: []
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER を .env に設定してください}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB を .env に設定してください}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD を .env に設定してください}
+    volumes:
+      # DBはコンテナ外の永続領域（名前付きvolume）。`down -v`で消さない。バックアップは infrastructure/backup
+      - db-data:/var/lib/postgresql
+    mem_limit: ${DB_MEM_LIMIT:-640m}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    image: ${NU_REGISTRY:-ghcr.io/nu-digital}/nu_app-migrate:${NU_TAG:?NU_TAG（デプロイするコミットSHA）を指定してください}
+    <<: *hardened
+    restart: "no"
+    depends_on:
+      db: { condition: service_healthy }
+    command: ["postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:?}?sslmode=disable", "up"]
+
+  api:
+    image: ${NU_REGISTRY:-ghcr.io/nu-digital}/nu_app-api:${NU_TAG:?}
+    <<: *hardened
+    read_only: true
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:?}?sslmode=disable
+      # 本番はhttps。API_INSECURE_COOKIES は設定しない（Secure Cookie）
+      APP_BASE_URL: "${APP_BASE_URL:?APP_BASE_URLを設定してください（例 https://app.nu-digital.jp）}"
+      # adminコンテナ（Nextの中継）はDockerの内部ネットワークから来る。そこが付けたX-Forwarded-Forの右端をクライアントIPとして使う
+      API_TRUSTED_PROXY_CIDRS: ${API_TRUSTED_PROXY_CIDRS:-172.16.0.0/12}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      MEDIA_DIR: /data/media
+      GOMEMLIMIT: ${API_GOMEMLIMIT:-768MiB}
+    mem_limit: ${API_MEM_LIMIT:-1g}
+    volumes:
+      # 画像はコンテナ外の永続領域（ホストのディレクトリ。所有者 65532:65532）。バックアップはDBと一組
+      - ${MEDIA_HOST_DIR:-/srv/nu_app/media}:/data/media
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  bot:
+    image: ${NU_REGISTRY:-ghcr.io/nu-digital}/nu_app-bot:${NU_TAG:?}
+    <<: *hardened
+    read_only: true
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    mem_limit: ${BOT_MEM_LIMIT:-128m}
+
+  web:
+    image: ${NU_REGISTRY:-ghcr.io/nu-digital}/nu_app-web:${NU_TAG:?}
+    <<: *hardened
+    read_only: true
+    # Nextの実行時キャッシュ(.next/cache)の書き込み先。コンテナを作り直すと消える
+    tmpfs: ["/tmp", "/app/.next/cache"]
+    depends_on:
+      api: { condition: service_healthy }
+    environment:
+      API_INTERNAL_URL: http://api:8080
+    mem_limit: ${WEB_MEM_LIMIT:-384m}
+    ports:
+      - "127.0.0.1:8081:3000"
+
+  admin:
+    image: ${NU_REGISTRY:-ghcr.io/nu-digital}/nu_app-admin:${NU_TAG:?}
+    <<: *hardened
+    read_only: true
+    tmpfs: ["/tmp", "/app/.next/cache"]
+    depends_on:
+      api: { condition: service_healthy }
+    environment:
+      API_INTERNAL_URL: http://api:8080
+    mem_limit: ${ADMIN_MEM_LIMIT:-384m}
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  db-data:

@@ -127,6 +127,18 @@ export function repositoryErrors(repositoryRoot = root) {
   if (existsSync(apiDockerfile) && !(readFileSync(apiDockerfile, 'utf8').match(/go build [^\n]*/g) ?? []).every(l => l.includes('-tags nodynamic'))) {
     errors.push('services/api/Dockerfile の go build には -tags nodynamic を付けてください（WebPエンコーダーの動作を環境に依存させないため）。');
   }
+  // 本番のCompose: ビルドしない・ポートは127.0.0.1だけ・外部イメージはdigest固定（D03・OPERATIONS「デプロイ設計の合格条件」）
+  const prodCompose = resolve(repositoryRoot, 'infrastructure/compose.prod.yaml');
+  if (existsSync(prodCompose)) {
+    const y = readFileSync(prodCompose, 'utf8').split('\n').filter(l => !l.trim().startsWith('#'));
+    if (y.some(l => /^\s+build:/.test(l))) errors.push('infrastructure/compose.prod.yaml に build: を書かないでください（本番のVPSではビルドしない）。');
+    for (const l of y) {
+      const m = l.match(/^\s*-\s*"((?:[\d.]+:)?\d+:\d+)"\s*$/);
+      if (m && !m[1].startsWith('127.0.0.1:')) errors.push(`infrastructure/compose.prod.yaml のポート ${m[1]} は 127.0.0.1 にだけbindしてください（外へ出すのはホストのNginxだけ）。`);
+      const im = l.match(/^\s+image:\s*(\S+)/);
+      if (im && !im[1].includes('${NU_REGISTRY') && !im[1].includes('@sha256:')) errors.push(`infrastructure/compose.prod.yaml の外部イメージ ${im[1]} はdigestで固定してください。`);
+    }
+  }
   // 公開サイトと管理画面のプレビューの許可リストは、バイト単位で同一でなければならない（p3-web.md §3）
   const shared = ['apps/web/lib/markdown-sanitize.mjs', 'apps/admin/lib/markdown-sanitize.mjs'].map(f => resolve(repositoryRoot, f));
   if (shared.every(f => existsSync(f))) {
