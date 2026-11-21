@@ -711,6 +711,28 @@ export async function runAdminUiE2E(o) {
         await ctx.close();
       }
     }
+    // 公開版に残る本人情報の確認（D08。Admin/Owner。PC・スマホ・320px）。結果は架空の語だけ
+    for (const [label, width, height] of [['pc', 1440, 900], ['sp', 390, 844], ['narrow', 320, 640]]) {
+      const ctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const page = await ctx.newPage();
+      await login(page, o.ownerLogin, o.ownerPass);
+      await page.goto(`${adminUrl}/admin/published-search`);
+      await page.getByLabel('探す語（2〜50文字）').fill('ZzNoSuchWordZz');
+      await page.getByRole('button', { name: '探す' }).click();
+      await page.getByTestId('no-hits').waitFor();
+      check(`[${label}] 見つからないときは、その旨が出る`, /見つかりませんでした/.test(await page.getByTestId('no-hits').innerText()));
+      check(`[${label}] 公開版の確認の画面で横スクロールが出ない`, (await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0);
+      const mctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const mp = await mctx.newPage();
+      await login(mp, o.memberLogin, o.memberPass);
+      await mp.goto(`${adminUrl}/admin/published-search`);
+      await mp.getByLabel('探す語（2〜50文字）').fill('abcdef');
+      await mp.getByRole('button', { name: '探す' }).click();
+      await mp.locator('.notice.error').waitFor();
+      check(`[${label}] 一般メンバーは探せない（権限の案内が出る）`, /権限/.test(await mp.locator('.notice.error').innerText()));
+      await mctx.close();
+      await ctx.close();
+    }
     // 記事・作品（CMS）: 下書き・プレビュー（描画時のサニタイズ）・保存の競合・公開（PC・スマホ・320px）
     for (const [label, width, height] of [['pc', 1440, 900], ['sp', 390, 844], ['narrow', 320, 640]]) {
       const own = { cookie: o.ownerCookie, csrf: o.ownerCsrf };

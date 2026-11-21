@@ -158,3 +158,21 @@ JOIN work_contributors w ON w.revision_id = c.published_revision_id AND w.user_i
 WHERE c.type = 'project' AND c.archived_at IS NULL
 GROUP BY c.id, c.section, c.slug, r.title, r.sort_date
 ORDER BY r.sort_date DESC NULLS LAST, c.id;
+
+-- 公開中の版（title・summary・本文・制作メンバーの役割名）に語が含まれるコンテンツを探す（管理者の確認用。D08）。
+-- 語は大文字小文字を区別せず、部分一致。LIKEの記号は使わず position() で探す。
+-- name: SearchPublishedContents :many
+SELECT c.section::text AS section, c.slug::text AS slug, r.title::text AS title,
+       (position(lower(@q::text) in lower(r.title)) > 0)::boolean AS in_title,
+       (position(lower(@q::text) in lower(r.summary)) > 0)::boolean AS in_summary,
+       (position(lower(@q::text) in lower(r.markdown)) > 0)::boolean AS in_markdown,
+       (EXISTS (SELECT 1 FROM work_contributors w WHERE w.revision_id = r.id AND position(lower(@q::text) in lower(w.role_label)) > 0))::boolean AS in_role,
+       CASE WHEN position(lower(@q::text) in lower(r.markdown)) > 0
+            THEN substr(r.markdown, greatest(position(lower(@q::text) in lower(r.markdown)) - 20, 1), 60) ELSE '' END::text AS snippet
+FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
+WHERE position(lower(@q::text) in lower(r.title)) > 0
+   OR position(lower(@q::text) in lower(r.summary)) > 0
+   OR position(lower(@q::text) in lower(r.markdown)) > 0
+   OR EXISTS (SELECT 1 FROM work_contributors w WHERE w.revision_id = r.id AND position(lower(@q::text) in lower(w.role_label)) > 0)
+ORDER BY c.section, c.slug
+LIMIT 100;
