@@ -60,7 +60,7 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] キーボードだけでログインできる`, true);
       const h1 = await page.getByRole('heading', { level: 1 }).innerText();
       check(`[${label}] ランチャーに表示名が出る`, h1.includes(o.memberName), h1);
-      check(`[${label}] 全員共通のカードが5枚あり、未実装の4つは「準備中」`, (await page.locator('.cards li').count()) === 5 && (await page.getByText('準備中').count()) === 4);
+      check(`[${label}] 全員共通のカードが5枚あり、未実装の2つ（物品・記事と作品）は「準備中」`, (await page.locator('.cards li').count()) === 5 && (await page.getByText('準備中').count()) === 2);
       const broken = await page.evaluate(() => [...document.images].filter((i) => !i.complete || i.naturalWidth === 0).map((i) => i.getAttribute('src')));
       check(`[${label}] 画像（ロゴ・団体写真）がすべて読み込まれる`, broken.length === 0, broken.join(','));
       const wrapped = await page.getByRole('button', { name: 'ログアウト' }).evaluate((el) => el.getBoundingClientRect().height <= 60);
@@ -217,6 +217,131 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] Editorを外せる`, true);
       if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-users-after.png`), fullPage: true });
       await ctx.close();
+    }
+    // プロフィール・メンバー・個人情報（PC・スマホ・320px）
+    const overflowOf = (page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    const smallOf = (page) => page.locator('button, a.btn, input:not([type=hidden]), select, textarea, summary').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 44; }).length);
+    for (const [label, width, height] of [['pc', 1440, 900], ['sp', 390, 844], ['narrow', 320, 640]]) {
+      const pid = `ui.${label}.prof`, pname = `プロフィール確認(${label})`, ppass = 'ui-profile-passphrase-1';
+      const created = await o.apiCall('POST', '/admin/users', { body: { loginId: pid, displayName: `仮名(${label})` }, cookie: o.ownerCookie, csrf: o.ownerCsrf });
+      await o.apiCall('POST', '/auth/accept-invite', { body: { token: created.json.url.split('#token=')[1], password: ppass } });
+      const ctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const page = await ctx.newPage();
+      await login(page, pid, ppass);
+      await page.getByRole('link', { name: /^プロフィール/ }).click();
+      await page.waitForURL('**/profile');
+      await page.getByRole('heading', { level: 1, name: 'プロフィール' }).waitFor();
+      check(`[${label}] プロフィール: 初期はすべて非公開で、個人情報は本人と管理者だけの注意書きがある`, (await page.locator('select[id^="vis-"]').evaluateAll((els) => els.every((e) => e.value === 'private'))) && /本人と、権限のある管理者（Admin・Owner）だけが見られます/.test(await page.locator('.notice-inline').innerText()));
+      check(`[${label}] プロフィールに横溢れがない`, (await overflowOf(page)) <= 0, `overflow=${await overflowOf(page)}`);
+      const smallP = await smallOf(page);
+      check(`[${label}] プロフィールの入力・ボタンの高さが44px以上`, smallP === 0, `44px未満=${smallP}`);
+      if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-profile.png`), fullPage: true });
+      if (label === 'narrow') { await ctx.close(); continue; }
+
+      const note = async () => page.locator('.notice').first();
+      await page.getByLabel('表示名（必須）').fill(pname);
+      await page.getByLabel('自己紹介', { exact: true }).fill(`自己紹介です(${label})`);
+      await page.getByLabel('学部', { exact: true }).fill('理工学部');
+      await page.getByLabel('学科', { exact: true }).fill('情報科学科');
+      await page.getByLabel('学年（1〜10）').fill('3');
+      await page.locator('#vis-bio').selectOption('members');
+      await page.getByRole('button', { name: '基本情報を保存する' }).click();
+      await page.locator('.notice.success').waitFor();
+      check(`[${label}] 基本情報を保存でき、完了が表示される`, /基本情報を保存しました/.test(await page.locator('.notice.success').innerText()));
+      await page.getByLabel('氏名', { exact: true }).fill(`秘密氏名${label}`);
+      await page.getByLabel('大学メール').fill('not-an-email');
+      await page.getByRole('button', { name: '個人情報を保存する' }).click();
+      // type=email のため、ブラウザーが形式エラーを伝えて送信を止める（入力は保持される）
+      check(`[${label}] 不正なメールはブラウザーの検証で止まり、入力が保持される`, (await page.getByLabel('大学メール').evaluate((el) => !el.validity.valid)) && (await page.getByLabel('氏名', { exact: true }).inputValue()) === `秘密氏名${label}`);
+      await page.getByLabel('大学メール').fill(`${label}@example.invalid`);
+      await page.getByLabel('学生証番号').fill('99X-0001');
+      await page.getByRole('button', { name: '個人情報を保存する' }).click();
+      await page.locator('.notice.success').waitFor();
+      // 外部リンク: 不正なURLはエラー、正しいURLは追加でき公開範囲を変えられる
+      await page.getByLabel('リンクの名前').fill('悪いリンク');
+      await page.getByLabel('URL', { exact: true }).fill('javascript:alert(1)');
+      await page.getByRole('button', { name: 'リンクを追加する' }).click();
+      await page.locator('.notice.error').waitFor();
+      check(`[${label}] javascript:のURLは登録できない`, /https:\/\/ または http:\/\/ で始まる/.test(await page.locator('.notice.error').innerText()));
+      await page.getByLabel('リンクの名前').fill('公開リンク');
+      await page.getByLabel('URL', { exact: true }).fill('https://example.invalid/portfolio');
+      await page.getByRole('button', { name: 'リンクを追加する' }).click();
+      await page.locator('li.item[data-label="公開リンク"]').waitFor();
+      await page.getByLabel('公開リンクの公開範囲').selectOption('members');
+      await page.locator('.notice.success').filter({ hasText: '公開範囲を変更しました' }).waitFor();
+      await page.getByLabel('種類（例: PC、VR機器）').fill('PC');
+      await page.getByLabel('名前', { exact: true }).fill('自作PC');
+      await page.getByLabel('詳細（任意）').fill('高性能');
+      await page.getByRole('button', { name: '機材を追加する' }).click();
+      await page.locator('li.item[data-name="自作PC"]').waitFor();
+      await page.getByLabel('自作PCの公開範囲').selectOption('members'); // 機材の公開範囲も初期は非公開。公開する場合は本人が選ぶ
+      await page.locator('.notice.success').filter({ hasText: '公開範囲を変更しました' }).waitFor();
+      // インターネット公開の同意は別: 同意してもメンバー内公開の設定は変わらない
+      check(`[${label}] 同意の前は「同意していません」`, /同意していません/.test(await page.locator('#consent-title ~ p').nth(1).innerText()));
+      await page.getByRole('button', { name: 'インターネット公開に同意する' }).click();
+      await page.locator('.notice.success').filter({ hasText: '同意しました' }).waitFor();
+      check(`[${label}] 同意しても、メンバー内公開の設定（自己紹介=メンバーに公開、学部=非公開）は変わらない`, (await page.locator('#vis-bio').inputValue()) === 'members' && (await page.locator('#vis-faculty').inputValue()) === 'private');
+      // 再読込しても保持される
+      await page.reload();
+      await page.getByLabel('表示名（必須）').waitFor();
+      check(`[${label}] 再読込しても入力が保持される`, (await page.getByLabel('表示名（必須）').inputValue()) === pname && (await page.getByLabel('氏名', { exact: true }).inputValue()) === `秘密氏名${label}` && (await page.locator('#vis-bio').inputValue()) === 'members');
+      if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-profile-filled.png`), fullPage: true });
+      await ctx.close();
+
+      // 別のメンバー（Owner）から見る: 公開した項目だけが見える
+      const vctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const vp = await vctx.newPage();
+      await login(vp, o.ownerLogin, o.ownerPass);
+      await vp.getByRole('link', { name: /^メンバー/ }).click();
+      await vp.waitForURL('**/members');
+      const mrow = vp.locator(`li.user[data-name="${pname}"]`);
+      await mrow.waitFor();
+      const mtext = await mrow.innerText();
+      check(`[${label}] メンバー一覧に公開した自己紹介が出て、非公開の学部と個人情報は出ない`, mtext.includes(`自己紹介です(${label})`) && !mtext.includes('理工学部') && !mtext.includes(`秘密氏名${label}`));
+      check(`[${label}] メンバー一覧に個人情報・ログインIDが一切出ない`, !(await vp.locator('body').innerText()).match(new RegExp(`秘密氏名|example\\.invalid|99X-0001|${pid.replace('.', '\\.')}`)));
+      check(`[${label}] メンバー一覧に横溢れがない`, (await overflowOf(vp)) <= 0);
+      if (o.shotsDir) await vp.screenshot({ path: join(o.shotsDir, `${label}-members.png`), fullPage: true });
+      await vp.getByRole('searchbox').fill('プロフィール確認');
+      await vp.getByRole('button', { name: '検索' }).click();
+      await vp.waitForFunction((n) => document.querySelectorAll('li.user').length === n, 1).catch(() => undefined);
+      await mrow.getByRole('link').click();
+      await vp.waitForURL('**/members/*');
+      await vp.getByRole('heading', { level: 1, name: pname }).waitFor();
+      const dtext = await vp.locator('main').innerText();
+      check(`[${label}] メンバー詳細: 公開した自己紹介・リンク・機材が見え、非公開の学部・個人情報は見えない`, dtext.includes('公開リンク') && dtext.includes('自作PC') && dtext.includes(`自己紹介です(${label})`) && !dtext.includes('理工学部') && !dtext.includes(`秘密氏名${label}`));
+      const rel = await vp.getByRole('link', { name: '公開リンク' }).getAttribute('rel');
+      check(`[${label}] 外部リンクは noopener noreferrer nofollow`, /noopener/.test(rel ?? '') && /noreferrer/.test(rel ?? '') && /nofollow/.test(rel ?? ''));
+
+      // 管理者(Owner)が個人情報を見る → 停止 → 削除 → メンバー一覧から消える
+      await vp.goto(adminUrl + '/admin/users');
+      const urow = vp.locator(`li.user[data-login="${pid}"]`);
+      await urow.waitFor();
+      await urow.getByRole('button', { name: '個人情報を見る' }).click();
+      const panel = urow.getByRole('region');
+      await panel.waitFor();
+      const ptext = await panel.innerText();
+      check(`[${label}] 管理者は個人情報を見られ、閲覧が記録される旨が表示される`, ptext.includes(`秘密氏名${label}`) && ptext.includes('99X-0001') && /監査ログに記録/.test(ptext));
+      check(`[${label}] 有効なユーザーには「個人情報を削除する」が出ない（先に停止）`, (await urow.getByRole('button', { name: '個人情報を削除する' }).count()) === 0);
+      await panel.getByRole('button', { name: '閉じる' }).click();
+      await urow.getByRole('button', { name: '停止する' }).click();
+      await urow.getByRole('group').getByRole('button', { name: '停止する' }).click();
+      await vp.waitForFunction((id) => /停止中/.test(document.querySelector(`li.user[data-login="${id}"]`)?.textContent ?? ''), pid);
+      await urow.getByRole('button', { name: '個人情報を削除する' }).click();
+      const form = urow.getByRole('form');
+      await form.waitFor();
+      check(`[${label}] 削除フォームに「元に戻せない」「本文や画像の本人情報は自動では消えない」の注意がある`, /元に戻せません/.test(await form.innerText()) && /自動では消えません/.test(await form.innerText()));
+      check(`[${label}] 理由が空のあいだは削除ボタンが押せない`, await form.getByRole('button', { name: '完全に削除する' }).isDisabled());
+      if (o.shotsDir) await vp.screenshot({ path: join(o.shotsDir, `${label}-delete-private.png`), fullPage: true });
+      await form.getByLabel(/削除の理由/).fill('卒業のため本人から依頼(確認用)');
+      await form.getByRole('button', { name: '完全に削除する' }).click();
+      await vp.locator('.notice.success').filter({ hasText: '個人情報を削除しました' }).waitFor();
+      await urow.getByRole('button', { name: '個人情報を見る' }).click();
+      await urow.getByRole('region').waitFor();
+      check(`[${label}] 削除後は個人情報が（未入力）になる`, !(await urow.getByRole('region').innerText()).includes(`秘密氏名${label}`) && (await urow.getByRole('region').innerText()).includes('（未入力）'));
+      await vp.goto(adminUrl + '/members');
+      await vp.locator('li.user').first().waitFor();
+      check(`[${label}] 停止・削除したメンバーは現役のメンバー一覧に出ない`, (await vp.locator(`li.user[data-name="${pname}"]`).count()) === 0 && (await vp.locator('li.user[data-name="退会メンバー"]').count()) === 0);
+      await vctx.close();
     }
     // 権限が無い人（一般メンバー）にはAPIが拒否し、画面は案内を表示する
     {

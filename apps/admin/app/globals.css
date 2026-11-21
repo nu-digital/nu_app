@@ -58,7 +58,9 @@ a { color: var(--color-brand); }
 .btn:hover { background: var(--color-brand-dark); border-color: var(--color-brand-dark); }
 .btn[disabled] { opacity: .6; cursor: progress; }
 .btn.secondary { background: var(--color-bg); color: var(--color-brand); }
-.btn.inline { width: auto; white-space: nowrap; }
+.btn.inline { width: auto; max-width: 100%; text-align: center; }
+.app-header .btn.inline, .actions .btn.inline { white-space: nowrap; }
+.app-header .who { flex-wrap: wrap; justify-content: flex-end; }
 
 .notice { display: flex; gap: var(--space-2); padding: var(--space-3); border-radius: 8px; margin-bottom: var(--space-4); border: 2px solid; }
 .notice.error { color: var(--color-error); background: var(--color-error-bg); border-color: var(--color-error); }
@@ -119,3 +121,24 @@ a.card:hover { border-color: var(--color-brand); }
 .btn.danger { background: var(--color-error); border-color: var(--color-error); }
 .btn.danger:hover { background: #8c1d18; border-color: #8c1d18; }
 .hint { color: var(--color-muted); font-size: .875rem; margin: var(--space-2) 0 0; }
+
+/* プロフィール・メンバー */
+.lead { color: var(--color-muted); }
+.notice-inline { padding: var(--space-3); border-left: 4px solid var(--color-brand); background: var(--color-bg); }
+textarea.input { padding: var(--space-3); min-height: 96px; resize: vertical; }
+select.input { padding: 0 var(--space-3); }
+.vis { margin-top: var(--space-2); }
+.vis label { font-weight: 400; color: var(--color-muted); font-size: .875rem; }
+.items { list-style: none; padding: 0; margin: 0 0 var(--space-4); display: grid; gap: var(--space-3); }
+.item { display: flex; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3); background: var(--color-bg); }
+.item .user-id { word-break: break-all; }
+.member-link { color: var(--color-ink); text-decoration: none; display: inline-block; min-height: var(--tap); line-height: var(--tap); }
+.member-link:hover strong { text-decoration: underline; }
+.bio { white-space: pre-wrap; word-break: break-word; }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-1) var(--space-4); }
+.facts dt { font-weight: 700; } .facts dd { margin: 0; }
+.plain { list-style: none; padding: 0; } .plain li { min-height: var(--tap); display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+
+.field label input[type="checkbox"] { width: 24px; height: 24px; vertical-align: middle; margin-right: var(--space-2); }
+.field label:has(input[type="checkbox"]) { display: flex; align-items: center; min-height: var(--tap); font-weight: 400; }
+.panel .hint + .field, .panel p + .field { margin-top: var(--space-3); }

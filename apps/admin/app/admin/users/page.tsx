@@ -5,8 +5,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { useRouter } from "next/navigation";
 
 import {
-  createUser, describe, fetchMe, issueLink, listUsers, setRole, setUserStatus,
-  type AdminUser, type LinkResult, type Me,
+  createUser, deletePrivateProfile, describe, fetchMe, getPrivateProfile, issueLink, listUsers, setRole, setUserStatus,
+  type AdminUser, type LinkResult, type Me, type PrivateProfile,
 } from "@/lib/api";
 
 const STATUS_LABEL: Record<AdminUser["status"], string> = { active: "有効", invited: "招待中", disabled: "停止中" };
@@ -28,6 +28,10 @@ export default function UsersPage() {
   const [issued, setIssued] = useState<Issued | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [priv, setPriv] = useState<PrivateProfile | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [anonymize, setAnonymize] = useState(true);
   const [addOpen, setAddOpen] = useState(false); // スマホで一覧が埋もれないよう、追加フォームは折りたたんでおく
   const noticeRef = useRef<HTMLDivElement>(null);
 
@@ -238,6 +242,50 @@ export default function UsersPage() {
                         </button>
                       )}
                     </div>
+                    <div className="actions">
+                      <button className="btn secondary inline" disabled={busy} onClick={() => run(u.id, async () => setPriv(await getPrivateProfile(u.id)), "個人情報を表示しました（この閲覧は記録されます）。")}>
+                        個人情報を見る
+                      </button>
+                      {u.status === "disabled" && deleting !== u.id && (
+                        <button className="btn secondary inline" disabled={busy} onClick={() => { setDeleting(u.id); setReason(""); setAnonymize(true); }}>個人情報を削除する</button>
+                      )}
+                    </div>
+                    {priv && priv.id === u.id && (
+                      <div className="panel" role="region" aria-label={`${u.loginId}の個人情報`}>
+                        <p className="hint"><strong>この閲覧は監査ログに記録されました。</strong>見終わったら閉じてください。</p>
+                        <dl className="facts">
+                          <dt>氏名</dt><dd>{priv.private.legalName ?? "（未入力）"}</dd>
+                          <dt>大学メール</dt><dd>{priv.private.universityEmail ?? "（未入力）"}</dd>
+                          <dt>学生証番号</dt><dd>{priv.private.studentNumber ?? "（未入力）"}</dd>
+                          <dt>最寄り駅</dt><dd>{priv.private.nearestStation ?? "（未入力）"}</dd>
+                        </dl>
+                        <button className="btn secondary inline" onClick={() => setPriv(null)}>閉じる</button>
+                      </div>
+                    )}
+                    {deleting === u.id && (
+                      <form
+                        className="panel"
+                        aria-label={`${u.loginId}の個人情報を削除`}
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          void run(u.id, async () => { await deletePrivateProfile(u.id, reason.trim(), anonymize); setPriv(null); setDeleting(null); }, `${u.loginId} の個人情報を削除しました。`);
+                        }}
+                      >
+                        <p><strong>この操作は元に戻せません。</strong>氏名・大学メール・学生証番号・最寄り駅・自己紹介・学部学科学年・外部リンク・個人機材・公開設定を削除し、インターネット公開の同意を取り消します。ユーザー本人のアカウントと活動の履歴は残ります。</p>
+                        <p className="hint">記事の本文や画像の中に書かれた本人の情報は、自動では消えません。必要に応じて管理者が確認して直してください。</p>
+                        <div className="field">
+                          <label htmlFor={`reason-${u.id}`}>削除の理由（必須・200文字まで。個人情報は書かないでください）</label>
+                          <textarea id={`reason-${u.id}`} className="input" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} required maxLength={200} />
+                        </div>
+                        <div className="field">
+                          <label><input type="checkbox" checked={anonymize} onChange={(e) => setAnonymize(e.target.checked)} /> 表示名も「退会メンバー」に置き換える</label>
+                        </div>
+                        <div className="actions">
+                          <button className="btn danger inline" type="submit" disabled={busy || reason.trim() === ""}>完全に削除する</button>
+                          <button className="btn secondary inline" type="button" onClick={() => setDeleting(null)}>やめる</button>
+                        </div>
+                      </form>
+                    )}
                     {locked && <p className="hint">管理者（Admin・Owner）の停止・URL発行は、Ownerだけができます。</p>}
                   </li>
                 );
