@@ -184,3 +184,44 @@ export const getPrivateProfile = async (id: string) => ok<PrivateProfile>(await 
 export const deletePrivateProfile = async (id: string, reason: string, anonymizeDisplayName: boolean) =>
   ok<{ consentWithdrawn: boolean; displayNameAnonymized: boolean; linksDeleted: number; devicesDeleted: number }>(
     await call("DELETE", `/admin/users/${id}/private-profile`, { reason, anonymizeDisplayName }), 200);
+
+// ---- 物品 ----
+
+export type Item = {
+  id: string; name: string; description: string; category: string; location: string; mode: "quantity" | "individual";
+  totalQuantity: number; outstanding: number; unitCount: number; available: number; archived?: boolean;
+};
+export type ItemUnit = { id: string; assetTag: string; serialNumber: string | null; state: string; loaned: { borrowerDisplayName: string; since: string; elapsedDays: number } | null };
+export type ItemLoan = { id: string; borrowerDisplayName: string; quantity: number; borrowedAt: string; elapsedDays: number };
+export type ItemDetail = Item & { units: ItemUnit[]; loans: ItemLoan[] };
+export type OutstandingLoan = { id: string; itemId: string; itemName: string; assetTag: string; borrowerDisplayName: string; quantity: number; borrowedAt: string; elapsedDays: number; mine: boolean };
+export type HistoryEvent = {
+  id: string; kind: "loan" | "return" | "correction"; itemId: string; itemName: string; assetTag: string; borrowerDisplayName: string; actorDisplayName: string;
+  quantity: number; at: string; correctionKind?: string; targetType?: string; reason?: string;
+};
+
+export async function listItems(p: { q?: string; category?: string; available?: boolean; cursor?: string }) {
+  const params = new URLSearchParams({ limit: "50" });
+  if (p.q) params.set("q", p.q);
+  if (p.category) params.set("category", p.category);
+  if (p.available) params.set("available", "true");
+  if (p.cursor) params.set("cursor", p.cursor);
+  return ok<{ items: Item[]; nextCursor: string | null; categories: string[] }>(await call("GET", `/inventory/items?${params.toString()}`), 200);
+}
+export const getItem = async (id: string) => ok<ItemDetail>(await call("GET", `/inventory/items/${id}`), 200);
+export const createLoan = async (body: { itemId: string; quantity?: number; unitId?: string }) =>
+  ok<{ id: string; quantity: number; remaining: number }>(await call("POST", "/inventory/loans", body), 201);
+export const returnLoan = async (loanId: string, quantity?: number) =>
+  ok<{ returned: number; outstanding: number }>(await call("POST", `/inventory/loans/${loanId}/returns`, quantity === undefined ? undefined : { quantity }), 200);
+export async function listLoans(p: { mine?: boolean; q?: string; cursor?: string }) {
+  const params = new URLSearchParams({ limit: "50" });
+  if (p.mine) params.set("mine", "true");
+  if (p.q) params.set("q", p.q);
+  if (p.cursor) params.set("cursor", p.cursor);
+  return ok<{ items: OutstandingLoan[]; nextCursor: string | null }>(await call("GET", `/inventory/loans?${params.toString()}`), 200);
+}
+export async function listHistory(cursor?: string) {
+  const params = new URLSearchParams({ limit: "50" });
+  if (cursor) params.set("cursor", cursor);
+  return ok<{ items: HistoryEvent[]; nextCursor: string | null }>(await call("GET", `/inventory/history?${params.toString()}`), 200);
+}
