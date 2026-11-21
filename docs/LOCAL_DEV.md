@@ -39,7 +39,7 @@ scripts/test-integration.sh   # 実PostgreSQLの統合テスト（使い捨て�
 scripts/sqlc.sh generate      # クエリ/migration変更後にsqlcの生成コードを更新
 ```
 
-`compose:smoke`は開発用の`nu_app`プロジェクトとvolumeに触れない。
+`compose:smoke`は開発用の`nu_app`プロジェクトとvolumeに触れない。画面E2E（Playwright。初回は`npx playwright install chromium`）を含み、**スクリーンショットなどの検証成果物は`.local/ui-shots/`に保存される（Git管理外）**。ブラウザー未導入の環境では`PLAYWRIGHT_SKIP=1`で画面E2Eだけ省略できる（省略した旨が表示され、成功扱いにはならない記録として残す）。
 
 ## 4. 初期Ownerの作成（ローカルの動作確認用）
 

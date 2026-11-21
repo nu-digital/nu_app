@@ -1,0 +1,97 @@
+/* デザイントークン（暫定。運用責任者が触って判断・修正する前提で、ここに集約する） */
+:root {
+  --color-brand: #004aad;        /* 団体カラー。白との比 8.6:1 */
+  --color-brand-dark: #003580;
+  --color-ink: #1a1a1a;          /* 本文。白との比 17:1 */
+  --color-muted: #4a4f57;        /* 補足。白との比 8.3:1 */
+  --color-bg: #ffffff;
+  --color-surface: #f4f6fa;
+  --color-border: #c9d0dc;
+  --color-error: #b3261e;        /* 白との比 6.5:1。色だけに頼らず「エラー」の文字も付ける */
+  --color-error-bg: #fdecea;
+  --color-success: #1b6e3a;
+  --color-success-bg: #e8f5ec;
+  --radius: 10px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 40px;
+  --tap: 44px;                   /* タップ対象の最小サイズ */
+  --font: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --focus: 0 0 0 3px #ffffff, 0 0 0 5px var(--color-brand);
+}
+
+* { box-sizing: border-box; }
+html { font-size: 100%; }
+body {
+  margin: 0; font-family: var(--font); color: var(--color-ink); background: var(--color-bg);
+  line-height: 1.7; font-size: 1rem; -webkit-text-size-adjust: 100%;
+}
+h1, h2 { line-height: 1.35; margin: 0 0 var(--space-3); }
+p { margin: 0 0 var(--space-3); }
+a { color: var(--color-brand); }
+:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
+
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* 認証画面（ログイン・招待・再設定） */
+.auth-wrap { min-height: 100dvh; display: grid; place-items: center; padding: var(--space-5) var(--space-4); background: var(--color-surface); }
+.auth-card { width: 100%; max-width: 420px; background: var(--color-bg); border-radius: var(--radius); padding: var(--space-5); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.auth-card h1 { font-size: 1.5rem; }
+.auth-brand { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-5); }
+.auth-brand img { width: 48px; height: 48px; object-fit: contain; border-radius: 6px; }
+.auth-brand span { font-weight: 700; font-size: 1.125rem; }
+
+.field { margin-bottom: var(--space-4); }
+.field label { display: block; font-weight: 700; margin-bottom: var(--space-1); }
+.field .hint { color: var(--color-muted); font-size: .875rem; margin-top: var(--space-1); }
+.input-row { display: flex; gap: var(--space-2); }
+.input {
+  width: 100%; min-height: var(--tap); padding: 0 var(--space-3); font: inherit; color: var(--color-ink);
+  background: var(--color-bg); border: 2px solid var(--color-border); border-radius: 8px;
+}
+.input:focus-visible { border-color: var(--color-brand); }
+.toggle { min-height: var(--tap); min-width: 88px; white-space: nowrap; padding: 0 var(--space-3); font: inherit; background: var(--color-bg); color: var(--color-brand); border: 2px solid var(--color-border); border-radius: 8px; cursor: pointer; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap); width: 100%;
+  padding: 0 var(--space-5); font: inherit; font-weight: 700; color: #fff; background: var(--color-brand);
+  border: 2px solid var(--color-brand); border-radius: 8px; cursor: pointer; text-decoration: none;
+}
+.btn:hover { background: var(--color-brand-dark); border-color: var(--color-brand-dark); }
+.btn[disabled] { opacity: .6; cursor: progress; }
+.btn.secondary { background: var(--color-bg); color: var(--color-brand); }
+.btn.inline { width: auto; white-space: nowrap; }
+
+.notice { display: flex; gap: var(--space-2); padding: var(--space-3); border-radius: 8px; margin-bottom: var(--space-4); border: 2px solid; }
+.notice.error { color: var(--color-error); background: var(--color-error-bg); border-color: var(--color-error); }
+.notice.success { color: var(--color-success); background: var(--color-success-bg); border-color: var(--color-success); }
+.notice strong { white-space: nowrap; }
+
+/* ランチャー */
+.app-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); background: var(--color-bg); position: sticky; top: 0; z-index: 2; }
+.app-header .brand { display: flex; align-items: center; gap: var(--space-2); font-weight: 700; text-decoration: none; color: var(--color-ink); }
+.app-header .brand img { width: 36px; height: 36px; object-fit: contain; }
+.app-header .who { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.app-header .who .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40vw; }
+
+.hero { position: relative; min-height: min(56vh, 520px); display: flex; align-items: flex-end; color: #fff; background: #0b1d3d; }
+.hero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,20,60,.85), rgba(0,20,60,.15) 70%); }
+.hero-text { position: relative; z-index: 1; padding: var(--space-5) var(--space-4); max-width: 1100px; width: 100%; margin: 0 auto; }
+.hero-text h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); margin-bottom: var(--space-1); }
+.hero-text p { margin: 0; font-size: 1.0625rem; }
+
+.launcher { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-6); }
+.launcher h2 { font-size: 1.25rem; }
+.cards { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.card { display: block; min-height: 112px; padding: var(--space-4); border: 2px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); color: var(--color-ink); text-decoration: none; }
+a.card:hover { border-color: var(--color-brand); }
+.card h3 { margin: 0 0 var(--space-1); font-size: 1.0625rem; }
+.card p { margin: 0; color: var(--color-muted); font-size: .9375rem; }
+.card.soon { background: var(--color-surface); border-style: dashed; }
+.badge { display: inline-block; margin-top: var(--space-2); padding: 0 var(--space-2); font-size: .8125rem; font-weight: 700; color: var(--color-muted); border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-bg); }
+
+@media (max-width: 480px) {
+  .hero { min-height: 40vh; }
+  .app-header .brand-text { display: none; } /* 狭い画面ではロゴだけにして、表示名とログアウトを崩さない */
+  .app-header .who .name { max-width: 44vw; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
