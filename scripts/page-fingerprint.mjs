@@ -10,17 +10,28 @@ export function extractInPage() {
   const KEEP = new Set(['href', 'src', 'alt', 'role', 'tabindex', 'aria-label', 'datetime', 'class', 'width', 'height', 'loading', 'target', 'rel', 'title', 'type', 'open']);
   const SKIP = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);
   const collapse = t => t.replace(/\s+/g, ' ').trim();
-  const norm = node => {
-    if (node.nodeType === 3) { const t = collapse(node.textContent ?? ''); return t ? JSON.stringify(t) : ''; }
+  // masked=true のとき、「投稿者：○○」の○○を伏せる（投稿者名は意図した差。公開許可が確認されるまで「nu_digital」になる。D14）
+  const norm = (node, masked) => {
+    if (node.nodeType === 3) {
+      let t = collapse(node.textContent ?? '');
+      if (masked && /^投稿者：/.test(t)) t = '投稿者：*';
+      return t ? JSON.stringify(t) : '';
+    }
     if (node.nodeType !== 1 || SKIP.has(node.tagName)) return '';
-    const attrs = [...node.attributes].filter(a => (KEEP.has(a.name) || a.name.startsWith('data-')) && a.name !== 'style').map(a => `${a.name}=${JSON.stringify(a.value)}`).sort();
-    const kids = [...node.childNodes].map(norm).filter(Boolean).join('');
+    // 「投稿者：○○」の要素は、中身を固定の文字列にする（Reactは「投稿者：」と名前を別のテキストノードにするため）
+    if (masked && node.tagName === 'SPAN' && collapse(node.textContent ?? '').startsWith('投稿者：')) return `<span>${JSON.stringify('投稿者：*')}</>`;
+    // masked=true: ドットを含むslugの記事URL（例: /blog/nu.metasou/）の末尾スラッシュも揃える（Nextは、ドットを含むパスをファイル扱いにして末尾のスラッシュを付けない。意図した差）
+    const val = a => (masked && a.name === 'href' ? a.value.replace(/^(\/(?:blog|news|project)\/[^/]*\.[^/]*)\/$/, '$1') : a.value);
+    const attrs = [...node.attributes].filter(a => (KEEP.has(a.name) || a.name.startsWith('data-')) && a.name !== 'style').map(a => `${a.name}=${JSON.stringify(val(a))}`).sort();
+    const kids = [...node.childNodes].map(n => norm(n, masked)).filter(Boolean).join('');
     return `<${node.tagName.toLowerCase()}${attrs.length ? ' ' + attrs.join(' ') : ''}>${kids}</>`;
   };
   // 404ページなど<main>が無いページは、body全体を対象にする
   const main = document.querySelector('main') ?? document.body;
   const article = document.querySelector('main article');
   const body = document.querySelector('.article-body');
+  const authorEl = main ? [...main.querySelectorAll('span')].find(e => collapse(e.textContent ?? '').startsWith('投稿者：')) : null;
+  const authorText = authorEl ? collapse(authorEl.textContent ?? '').replace(/^投稿者：\s*/, '') : null;
   const abs = a => a.getAttribute('href') ?? '';
   const cardRe = /^\/(blog|news|project)\/[^/?#]+\/?$/;
   const cards = main ? [...main.querySelectorAll('a')].filter(a => cardRe.test(abs(a))).map(a => ({
@@ -30,9 +41,12 @@ export function extractInPage() {
   return {
     title: document.title,
     h1: collapse(document.querySelector('h1')?.textContent ?? ''),
-    mainDom: main ? norm(main) : '',
-    articleDom: article ? norm(article) : '',
-    bodyDom: body ? norm(body) : '',
+    mainDom: main ? norm(main, false) : '',
+    articleDom: article ? norm(article, false) : '',
+    mainDomMasked: main ? norm(main, true) : '',
+    articleDomMasked: article ? norm(article, true) : '',
+    author: authorText,
+    bodyDom: body ? norm(body, false) : '',
     bodyTextLen: body ? collapse(body.textContent ?? '').length : 0,
     time: time ? { datetime: time.getAttribute('datetime'), text: collapse(time.textContent ?? '') } : null,
     imgs: main ? [...main.querySelectorAll('img')].map(i => ({ src: i.getAttribute('src') ?? '', alt: i.getAttribute('alt') ?? '' })) : [],
@@ -76,6 +90,8 @@ export async function fingerprintUrl(page, request, base, path) {
   return {
     ...out, meta, title: x.title, h1: x.h1, time: x.time, bodyTextLen: x.bodyTextLen, youtubeDataDivs: x.youtubeDataDivs,
     mainDomSha: sha(x.mainDom), articleDomSha: sha(x.articleDom), bodyDomSha: sha(x.bodyDom),
+    // 投稿者名を伏せたDOMのハッシュ（意図した差を除いて、DOMが基準と完全一致することを検査する）と、投稿者名
+    mainDomShaMasked: sha(x.mainDomMasked), articleDomShaMasked: sha(x.articleDomMasked), author: x.author,
     imgs: x.imgs, links: x.links, iframes: x.iframes, headings: x.headings, cards: x.cards,
   };
 }
@@ -95,10 +111,14 @@ export async function fingerprintVariants(request, base, articles) {
 }
 
 /** 基準と実際を比べて、差を人が読める一覧で返す。knownDiffsは意図した差（`url|項目`）の一覧（無ければ空）。 */
+// ドットを含むslugの記事URLの末尾スラッシュの違い（上のnormと同じ。意図した差）は、リンクの比較では揃える
+const normHref = h => String(h).replace(/^(\/(?:blog|news|project)\/[^/]*\.[^/]*)\/$/, '$1');
+const normLinks = (k, v) => (k === 'links' && Array.isArray(v) ? v.map(normHref) : k === 'cards' && Array.isArray(v) ? v.map(c => ({ ...c, href: normHref(c.href) })) : v);
+
 export function compareFingerprints(baseline, actual, knownDiffs = []) {
   const diffs = [];
   const known = new Set(knownDiffs);
-  const push = (url, field, a, b) => { if (!known.has(`${url}|${field}`)) diffs.push({ url, field, baseline: a, actual: b }); };
+  const push = (url, field, a, b) => { if (!known.has(`${url}|${field}`) && !known.has(`${url}|*`)) diffs.push({ url, field, baseline: a, actual: b }); };
   const byUrl = m => new Map(m.map(p => [p.url, p]));
   const A = byUrl(actual.pages);
   for (const b of baseline.pages) {
@@ -106,7 +126,7 @@ export function compareFingerprints(baseline, actual, knownDiffs = []) {
     if (!a) { push(b.url, 'ページが無い', 'あり', 'なし'); continue; }
     for (const k of Object.keys(b)) {
       if (k === 'url') continue;
-      const bv = JSON.stringify(b[k]), av = JSON.stringify(a[k]);
+      const bv = JSON.stringify(normLinks(k, b[k])), av = JSON.stringify(normLinks(k, a[k]));
       if (bv !== av) push(b.url, k, b[k], a[k]);
     }
   }

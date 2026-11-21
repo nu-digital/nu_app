@@ -1,0 +1,987 @@
+[
+ {
+  "url": "/404/",
+  "field": "*",
+  "reason": "静的exportの/404/・/_not-found/は、動的配信では実在するページではなく、未知のURLが404を返す（未知のURLの404は変種の検査で確認）"
+ },
+ {
+  "url": "/_not-found/",
+  "field": "*",
+  "reason": "静的exportの/404/・/_not-found/は、動的配信では実在するページではなく、未知のURLが404を返す（未知のURLの404は変種の検査で確認）"
+ },
+ {
+  "url": "/blog/activity-2025-12-22-6db7c7/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2025-12-22-6db7c7/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2025-12-22-6db7c7/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-01-20-2f9241/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-01-20-2f9241/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-01-20-2f9241/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-01-29-24a47f/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-01-29-24a47f/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-01-29-24a47f/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-04-11-fe646c/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-04-11-fe646c/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-04-11-fe646c/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-05-28-f690fa/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-05-28-f690fa/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-05-28-f690fa/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-05-099b2b/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-05-099b2b/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-05-099b2b/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-06-71597c/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-06-71597c/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-06-71597c/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-08-a26f47/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-08-a26f47/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-08-a26f47/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-08-d62351/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-08-d62351/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-08-d62351/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-12-d3e961/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-12-d3e961/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-12-d3e961/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-19-a9bc7b/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-19-a9bc7b/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-06-19-a9bc7b/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-07-20-8c34f0/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-07-20-8c34f0/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-07-20-8c34f0/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-07-24-50e440/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-07-24-50e440/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-07-24-50e440/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-08-01-1cc8bf/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-08-01-1cc8bf/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-08-01-1cc8bf/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-08-03-cf9870/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-08-03-cf9870/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-08-03-cf9870/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-08-10-c49474/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-08-10-c49474/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-08-10-c49474/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-08-13-9d5dc3/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-08-13-9d5dc3/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2026-08-13-9d5dc3/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/another/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/another/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/another/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/bennkyou/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/bennkyou/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/bennkyou/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/booth/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/booth/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/booth/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/busitu/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/busitu/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/busitu/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/cedec-2026-scholarship/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/cedec-2026-scholarship/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/cedec-2026-scholarship/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/dg/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/dg/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/dg/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/gamedan/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/gamedan/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/gamedan/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/houkoku/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/houkoku/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/houkoku/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/ibunya/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/ibunya/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/ibunya/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/iwakenlab-5th-mini-exhibit/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/iwakenlab-5th-mini-exhibit/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/iwakenlab-5th-mini-exhibit/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/kouryuu/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/kouryuu/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/kouryuu/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/kouryuu2026/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/kouryuu2026/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/kouryuu2026/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/metacms_article/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/metacms_article/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/metacms_article/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/newDocument/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/newDocument/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/newDocument/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/nu.metasou/",
+  "field": "meta",
+  "reason": "ドットを含むslugは、Nextがファイル扱いにして、末尾スラッシュ付きのURLを末尾スラッシュなしへ308にする（内容は200で同一）。Nextの仕様で、ページのDOM・見た目は一致を確認済み"
+ },
+ {
+  "url": "/blog/nu.metasou/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/nu.metasou/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/nu.metasou/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/numa_koushuu/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/numa_koushuu/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/numa_koushuu/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/science/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/science/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/science/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/sousaku/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/sousaku/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/sousaku/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/student-vr-meetup-2026/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/student-vr-meetup-2026/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/student-vr-meetup-2026/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/surugadai-ourisai-2026/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/surugadai-ourisai-2026/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/surugadai-ourisai-2026/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/svrc/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/svrc/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/svrc/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/vkasai/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/vkasai/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/vkasai/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/vket/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/vket/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/vket/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/vketReal/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/vketReal/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/vketReal/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/xr/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/xr/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/xr/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/news/site-redesign/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/news/site-redesign/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/news/site-redesign/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/dimensions-gate/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/dimensions-gate/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/dimensions-gate/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/exhibition-game-launcher/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/exhibition-game-launcher/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/exhibition-game-launcher/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/fogland/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/fogland/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/fogland/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/lbe-restaurant-simulator/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/lbe-restaurant-simulator/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/lbe-restaurant-simulator/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/nu-room/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/nu-room/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/nu-room/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/organization-website/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/organization-website/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/organization-website/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/recall/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/recall/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/recall/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/recruitment-poster/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/recruitment-poster/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/recruitment-poster/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/shadow-interaction/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/shadow-interaction/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/shadow-interaction/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/tokyo-open-data-guide/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/tokyo-open-data-guide/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/tokyo-open-data-guide/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/uchatclient-1/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/uchatclient-1/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/uchatclient-1/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/uchatclient-2/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/uchatclient-2/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/uchatclient-2/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/vkasai-booth/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/vkasai-booth/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/vkasai-booth/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/vrc-prototypes-2025/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/vrc-prototypes-2025/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/vrc-prototypes-2025/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/vrc-prototypes-2026/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/vrc-prototypes-2026/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/vrc-prototypes-2026/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/web-prototypes/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/web-prototypes/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/web-prototypes/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/world-hackathon-2-prototype/",
+  "field": "mainDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/world-hackathon-2-prototype/",
+  "field": "articleDomSha",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/project/world-hackathon-2-prototype/",
+  "field": "author",
+  "reason": "投稿者名の匿名化（D14）: 公開許可が確認されるまで「nu_digital」と表示する。投稿者名を伏せたDOM（mainDomShaMasked・articleDomShaMasked）は基準と完全一致を検査している"
+ },
+ {
+  "url": "/blog/activity-2025-12-22-6db7c7",
+  "field": "status",
+  "reason": "リダイレクトが301から308に変わった（Next 16。末尾スラッシュ付きへ。ブラウザー・検索エンジンの扱いは同じ）"
+ },
+ {
+  "url": "/blog/activity-2025-12-22-6db7c7/index.html",
+  "field": "status",
+  "reason": "/x/index.html は静的ファイルが無くなり404（正規のURLは末尾スラッシュ付き）"
+ },
+ {
+  "url": "/news/site-redesign",
+  "field": "status",
+  "reason": "リダイレクトが301から308に変わった（Next 16。末尾スラッシュ付きへ。ブラウザー・検索エンジンの扱いは同じ）"
+ },
+ {
+  "url": "/news/site-redesign/index.html",
+  "field": "status",
+  "reason": "/x/index.html は静的ファイルが無くなり404（正規のURLは末尾スラッシュ付き）"
+ },
+ {
+  "url": "/project/demo-yura",
+  "field": "status",
+  "reason": "リダイレクトが301から308に変わった（Next 16。末尾スラッシュ付きへ。ブラウザー・検索エンジンの扱いは同じ）"
+ },
+ {
+  "url": "/project/demo-yura/index.html",
+  "field": "status",
+  "reason": "/x/index.html は静的ファイルが無くなり404（正規のURLは末尾スラッシュ付き）"
+ },
+ {
+  "url": "/blog/newDocument",
+  "field": "status",
+  "reason": "リダイレクトが301から308に変わった（Next 16。末尾スラッシュ付きへ。ブラウザー・検索エンジンの扱いは同じ）"
+ },
+ {
+  "url": "/blog/newDocument/index.html",
+  "field": "status",
+  "reason": "/x/index.html は静的ファイルが無くなり404（正規のURLは末尾スラッシュ付き）"
+ },
+ {
+  "url": "/blog/nu.metasou",
+  "field": "status",
+  "reason": "ドットを含むslugは、Nextがファイル扱いにして、末尾スラッシュ付きのURLを末尾スラッシュなしへ308にする（内容は200で同一）。Nextの仕様で、ページのDOM・見た目は一致を確認済み"
+ },
+ {
+  "url": "/blog/nu.metasou",
+  "field": "location",
+  "reason": "ドットを含むslugは、Nextがファイル扱いにして、末尾スラッシュ付きのURLを末尾スラッシュなしへ308にする（内容は200で同一）。Nextの仕様で、ページのDOM・見た目は一致を確認済み"
+ },
+ {
+  "url": "/blog/nu.metasou/index.html",
+  "field": "status",
+  "reason": "/x/index.html は静的ファイルが無くなり404（正規のURLは末尾スラッシュ付き）"
+ },
+ {
+  "url": "/blog/does-not-exist",
+  "field": "status",
+  "reason": "未知のURLは、スラッシュ付きへ308のあと404（以前は404を直接返した）"
+ },
+ {
+  "url": "/blog/does-not-exist",
+  "field": "location",
+  "reason": "未知のURLは、スラッシュ付きへ308のあと404（以前は404を直接返した）"
+ },
+ {
+  "url": "/blog",
+  "field": "status",
+  "reason": "リダイレクトが301から308に変わった（Next 16。末尾スラッシュ付きへ。ブラウザー・検索エンジンの扱いは同じ）"
+ }
+]

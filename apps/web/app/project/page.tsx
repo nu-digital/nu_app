@@ -2,7 +2,10 @@ import ContentCard from "@/components/content/ContentCard";
 
 import { getAllContent } from "@/lib/markdown";
 
-export default function ProjectPage() {
+export const dynamic = "force-dynamic";
+
+export default async function ProjectPage() {
+  const projects = await getAllContent("project");
   return (
     <main className="min-h-screen px-5 py-14 text-[var(--brand-ink)] md:py-20">
       <header className="mx-auto mb-12 max-w-6xl border-b-4 border-[var(--brand-blue)] pb-6">
@@ -15,7 +18,7 @@ export default function ProjectPage() {
       </header>
 
       <section className="mx-auto grid max-w-6xl grid-cols-1 gap-x-8 gap-y-12 md:grid-cols-2 lg:grid-cols-3">
-        {getAllContent("project").map((project) => (
+        {projects.map((project) => (
           <ContentCard key={project.slug} {...project} />
         ))}
       </section>

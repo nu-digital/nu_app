@@ -94,7 +94,7 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 - 公開画像は**長期キャッシュ・静的コピーをしない**: `/api/v1/public/media/*`は`Cache-Control: no-cache`（強いETag）。Nginxの`proxy_cache`・Next.jsの画像最適化キャッシュ・静的書き出しに焼き込むと、公開停止・redact後も画像が残るため、公式サイト側（P3-04）でもこの方針を守る。
 ### 既存記事の移行と投稿者名（P3-04a・D14）
 
-- `nuctl import-legacy --content-dir <dir> --inventory <inventory.json> --as <ownerのログインID> [--apply]`（既定はdry-run）。運用者がサーバー上で手動で実行する（workflowから呼ばない。`check.mjs`が禁止）。`api`イメージは`content/`を含まないため**読み取り専用でマウント**する: `docker compose run --rm --no-deps -v "$PWD/apps/web/content:/content:ro" -v "$PWD/docs/legacy-baseline/inventory.json:/inventory.json:ro" --entrypoint /nuctl api import-legacy --content-dir /content --inventory /inventory.json --as <オーナー> [--apply]`。ゴールデン（`docs/legacy-baseline/`）と食い違えば何も書かずに失敗する。再実行は冪等（既存の記事は触らない）。
+- `nuctl import-legacy --content-dir <apps/web/content> --baseline-dir <docs/legacy-baseline> --as <ownerのログインID> [--apply]`（既定はdry-run）。運用者がサーバー上で手動で実行する（workflowから呼ばない。`check.mjs`が禁止）。`api`イメージは`content/`を含まないため**読み取り専用でマウント**する: `docker compose run --rm --no-deps -v "$PWD/apps/web/content:/content:ro" -v "$PWD/docs/legacy-baseline:/baseline:ro" --entrypoint /nuctl api import-legacy --content-dir /content --baseline-dir /baseline --as <オーナー> [--apply]`。ゴールデン（`docs/legacy-baseline/`）と食い違えば何も書かずに失敗する。再実行は冪等（既存の記事は触らない）。
 - **投稿者名は`legacy_authors`にだけ置き、記事の版・監査ログ・Discordには入れない**。移行直後はすべて公開許可が**未確認**で、公開APIの`author`は「nu_digital」。名前の公開は、管理者が本人の許可を確認して記録した後だけ（P3-04a-2の管理画面）。ユーザーへの紐付けは公開可否と独立で、表示名での自動紐付けはしない。
 - **投稿者の管理API（P3-04a-2）**: `GET /admin/legacy-authors`（未確認が先頭）、`POST .../permit`（確認の方法の記録が必須。確認者・日時を保存）、`POST .../withdraw`、`PUT/DELETE .../link`（ユーザーIDで紐付け。表示名では紐付けない）。紐付けと公開可否は互いに変えない。**同意の撤回**で紐付く投稿者は撤回状態になり（再同意しても自動では再公開しない）、**個人情報の削除**で名前は匿名の記号へ置換され再許可・再紐付けもできない。監査に名前・確認の記録内容は入らない。画面は `/admin/legacy-authors`（ユーザー管理から入る）。
 - 取り下げ: `docs/legacy-baseline/takedown.json`に載せた記事は移行しない（災害復旧後の再実行でも再公開されない）。
@@ -109,3 +109,12 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 - 確認: `GET /admin/notifications/deliveries?status=pending|dead`。`dead`は恒久的な拒否（権限・チャンネルの誤り）か再試行の上限。原因を直してから`POST /admin/notifications/deliveries/{id}/retry`で再送する。
 - 重複: 障害の切り替わりで同じ通知が2回届くことがある（exactly-onceは保証しない）。本文の「通知ID」で同一かを確認できる。
 - tokenを漏らした疑いがあるときは、Discordの開発者ポータルでtokenを再生成し、`.env`を差し替えてAPIを再起動する。ログ・DB・APIの応答にtokenは出ない設計（テストで確認）。
+
+## 公式サイトの動的配信（P3-04b）
+
+- 公式サイト（`apps/web`）は、コンテンツを公開API（`API_INTERNAL_URL`。サーバー側のみ）から**描画時に取得**する（Next standalone。キャッシュしない）。撤回・個人情報削除（D08）は次のリクエストから反映される。**APIが落ちている間、コンテンツを使うページ（トップ含む）は5xx・`no-store`になる**（静的配信ではなくなった代償）。`/healthz/`はAPIに依存せず200を返す（コンテナの死活監視に使い、APIの障害でwebを再起動させない）。P4-01の死活監視には、API・webの両方のhealthzと、`/blog/`が200であることの監視を含める。
+- **プロキシ・CDNの要件（P4-01）**: HTMLと公開JSON（`/api/v1/public/contents*`）は**キャッシュしない**（秒単位のmicrocacheも不可）。アップロード画像は`/api/v1/public/media/<22文字>`の**GET・HEADだけ**をAPIへ中継し（`Cookie`・`Authorization`を外す・`proxy_cache`を使わない・`proxy_pass`はURIなし）、それ以外の`/api/v1/*`はサイトのホストから出さない。
+- **切り戻しは、API接続版の前のイメージへ**。静的イメージ（`content/*.md`の原文）へは戻さない（CMSで公開停止・修正した後に戻すと、消した内容が再び公開されるため）。
+- **検索エンジン**: 作品ページは`noarchive`。撤回・削除の依頼で検索結果に残る場合は、各検索エンジンの削除依頼（URL削除ツール）を使う。
+- 末尾スラッシュ: 標準のとおり、スラッシュ無しはスラッシュ付きへ308。ドットを含むslug（例: `/blog/nu.metasou/`）はNextがファイル扱いにして、スラッシュ無しのURLへ308する（内容は同じ）。
+- 検査（CI: `web / lint-typecheck-build`）: 擬似の公開APIと組み合わせて起動し、全ルート・記事・画像、ブラウザー操作、移設前基準との**指紋の比較**（意図した差は`docs/legacy-baseline/known-diffs.json`に理由つき。投稿者名を伏せたDOMのハッシュは基準と完全一致）、APIが使えないときの5xx・`no-store`を確認する。

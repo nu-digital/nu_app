@@ -2,19 +2,18 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ContentArticle from "@/components/content/ContentArticle";
 import { siteConfig } from "@/data/site";
-import { getAllContentSlugs, getContentBySlug } from "@/lib/markdown";
+import { getContentBySlug } from "@/lib/markdown";
 
 type Props = {
   params: Promise<{ slug: string }>;
 };
 
-export function generateStaticParams() {
-  return getAllContentSlugs("project");
-}
+// 公開API（撤回・個人情報削除を次のリクエストから反映する）から描画時に取得する。ビルド時に焼き込まない
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const post = getContentBySlug("project", slug);
+  const post = await getContentBySlug("project", slug);
 
   if (!post) {
     return {};
@@ -26,6 +25,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: post.title,
+    // 制作メンバー（同意に基づく表示名）を含むため、検索エンジンのキャッシュ（アーカイブ）に残さない
+    robots: { noarchive: true },
     description: post.excerpt,
     openGraph: {
       title: post.title,
@@ -45,7 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function PostPage({ params }: Props) {
   const { slug } = await params;
-  const post = getContentBySlug("project", slug);
+  const post = await getContentBySlug("project", slug);
 
   if (!post) {
     notFound();

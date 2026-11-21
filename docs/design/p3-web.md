@@ -45,7 +45,7 @@
 
 ## 2. P3-04a: 移行CLI
 
-`nuctl import-legacy --content-dir <dir> --inventory <inventory.json> --as <ownerのログインID> [--apply]`。運用者がサーバー上で手動で実行する（workflowから呼べない。`check.mjs`の禁止に追加）。`api`イメージ（distroless）は`content/`を含まないため、運用手順に**読み取り専用のマウント**を書く: `docker compose run --rm --no-deps -v "$PWD/apps/web/content:/content:ro" -v "$PWD/docs/legacy-baseline/inventory.json:/inventory.json:ro" --entrypoint /nuctl api import-legacy --content-dir /content --inventory /inventory.json --as <オーナー> [--apply]`。
+`nuctl import-legacy --content-dir <dir> --baseline-dir <dir> --as <ownerのログインID> [--apply]`。運用者がサーバー上で手動で実行する（workflowから呼べない。`check.mjs`の禁止に追加）。`api`イメージ（distroless）は`content/`を含まないため、運用手順に**読み取り専用のマウント**を書く: `docker compose run --rm --no-deps -v "$PWD/apps/web/content:/content:ro" -v "$PWD/docs/legacy-baseline/inventory.json:/inventory.json:ro" --entrypoint /nuctl api import-legacy --content-dir /content --inventory /inventory.json --as <オーナー> [--apply]`。
 
 - **入力の検査（全件・適用前）**: (1) 各`.md`のsha256を`inventory.json`の`fileSha256`と照合（一致しなければ中止。意図して変えた場合だけ`--allow-source-changes`）、(2) **frontmatterを`yaml.v3`で読む**（`yaml.Node`を辿り、スカラーを**タグを解釈せずそのまま文字列**で取る＝`2026-10-20`が日時型にならない）。frontmatterの範囲は**先頭の`---`と、次の単独の`---`行**まで（本文中の`---`は触れない）、(3) 67本すべてを`mdcheck`に通す（元URLコメントを外した後）、(4) 項目の検査は**APIと共通の関数**（`checkFields`・`validMetadataValue`・slug・日付の整合を`internal/cmsrules`へ切り出して両方が使う）、(5) `title`・`date`必須、`image`が`/images/`始まり、`category`はBlog/Product。**1本でも違反なら何も書かずに一覧を出して終了**（本文を勝手に書き換えない）。
 - **元URLコメントの除去**: 「本文の**最初の空でない1行**が`<!-- 元URL: https://… | 取得日: YYYY-MM-DD -->`に完全一致」する場合だけ外し、URLを`metadata.sourceUrl`へ（それ以外のコメントは`mdcheck`が違反にする）。

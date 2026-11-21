@@ -67,12 +67,21 @@ services:
       migrate: { condition: service_completed_successfully }
 
   web:
-    build: ../apps/web
+    # 公開サイト。コンテンツは公開API（api）から描画時に取得する（動的配信）。画像のアップロード分は /api/v1/public/media/* をapiへ中継する
+    build:
+      context: ../apps/web
+      args:
+        API_INTERNAL_URL: http://api:8080
     <<: *hardened
     read_only: true
-    tmpfs: ["/tmp", "/var/cache/nginx"]
+    # Nextの実行時キャッシュ(.next/cache)の書き込み先。コンテナを作り直すと消える
+    tmpfs: ["/tmp", "/app/.next/cache"]
+    depends_on:
+      api: { condition: service_started }
+    environment:
+      API_INTERNAL_URL: http://api:8080
     ports:
-      - "127.0.0.1:${WEB_PORT:-8081}:8080"
+      - "127.0.0.1:${WEB_PORT:-8081}:3000"
 
   admin:
     build: ../apps/admin

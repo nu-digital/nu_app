@@ -17,11 +17,11 @@ import { featuredVideo, overviewSlides } from "@/data/site";
 
 type ContentArticleProps = { post: ContentPost };
 
-export default function ContentArticle({ post }: ContentArticleProps) {
+export default async function ContentArticle({ post }: ContentArticleProps) {
   const hasFeaturedVideo = /<div\s+data-video="featured"\s*>\s*<\/div>/.test(post.content);
   const videoIds = getYouTubeVideoIds(post.content)
     .filter((id) => !hasFeaturedVideo || id !== featuredVideo.videoId);
-  const latestPosts = getBlogFeed()
+  const latestPosts = (await getBlogFeed())
     .filter((item) => item.collection !== post.collection || item.slug !== post.slug)
     .slice(0, 5);
 
@@ -77,6 +77,16 @@ export default function ContentArticle({ post }: ContentArticleProps) {
               </ReactMarkdown>
             </div>
             </ArticleMedia>
+            {post.contributors.length > 0 && (
+              <section aria-labelledby="contributors" className="mt-10 border-t border-slate-200 pt-6">
+                <h2 id="contributors" className="text-lg font-black">制作メンバー</h2>
+                <ul className="mt-3 space-y-1 text-sm text-slate-700">
+                  {post.contributors.map((c, i) => (
+                    <li key={`${c.roleLabel}-${i}`}><span className="font-bold">{c.roleLabel}</span>：{c.displayName}</li>
+                  ))}
+                </ul>
+              </section>
+            )}
             <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 py-6 text-sm">
               <span className="text-slate-500">投稿者：{post.author}</span>
               <Link href="/blog" className="font-bold text-[var(--brand-blue)]">ブログ一覧へ →</Link>

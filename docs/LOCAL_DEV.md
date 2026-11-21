@@ -12,7 +12,7 @@ npm run dev:up                # db → migrate → api → bot / web / admin を
 
 | サービス | URL（127.0.0.1のみ） | 内容 |
 |---|---|---|
-| web | http://127.0.0.1:8081/ | 既存の公式サイト（静的export）。URLは本番想定と同じ |
+| web | http://127.0.0.1:8081/ | 公式サイト（動的配信。コンテンツは公開API（api）から描画時に取得）。URLは本番想定と同じ。APIが落ちている間は、コンテンツのページは5xxになる（`/healthz/`は応答する）。移行前の記事は、運用者が`nuctl import-legacy`で取り込むまで表示されない |
 | admin | http://127.0.0.1:3000/ | 内部アプリの骨組み（`/healthz`のみ。画面はP1以降） |
 | api | http://127.0.0.1:8080/healthz ・ `/readyz` | `readyz`はDB接続を含む |
 | db | `127.0.0.1:15432`（PostgreSQL） | ローカル専用。ポートは`.env`の`DB_PORT` |

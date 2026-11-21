@@ -113,6 +113,20 @@ export function repositoryErrors(repositoryRoot = root) {
       if (!/^[\w-]+\/[\w-]+@[a-f0-9]{40}$/.test(match[1])) errors.push('外部Actionは完全なSHAで固定してください。');
     }
   }
+  // 公式サイトは動的配信。撤回・個人情報削除（D08）を次のリクエストから反映するため、キャッシュの仕組みを入れない（p3-web.md §3）
+  const siteDirs = ['app', 'components', 'lib'].map(d => resolve(repositoryRoot, 'apps/web', d));
+  const siteFiles = [resolve(repositoryRoot, 'apps/web/next.config.ts'), resolve(repositoryRoot, 'apps/web/proxy.ts')];
+  const collect = d => existsSync(d) ? readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? collect(resolve(d, e.name)) : [resolve(d, e.name)]) : [];
+  const cachePattern = /\b(revalidate|unstable_cache|cacheComponents|staleTimes|force-static)\b|["']use cache["']|unoptimized\s*:\s*false/;
+  for (const f of [...siteDirs.flatMap(collect), ...siteFiles].filter(f => /\.(ts|tsx|mjs|js)$/.test(f) && existsSync(f))) {
+    const code = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    if (cachePattern.test(code)) errors.push(`${f.slice(repositoryRoot.length + 1)}: 公式サイトにキャッシュの設定（revalidate・"use cache"・unstable_cache・cacheComponents・staleTimes・force-static）は入れないでください。`);
+  }
+  // WebPエンコーダー（gen2brain/webp）は、環境のlibwebpを動的に読まない同梱のGo実装だけを使う（nodynamic）。本番イメージのビルドで必須
+  const apiDockerfile = resolve(repositoryRoot, 'services/api/Dockerfile');
+  if (existsSync(apiDockerfile) && !(readFileSync(apiDockerfile, 'utf8').match(/go build [^\n]*/g) ?? []).every(l => l.includes('-tags nodynamic'))) {
+    errors.push('services/api/Dockerfile の go build には -tags nodynamic を付けてください（WebPエンコーダーの動作を環境に依存させないため）。');
+  }
   // 公開サイトと管理画面のプレビューの許可リストは、バイト単位で同一でなければならない（p3-web.md §3）
   const shared = ['apps/web/lib/markdown-sanitize.mjs', 'apps/admin/lib/markdown-sanitize.mjs'].map(f => resolve(repositoryRoot, f));
   if (shared.every(f => existsSync(f))) {

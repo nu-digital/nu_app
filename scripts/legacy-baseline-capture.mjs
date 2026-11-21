@@ -6,12 +6,13 @@ import { join, resolve, extname } from 'node:path';
 import { createRequire } from 'node:module';
 
 const [outArg, shotArg, basePath = ''] = process.argv.slice(2);
-const out = resolve(outArg), shots = resolve(shotArg);
+const external = /^https?:\/\//.test(outArg); // 稼働中のサイトのURLを渡すと、そのサイトに対して行う（動的配信）
+const out = external ? '' : resolve(outArg), shots = resolve(shotArg);
 mkdirSync(shots, { recursive: true });
 const { chromium } = createRequire(join(resolve(process.env.PLAYWRIGHT_DIR), 'x.js'))('playwright');
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.json': 'application/json', '.woff2': 'font/woff2', '.txt': 'text/plain' };
 
-const server = createServer((req, res) => {
+const server = external ? null : createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (basePath) { if (!p.startsWith(basePath + '/') && p !== basePath) { res.writeHead(404).end(); return; } p = p.slice(basePath.length) || '/'; }
   let f = join(out, p);
@@ -19,9 +20,9 @@ const server = createServer((req, res) => {
   if (!existsSync(f)) { f = join(out, '404.html'); res.statusCode = 404; }
   res.setHeader('content-type', types[extname(f)] || 'application/octet-stream');
   res.end(readFileSync(f));
-}).listen(0, '127.0.0.1');
-await new Promise(r => server.once('listening', r));
-const base = `http://127.0.0.1:${server.address().port}${basePath}`;
+});
+if (server) { server.listen(0, '127.0.0.1'); await new Promise(r => server.once('listening', r)); }
+const base = external ? outArg.replace(/\/$/, '') + basePath : `http://127.0.0.1:${server.address().port}${basePath}`;
 
 const inv = JSON.parse(readFileSync(new URL('../docs/legacy-baseline/inventory.json', import.meta.url)));
 const result = { base: basePath || '(root)', routes: [], gallery: [], viewports: [], notes: [] };
@@ -133,7 +134,7 @@ check('先頭(1枚目)から←で末尾へ循環', first.startsWith('1 /') && w
 await page.keyboard.press('Escape');
 await imgs.nth(0).click(); await page.screenshot({ path: join(shots, 'pc-gallery-lightbox-open.png') });
 await ctx.close();
-await browser.close(); server.close();
+await browser.close(); server?.close();
 writeFileSync(join(shots, 'capture-result.json'), JSON.stringify(result, null, 2));
 const bad = result.routes.filter(r => r.status !== 200 || r.brokenImages || r.failures);
 console.log(JSON.stringify({ base: result.base, routes: result.routes.length, nonOk: bad.length, notFoundStatus: result.notFoundStatus, galleryFail: result.gallery.filter(g => !g.ok).map(g => g.name), galleryChecks: result.gallery.length }, null, 1));
