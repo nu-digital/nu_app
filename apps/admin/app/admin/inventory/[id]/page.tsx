@@ -1,0 +1,114 @@
+"use client";
+
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+
+import AppShell from "@/components/AppShell";
+import Notice from "@/components/Notice";
+import { createUnit, describe, getItem, updateItem, type ItemDetail } from "@/lib/api";
+
+export default function AdminItemPage() {
+  return <AppShell>{() => <Edit />}</AppShell>;
+}
+
+function Edit() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [version, setVersion] = useState(0);
+  const [it, setIt] = useState<ItemDetail | null>(null);
+  const [msg, setMsg] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [f, setF] = useState({ name: "", category: "", location: "", description: "" });
+  const [total, setTotal] = useState(1);
+  const [reason, setReason] = useState("");
+  const [tag, setTag] = useState("");
+  const [serial, setSerial] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    getItem(id)
+      .then((v) => {
+        if (!alive) return;
+        setIt(v);
+        setF({ name: v.name, category: v.category, location: v.location, description: v.description });
+        setTotal(v.totalQuantity);
+      })
+      .catch((e) => alive && setMsg({ kind: "error", text: (e as { status?: number }).status === 404 ? "この物品は見つかりません。" : describe(e) }));
+    return () => {
+      alive = false;
+    };
+  }, [id, version]);
+
+  const act = async (f2: () => Promise<string>) => {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const text = await f2();
+      setVersion((v) => v + 1);
+      setMsg({ kind: "success", text });
+    } catch (e) {
+      setMsg({ kind: "error", text: describe(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!it) return <main className="page" aria-busy="true">{msg && <Notice kind={msg.kind}>{msg.text}</Notice>}<p><Link href="/admin/inventory">← 物品の管理へ</Link></p></main>;
+  const outstanding = it.outstanding;
+  return (
+    <main className="page">
+      <p><Link href="/admin/inventory">← 物品の管理へ</Link></p>
+      <h1>{it.name}</h1>
+      <p className="meta">{it.mode === "quantity" ? "数量で管理" : "個体ごとに管理"}（管理方式は、貸出や個体ができたあとは変えられません）</p>
+      {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
+
+      <section className="panel" aria-labelledby="basic-title">
+        <h2 id="basic-title">基本情報</h2>
+        <form onSubmit={(e) => { e.preventDefault(); void act(async () => { await updateItem(id, { name: f.name.trim(), category: f.category.trim(), location: f.location.trim(), description: f.description.trim() }); return "基本情報を保存しました。"; }); }}>
+          <div className="field"><label htmlFor="e-name">名前（必須）</label><input id="e-name" className="input" required maxLength={100} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
+          <div className="field"><label htmlFor="e-cat">カテゴリ</label><input id="e-cat" className="input" maxLength={50} value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} /></div>
+          <div className="field"><label htmlFor="e-loc">保管場所</label><input id="e-loc" className="input" maxLength={100} value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} /></div>
+          <div className="field"><label htmlFor="e-desc">説明</label><textarea id="e-desc" className="input" rows={3} maxLength={1000} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></div>
+          <button className="btn inline" type="submit" disabled={busy || !f.name.trim()}>保存する</button>
+        </form>
+      </section>
+
+      {it.mode === "quantity" ? (
+        <section className="panel" aria-labelledby="total-title">
+          <h2 id="total-title">総数を変える</h2>
+          <p className="hint">現在の総数は{it.totalQuantity}個、貸出中は{outstanding}個です。貸出中の数より少なくはできません。変更は理由つきで履歴に残ります。</p>
+          <form onSubmit={(e) => { e.preventDefault(); void act(async () => { await updateItem(id, { totalQuantity: total, reason: reason.trim() }); setReason(""); return `総数を${total}個に変更しました。`; }); }}>
+            <div className="field"><label htmlFor="t-total">新しい総数</label><input id="t-total" className="input" type="number" min={1} inputMode="numeric" value={total} onChange={(e) => setTotal(Number(e.target.value) || 1)} /></div>
+            <div className="field"><label htmlFor="t-reason">変更の理由（必須）</label><input id="t-reason" className="input" maxLength={200} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+            <button className="btn inline" type="submit" disabled={busy || !reason.trim() || total === it.totalQuantity}>総数を変更する</button>
+          </form>
+        </section>
+      ) : (
+        <section className="panel" aria-labelledby="unit-title">
+          <h2 id="unit-title">個体を登録する</h2>
+          <ul className="items">
+            {it.units.map((u) => (
+              <li key={u.id} className="item" data-tag={u.assetTag}><div><strong>{u.assetTag}</strong><div className="user-id">{u.loaned ? `貸出中: ${u.loaned.borrowerDisplayName}さん` : "在庫あり"}</div></div></li>
+            ))}
+            {it.units.length === 0 && <li className="hint">個体がまだありません。</li>}
+          </ul>
+          <form onSubmit={(e) => { e.preventDefault(); void act(async () => { await createUnit(id, tag.trim(), serial.trim() || undefined); const t = tag.trim(); setTag(""); setSerial(""); return `管理番号 ${t} を登録しました。`; }); }}>
+            <div className="field"><label htmlFor="u-tag">管理番号（必須）</label><input id="u-tag" className="input" required maxLength={50} value={tag} onChange={(e) => setTag(e.target.value)} /></div>
+            <div className="field"><label htmlFor="u-serial">シリアル番号</label><input id="u-serial" className="input" maxLength={100} value={serial} onChange={(e) => setSerial(e.target.value)} /></div>
+            <button className="btn inline" type="submit" disabled={busy || !tag.trim()}>個体を登録する</button>
+          </form>
+        </section>
+      )}
+
+      <section className="panel" aria-labelledby="arch-title">
+        <h2 id="arch-title">この物品を廃止する</h2>
+        <p className="hint">廃止すると一覧に出なくなり、借りられなくなります。履歴は残ります。貸出中のものがあるあいだは廃止できません。</p>
+        <form onSubmit={(e) => { e.preventDefault(); if (!window.confirm(`「${it.name}」を廃止します。よろしいですか？`)) return; void act(async () => { await updateItem(id, { archived: true }); router.push("/admin/inventory"); return "廃止しました。"; }); }}>
+          <button className="btn danger inline" type="submit" disabled={busy}>廃止する</button>
+        </form>
+      </section>
+    </main>
+  );
+}

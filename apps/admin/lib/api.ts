@@ -14,8 +14,8 @@ export function setCsrf(token: string) {
   csrfToken = token;
 }
 
-async function call(method: string, path: string, body?: unknown): Promise<{ status: number; json: unknown; retryAfter?: number }> {
-  const headers: Record<string, string> = {};
+async function call(method: string, path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<{ status: number; json: unknown; retryAfter?: number }> {
+  const headers: Record<string, string> = { ...extraHeaders };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (method !== "GET" && csrfToken) headers["X-CSRF-Token"] = csrfToken;
   const res = await fetch(`/api/v1${path}`, {
@@ -224,4 +224,22 @@ export async function listHistory(cursor?: string) {
   const params = new URLSearchParams({ limit: "50" });
   if (cursor) params.set("cursor", cursor);
   return ok<{ items: HistoryEvent[]; nextCursor: string | null }>(await call("GET", `/inventory/history?${params.toString()}`), 200);
+}
+
+// --- 物品の管理（Admin/Owner。権限はAPIが強制する）---
+export type ItemInput = { name: string; description: string; category: string; location: string };
+export async function createItem(b: ItemInput & { mode: "quantity" | "individual"; totalQuantity?: number }) {
+  return ok<Item>(await call("POST", "/inventory/items", b), 201);
+}
+export async function updateItem(id: string, b: Partial<ItemInput> & { totalQuantity?: number; reason?: string; archived?: boolean }) {
+  return ok<Item>(await call("PATCH", `/inventory/items/${id}`, b), 200);
+}
+export async function createUnit(itemId: string, assetTag: string, serialNumber?: string) {
+  return ok<ItemUnit>(await call("POST", `/inventory/items/${itemId}/units`, { assetTag, ...(serialNumber ? { serialNumber } : {}) }), 201);
+}
+/** 訂正。同じ`key`の再送は二重適用されない（フォームを開くたびに新しいキーを作る）。 */
+export async function createCorrection(key: string, b: { targetType: "loan" | "return"; targetId: string; kind: "adjust" | "void"; deltaQuantity?: number; reason: string }) {
+  const r = await call("POST", "/admin/inventory/corrections", b, { "Idempotency-Key": key });
+  if (r.status !== 200 && r.status !== 201) throw toError(r);
+  return r.json as { replayed: boolean; itemOutstanding: number; itemAvailable: number };
 }

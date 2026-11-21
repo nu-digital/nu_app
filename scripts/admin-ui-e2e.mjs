@@ -441,6 +441,121 @@ export async function runAdminUiE2E(o) {
       await ctxA.close();
       await ctxB.close();
     }
+    // 物品の管理（Admin/Owner。登録・個体・総数変更・訂正。PC・スマホ・320px）
+    for (const [label, width, height] of [['pc', 1440, 900], ['sp', 390, 844], ['narrow', 320, 640]]) {
+      const mpw = 'ui-inventory-passphrase-1';
+      const mid = `ui.${label}.invm`, mname = `管理確認の借り手(${label})`;
+      const c = await o.apiCall('POST', '/admin/users', { body: { loginId: mid, displayName: mname }, cookie: o.ownerCookie, csrf: o.ownerCsrf });
+      await o.apiCall('POST', '/auth/accept-invite', { body: { token: c.json.url.split('#token=')[1], password: mpw } });
+      const ml = await o.apiCall('POST', '/auth/login', { body: { loginId: mid, password: mpw } });
+      const mem = { cookie: (ml.setCookie[0] ?? '').split(';')[0], csrf: ml.json.csrfToken };
+
+      // 一般メンバーには「物品の管理」の導線が無く、登録しようとしてもAPIが拒否して案内が出る
+      const mctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const mp = await mctx.newPage();
+      await login(mp, mid, mpw);
+      await mp.goto(`${adminUrl}/inventory`);
+      await mp.getByRole('heading', { level: 1, name: '物品' }).waitFor();
+      check(`[${label}] 一般メンバーの物品一覧に「物品の管理」の導線が出ない`, (await mp.getByRole('link', { name: '物品の管理' }).count()) === 0);
+      await mp.goto(`${adminUrl}/admin/inventory`);
+      await mp.getByLabel('名前（必須）').fill(`権限なし(${label})`);
+      await mp.getByRole('button', { name: '登録する' }).click();
+      await mp.locator('.notice.error').waitFor();
+      check(`[${label}] 一般メンバーが物品を登録しようとするとAPIが拒否し、案内が出る`, /権限がありません/.test(await mp.locator('.notice.error').innerText()));
+      await mctx.close();
+
+      const ctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const page = await ctx.newPage();
+      await login(page, o.ownerLogin, o.ownerPass);
+      await page.goto(`${adminUrl}/inventory`);
+      await page.getByRole('link', { name: '物品の管理' }).click();
+      await page.waitForURL('**/admin/inventory');
+      const qn = `管理ケーブル(${label})`, inn = `管理カメラ(${label})`;
+      await page.getByLabel('名前（必須）').fill(qn);
+      await page.getByLabel('カテゴリ').fill('ケーブル');
+      await page.getByLabel('総数').fill('4');
+      await page.getByRole('button', { name: '登録する' }).click();
+      await page.locator('.notice.success').filter({ hasText: `「${qn}」を登録しました` }).waitFor();
+      await page.getByLabel('名前（必須）').fill(inn);
+      await page.getByLabel('管理方式').selectOption('individual');
+      check(`[${label}] 個体管理を選ぶと総数の入力が消える`, (await page.getByLabel('総数').count()) === 0);
+      await page.getByRole('button', { name: '登録する' }).click();
+      await page.locator('.notice.success').filter({ hasText: `「${inn}」を登録しました` }).waitFor();
+      check(`[${label}] 物品の管理に横溢れがない`, (await overflowOf(page)) <= 0, `overflow=${await overflowOf(page)}`);
+      check(`[${label}] 物品の管理の操作対象が44px以上`, (await smallOf(page)) === 0, `small=${await smallOf(page)}`);
+      if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-inventory-admin.png`), fullPage: true });
+
+      // 個体を登録する
+      await page.locator(`li.item[data-name="${inn}"]`).getByRole('link', { name: '編集・個体' }).click();
+      await page.getByRole('heading', { level: 1, name: inn }).waitFor();
+      await page.getByLabel('管理番号（必須）').fill(`CAM-${label}-01`);
+      await page.getByRole('button', { name: '個体を登録する' }).click();
+      await page.locator(`li.item[data-tag="CAM-${label}-01"]`).waitFor();
+      await page.getByLabel('管理番号（必須）').fill(`CAM-${label}-01`);
+      await page.getByRole('button', { name: '個体を登録する' }).click();
+      await page.locator('.notice.error').waitFor();
+      check(`[${label}] 同じ管理番号の個体は登録できず、案内が出る`, (await page.locator(`li.item[data-tag="CAM-${label}-01"]`).count()) === 1 && (await page.locator('.notice.error').innerText()).length > 10);
+
+      // 総数の変更: 理由が空だと押せない。貸出中より少ない総数は拒否される
+      await page.goto(`${adminUrl}/admin/inventory`);
+      await page.locator(`li.item[data-name="${qn}"]`).getByRole('link', { name: '編集・個体' }).click();
+      await page.getByRole('heading', { level: 1, name: qn }).waitFor();
+      const qid = page.url().split('/').pop();
+      const lr = await o.apiCall('POST', '/inventory/loans', { body: { itemId: qid, quantity: 3 }, ...mem });
+      check(`[${label}] （準備）一般メンバーが3個借りる`, lr.status === 201, `status=${lr.status} body=${JSON.stringify(lr.json)}`);
+      await page.reload();
+      await page.getByLabel('新しい総数').waitFor();
+      await page.getByLabel('新しい総数').fill('2');
+      check(`[${label}] 総数の変更は理由が空のあいだ押せない`, await page.getByRole('button', { name: '総数を変更する' }).isDisabled());
+      await page.getByLabel('変更の理由（必須）').fill('確認用に減らす');
+      await page.getByRole('button', { name: '総数を変更する' }).click();
+      await page.locator('.notice.error').waitFor();
+      check(`[${label}] 貸出中の数より少ない総数への変更は拒否される`, /現在の総数は4個/.test(await page.locator('main').innerText()) && (await page.locator('.notice.error').innerText()).length > 10);
+      await page.getByLabel('新しい総数').fill('6');
+      await page.getByRole('button', { name: '総数を変更する' }).click();
+      await page.locator('.notice.success').filter({ hasText: '総数を6個に変更しました' }).waitFor();
+      await page.getByText('現在の総数は6個、貸出中は3個').waitFor({ timeout: 10000 }).catch(() => {});
+      check(`[${label}] 総数を6に変更できる`, /現在の総数は6個、貸出中は3個/.test(await page.locator('main').innerText()));
+      check(`[${label}] 物品の編集に横溢れがない・操作対象が44px以上`, (await overflowOf(page)) <= 0 && (await smallOf(page)) === 0, `overflow=${await overflowOf(page)} small=${await smallOf(page)}`);
+      if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-inventory-admin-edit.png`), fullPage: true });
+
+      // 訂正: 履歴から借り手の貸出を取り消す → 貸出中が0に戻り、元の記録と訂正が履歴に残る
+      await page.goto(`${adminUrl}/inventory/history`);
+      const ev = page.locator('li.item[data-kind="loan"]').filter({ hasText: qn }).filter({ hasText: mname });
+      await ev.waitFor();
+      await ev.getByRole('button', { name: 'この記録を訂正する' }).click();
+      const form = ev.getByRole('form', { name: '記録の訂正' });
+      check(`[${label}] 訂正は理由が空のあいだ押せず、元の記録が残る注意がある`, (await form.getByRole('button', { name: '訂正する' }).isDisabled()) && /元の記録は消えず/.test(await form.innerText()));
+      if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-inventory-correction.png`), fullPage: true });
+      await form.getByLabel('訂正の理由（必須）').fill('誤って登録されたため(確認用)');
+      await form.getByRole('button', { name: '訂正する' }).click();
+      await page.locator('.notice.success').filter({ hasText: '記録を取り消しました' }).waitFor();
+      await page.locator('li.item[data-kind="correction"]').filter({ hasText: qn }).first().waitFor();
+      const htext = await page.locator('main').innerText();
+      check(`[${label}] 取消後も元の貸出が履歴に残り、訂正（理由つき）が追加される`, htext.includes(`${mname}さんが${qn}を3個借りました`) && htext.includes('理由: 誤って登録されたため(確認用)'));
+      await page.goto(`${adminUrl}/inventory/${qid}`);
+      await page.locator('.stock').waitFor();
+      check(`[${label}] 取消後は残りが総数（6）に戻る`, /残り 6 \/ 全?6|残り 6/.test(await page.locator('.stock').innerText()), await page.locator('.stock').innerText());
+      // 一般メンバーには訂正の導線が出ない
+      const mctx2 = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const mp2 = await mctx2.newPage();
+      await login(mp2, mid, mpw);
+      await mp2.goto(`${adminUrl}/inventory/history`);
+      await mp2.locator('li.item[data-kind]').first().waitFor();
+      const mtext = await mp2.locator('main').innerText();
+      check(`[${label}] 一般メンバーの履歴に訂正の導線と訂正の理由が出ない`, (await mp2.getByRole('button', { name: 'この記録を訂正する' }).count()) === 0 && !mtext.includes('誤って登録されたため'));
+      await mctx2.close();
+
+      // 廃止: 貸出が無ければ廃止でき、一覧から消える
+      await page.goto(`${adminUrl}/admin/inventory/${qid}`);
+      await page.getByRole('heading', { level: 1, name: qn }).waitFor();
+      page.once('dialog', (d) => d.accept());
+      await page.getByRole('button', { name: '廃止する' }).click();
+      await page.waitForURL('**/admin/inventory');
+      await page.locator(`li.item[data-name="${inn}"]`).waitFor();
+      check(`[${label}] 廃止した物品は管理の一覧から消える`, (await page.locator(`li.item[data-name="${qn}"]`).count()) === 0);
+      await ctx.close();
+    }
     // 権限が無い人（一般メンバー）にはAPIが拒否し、画面は案内を表示する
     {
       const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
