@@ -13,6 +13,7 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | GET | `/auth/me` | Member | 自分のID/ロール/状態 |
 | POST | `/auth/accept-invite` | Public + token | 招待URL tokenを検証して初期パスワード設定 |
 | POST | `/auth/reset-password` | Public + token | 再設定tokenの検証とパスワード更新、既存セッション失効 |
+| GET | `/admin/users` | Admin | アカウント一覧（検索・ページング。個人情報・秘密値は返さない） |
 | POST | `/admin/users` | Admin | loginIdと最小項目を指定してアカウント作成 |
 | POST | `/admin/users/{id}/invite-link` | Admin | 一度だけ表示する招待URLを発行 |
 | POST | `/admin/users/{id}/reset-link` | Admin | 本人確認後に再設定URLを発行 |
@@ -33,6 +34,7 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | `GET /auth/me` | – | 200（loginと同形式） | 401 |
 | `POST /auth/accept-invite` | `{token,password}` | 204（自動ログインしない） | 400 `INVALID_LINK`（無効/期限切れ/使用済み/失効を区別しない）、422 `WEAK_PASSWORD` |
 | `POST /auth/reset-password` | `{token,password}` | 204（全セッション失効） | 同上 |
+| `GET /admin/users` | クエリ `q`（ログインID・表示名の部分一致）, `limit`（1〜100、既定50）, `cursor` | 200 `{items:[{id,loginId,displayName,status,roles,createdAt,activatedAt}],nextCursor}`（Admin/Owner。個人情報・秘密値は含まない） | 401、403、400 |
 | `POST /admin/users` | `{loginId,displayName}` | 201 `{user,url,expiresAt}`（`url`=`<APP_BASE_URL>/invite#token=…`、一度だけ） | 409 `LOGIN_ID_TAKEN`、422 |
 | `POST /admin/users/{id}/invite-link` | – | 200 `{url,expiresAt}`（invitedのみ） | 409 `INVALID_STATE`・`CONFLICT` |
 | `POST /admin/users/{id}/reset-link` | – | 200 `{url,expiresAt}`（activeのみ。管理者対象はOwnerのみ） | 403、409 |

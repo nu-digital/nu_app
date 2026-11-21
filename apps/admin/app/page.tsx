@@ -13,6 +13,7 @@ const APPS: AppDef[] = [
   { id: "articles", title: "記事・作品", description: "活動報告や作品紹介を書いて、公開します。" },
   { id: "members", title: "メンバー", description: "メンバーを探して、プロフィールを見ます。" },
   { id: "profile", title: "プロフィール", description: "自分の表示名や公開する内容を設定します。" },
+  { id: "users", title: "ユーザー管理", description: "ユーザーの追加・停止や、招待・再設定URLの発行をします（管理者向け）。", href: "/admin/users" },
 ];
 
 export default function Launcher() {

@@ -123,3 +123,18 @@ SELECT * FROM users WHERE login_id = $1 FOR UPDATE;
 -- name: InsertRecoveryEvent :exec
 INSERT INTO emergency_recovery_events (executed_by_os_user, target_user_id, approver_note)
 VALUES ($1, $2, $3);
+
+-- name: ListUsers :many
+-- 管理画面の一覧。返す列は最小限（個人情報・秘密値は含めない）。検索は呼び出し側でLIKEのワイルドカードをエスケープして渡す。
+-- カーソル(作成日時,id)で安定して並べる。
+SELECT u.id, u.login_id, u.status, u.created_at, u.activated_at,
+       COALESCE(p.display_name, '') AS display_name,
+       COALESCE(array_agg(r.role ORDER BY r.role) FILTER (WHERE r.role IS NOT NULL), '{}')::text[] AS roles
+FROM users u
+LEFT JOIN profiles p ON p.user_id = u.id
+LEFT JOIN user_roles r ON r.user_id = u.id
+WHERE ($1::text = '' OR u.login_id ILIKE '%' || $1 || '%' ESCAPE '\' OR p.display_name ILIKE '%' || $1 || '%' ESCAPE '\')
+  AND ($2::timestamptz IS NULL OR (u.created_at, u.id) > ($2, $3::uuid))
+GROUP BY u.id, p.display_name
+ORDER BY u.created_at, u.id
+LIMIT $4;

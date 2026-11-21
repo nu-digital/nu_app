@@ -8,7 +8,7 @@ const require = createRequire(join(resolve('apps/admin'), 'x.js'));
 const { chromium } = require('playwright');
 
 /**
- * @param {{adminUrl:string, apiCall:Function, ownerCookie:string, ownerCsrf:string, memberLogin:string, memberPass:string, memberName:string, shotsDir?:string, check:(name:string, ok:boolean, detail?:string)=>void}} o
+ * @param {{ownerLogin:string, ownerPass:string, adminUrl:string, apiCall:Function, ownerCookie:string, ownerCsrf:string, memberLogin:string, memberPass:string, memberName:string, shotsDir?:string, check:(name:string, ok:boolean, detail?:string)=>void}} o
  */
 export async function runAdminUiE2E(o) {
   const { adminUrl, check } = o;
@@ -60,7 +60,7 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] キーボードだけでログインできる`, true);
       const h1 = await page.getByRole('heading', { level: 1 }).innerText();
       check(`[${label}] ランチャーに表示名が出る`, h1.includes(o.memberName), h1);
-      check(`[${label}] 全員共通のカードが4枚あり、未実装は「準備中」`, (await page.locator('.cards li').count()) === 4 && (await page.getByText('準備中').count()) === 4);
+      check(`[${label}] 全員共通のカードが5枚あり、未実装の4つは「準備中」`, (await page.locator('.cards li').count()) === 5 && (await page.getByText('準備中').count()) === 4);
       const broken = await page.evaluate(() => [...document.images].filter((i) => !i.complete || i.naturalWidth === 0).map((i) => i.getAttribute('src')));
       check(`[${label}] 画像（ロゴ・団体写真）がすべて読み込まれる`, broken.length === 0, broken.join(','));
       const wrapped = await page.getByRole('button', { name: 'ログアウト' }).evaluate((el) => el.getBoundingClientRect().height <= 60);
@@ -128,6 +128,106 @@ export async function runAdminUiE2E(o) {
       await p2.locator('.notice.error').waitFor();
       check(`[${label}] 使用済みの招待リンクはエラーになる`, /無効|期限切れ/.test(await p2.locator('.notice.error').innerText()));
       await ctx2.close();
+    }
+    // ユーザー管理画面（Ownerが操作。PC・スマホ・320px）
+    const login = async (page, id, pass) => {
+      await page.goto(adminUrl + '/login');
+      await page.getByLabel('ログインID').fill(id);
+      await page.getByLabel('パスワード', { exact: true }).fill(pass);
+      await page.getByRole('button', { name: 'ログイン', exact: true }).click();
+      await page.waitForURL(adminUrl + '/');
+    };
+    for (const [label, width, height] of [['pc', 1440, 900], ['sp', 390, 844], ['narrow', 320, 640]]) {
+      const ctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const page = await ctx.newPage();
+      await login(page, o.ownerLogin, o.ownerPass);
+      // ランチャーの「ユーザー管理」カードから入る
+      await page.getByRole('link', { name: /ユーザー管理/ }).click();
+      await page.waitForURL('**/admin/users');
+      await page.getByRole('heading', { level: 1, name: 'ユーザー管理' }).waitFor();
+      const row = (id) => page.locator(`li.user[data-login="${id}"]`);
+      await row(o.ownerLogin).waitFor();
+      check(`[${label}] ユーザー一覧に自分が「（あなた）」つきで表示され、自分には停止ボタンが無い`, /（あなた）/.test(await row(o.ownerLogin).innerText()) && (await row(o.ownerLogin).getByRole('button', { name: '停止する' }).count()) === 0);
+      const ovf = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      check(`[${label}] ユーザー管理に横溢れがない`, ovf <= 0, `overflow=${ovf}`);
+      const small = await page.locator('button, a.btn, input, summary').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 44; }).length);
+      check(`[${label}] ユーザー管理のボタン・入力の高さが44px以上`, small === 0, `44px未満=${small}`);
+      if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-users.png`), fullPage: true });
+      if (label === 'narrow') { await ctx.close(); continue; }
+
+      // 検索
+      await page.getByRole('searchbox').fill(o.ownerLogin);
+      await page.getByRole('button', { name: '検索' }).click();
+      await page.waitForFunction((n) => document.querySelectorAll('li.user').length === n, 1);
+      check(`[${label}] 検索で絞り込める`, (await page.locator('li.user').count()) === 1);
+      await page.getByRole('searchbox').fill('');
+      await page.getByRole('button', { name: '検索' }).click();
+      await page.waitForFunction(() => document.querySelectorAll('li.user').length > 1);
+
+      // 追加 → 招待URLが一度だけ表示される
+      const added = `ui.${label}.added`;
+      await page.getByText('ユーザーを追加する', { exact: true }).click(); // 折りたたまれている追加フォームを開く
+      await page.getByLabel('ログインID', { exact: true }).fill(added);
+      await page.getByLabel('表示名', { exact: true }).fill(`追加確認(${label})`);
+      await page.getByRole('button', { name: '追加して招待URLを発行する' }).click();
+      await page.locator('#issued-url').waitFor();
+      const url = await page.locator('#issued-url').inputValue();
+      check(`[${label}] 追加すると招待URL（フラグメント形式）が表示される`, /\/invite#token=[A-Za-z0-9_-]{43}$/.test(url), url.replace(/token=.*/, 'token=…'));
+      await row(added).waitFor();
+      check(`[${label}] 追加したユーザーが「招待中」で一覧に出る`, /招待中/.test(await row(added).innerText()));
+      if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-users-issued.png`) });
+      await page.getByRole('button', { name: '閉じる' }).click();
+      check(`[${label}] 閉じるとURLは画面から消える`, (await page.locator('#issued-url').count()) === 0);
+
+      // 受諾（API）→ 一覧を更新すると「有効」
+      const tok = url.split('#token=')[1];
+      const acc = await o.apiCall('POST', '/auth/accept-invite', { body: { token: tok, password: 'ui-added-passphrase-1' } });
+      check(`[${label}] 招待URLで受諾できる`, acc.status === 204, `status=${acc.status}`);
+      await page.getByRole('button', { name: '検索' }).click();
+      await page.waitForFunction((id) => /有効/.test(document.querySelector(`li.user[data-login="${id}"]`)?.textContent ?? ''), added);
+      check(`[${label}] 受諾後は「有効」になる`, true);
+
+      // 再設定URLの発行
+      await row(added).getByRole('button', { name: '再設定URLを発行' }).click();
+      await page.locator('#issued-url').waitFor();
+      check(`[${label}] 再設定URLが発行される`, /\/reset#token=/.test(await page.locator('#issued-url').inputValue()));
+      await page.getByRole('button', { name: '閉じる' }).click();
+
+      // 停止（確認つき）→ 再開
+      await row(added).getByRole('button', { name: '停止する' }).click();
+      check(`[${label}] 停止には確認が出る`, (await row(added).getByRole('group').count()) === 1);
+      await row(added).getByRole('button', { name: 'やめる' }).click();
+      check(`[${label}] 「やめる」で停止されない`, /有効/.test(await row(added).innerText()));
+      await row(added).getByRole('button', { name: '停止する' }).click();
+      await row(added).getByRole('group').getByRole('button', { name: '停止する' }).click();
+      await page.waitForFunction((id) => /停止中/.test(document.querySelector(`li.user[data-login="${id}"]`)?.textContent ?? ''), added);
+      check(`[${label}] 停止すると「停止中」になる`, true);
+      const re = await o.apiCall('POST', '/auth/login', { body: { loginId: added, password: 'ui-added-passphrase-1' } });
+      check(`[${label}] 停止したユーザーはログインできない`, re.status === 401, `status=${re.status}`);
+      await row(added).getByRole('button', { name: '再開する' }).click();
+      await page.waitForFunction((id) => /有効/.test(document.querySelector(`li.user[data-login="${id}"]`)?.textContent ?? ''), added);
+      check(`[${label}] 再開すると「有効」に戻る`, true);
+
+      // Editorの付与・解除（Ownerなのでadminの付与ボタンも出る）
+      await row(added).getByRole('button', { name: 'Editorにする' }).click();
+      await page.waitForFunction((id) => /Editor/.test(document.querySelector(`li.user[data-login="${id}"] .badges`)?.textContent ?? ''), added);
+      check(`[${label}] Editorを付与できる`, (await row(added).getByRole('button', { name: 'Adminにする' }).count()) === 1);
+      await row(added).getByRole('button', { name: 'Editorを外す' }).click();
+      await page.waitForFunction((id) => !/Editor/.test(document.querySelector(`li.user[data-login="${id}"] .badges`)?.textContent ?? ''), added);
+      check(`[${label}] Editorを外せる`, true);
+      if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-users-after.png`), fullPage: true });
+      await ctx.close();
+    }
+    // 権限が無い人（一般メンバー）にはAPIが拒否し、画面は案内を表示する
+    {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+      const page = await ctx.newPage();
+      await login(page, o.memberLogin, o.memberPass);
+      await page.getByRole('link', { name: /ユーザー管理/ }).click();
+      await page.locator('.notice.error').waitFor();
+      check('一般メンバーにはユーザー管理の権限が無い案内が出て、一覧は出ない', /権限がありません/.test(await page.locator('.notice.error').innerText()) && (await page.locator('li.user').count()) === 0);
+      if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, 'sp-users-forbidden.png') });
+      await ctx.close();
     }
     // トークン無しで開いた場合の案内
     const ctx3 = await browser.newContext();

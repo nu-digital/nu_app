@@ -415,6 +415,72 @@ func (q *Queries) ListUserRoles(ctx context.Context, userID pgtype.UUID) ([]stri
 	return items, nil
 }
 
+const listUsers = `-- name: ListUsers :many
+SELECT u.id, u.login_id, u.status, u.created_at, u.activated_at,
+       COALESCE(p.display_name, '') AS display_name,
+       COALESCE(array_agg(r.role ORDER BY r.role) FILTER (WHERE r.role IS NOT NULL), '{}')::text[] AS roles
+FROM users u
+LEFT JOIN profiles p ON p.user_id = u.id
+LEFT JOIN user_roles r ON r.user_id = u.id
+WHERE ($1::text = '' OR u.login_id ILIKE '%' || $1 || '%' ESCAPE '\' OR p.display_name ILIKE '%' || $1 || '%' ESCAPE '\')
+  AND ($2::timestamptz IS NULL OR (u.created_at, u.id) > ($2, $3::uuid))
+GROUP BY u.id, p.display_name
+ORDER BY u.created_at, u.id
+LIMIT $4
+`
+
+type ListUsersParams struct {
+	Column1 string
+	Column2 pgtype.Timestamptz
+	Column3 pgtype.UUID
+	Limit   int32
+}
+
+type ListUsersRow struct {
+	ID          pgtype.UUID
+	LoginID     string
+	Status      string
+	CreatedAt   pgtype.Timestamptz
+	ActivatedAt pgtype.Timestamptz
+	DisplayName string
+	Roles       []string
+}
+
+// 管理画面の一覧。返す列は最小限（個人情報・秘密値は含めない）。検索は呼び出し側でLIKEのワイルドカードをエスケープして渡す。
+// カーソル(作成日時,id)で安定して並べる。
+func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
+	rows, err := q.db.Query(ctx, listUsers,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUsersRow{}
+	for rows.Next() {
+		var i ListUsersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.LoginID,
+			&i.Status,
+			&i.CreatedAt,
+			&i.ActivatedAt,
+			&i.DisplayName,
+			&i.Roles,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockOwnerRows = `-- name: LockOwnerRows :many
 SELECT user_id FROM user_roles WHERE role = 'owner' ORDER BY user_id FOR UPDATE
 `
