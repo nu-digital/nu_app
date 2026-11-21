@@ -1,0 +1,5 @@
+{
+  "note": "公開サイトから取り下げる記事・静的画像の一覧（D08・個人情報の対応。docs/design/p3-web.md §2・§4、docs/OPERATIONS.md）。web-verifyは「ここにある画像は存在しないこと、それ以外は基準とsha256まで一致」を検査し、移行CLI(import-legacy)は「ここにある記事」を移行しない。理由には個人情報を書かない。",
+  "articles": [],
+  "images": []
+}

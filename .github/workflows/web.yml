@@ -35,6 +35,8 @@ jobs:
       - run: npm run web:build
       # 移設前基準(inventory.json)とのルート・記事・画像の一致
       - run: npm run web:verify
+      # 移行CLIの正解（frontmatter・日付のゴールデン）が、記事の現状とずれていないこと
+      - run: npm run web:goldens
       # ブラウザー操作: 全ルート200・壊れた画像なし・ギャラリー(クリック/Enter/Space/左右/Esc/フォーカス復帰)・横溢れなし。
       # 画面画像の一致は、フォント・Chromium版に依存するためCIでは判定せず、ローカルで基準画像と比較する(docs/legacy-baseline)。
       - run: npx playwright install --with-deps chromium

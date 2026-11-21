@@ -1,0 +1,1546 @@
+{
+ "note": "gray-matterが読んだfrontmatter（サイトはString()で読む）。再生成: node scripts/legacy-goldens.mjs",
+ "articles": [
+  {
+   "collection": "blog",
+   "slug": "activity-2025-12-22-6db7c7",
+   "fm": {
+    "title": "ゆるゆるゲーム制作会",
+    "image": "/images/imported/img-a7d42ba6deee67790aac.webp",
+    "author": "yurarara",
+    "date": "2025-12-22",
+    "category": "Blog",
+    "excerpt": "メンバーとUnity・Blenderを使った共同制作に取り組みました。",
+    "sourceId": "blog/activity-2025-12-22-6db7c7"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 401
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-01-20-2f9241",
+   "fm": {
+    "title": "GCI 2025 Winter 修了",
+    "image": "/images/imported/img-2c574083a3e232d1cd3f.webp",
+    "author": "yurarara",
+    "date": "2026-01-20",
+    "category": "Blog",
+    "excerpt": "GCI 2025 Winterを修了しました。AIキャラクターとのインタラクション制作につなげるため、機械学習を学びました。",
+    "sourceId": "blog/activity-2026-01-20-2f9241"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 880
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-01-29-24a47f",
+   "fm": {
+    "title": "次年度プロジェクト要綱提出",
+    "image": "/images/ogp/member.webp",
+    "author": "yurarara",
+    "date": "2026-01-29",
+    "category": "Blog",
+    "excerpt": "次年度の学生プロジェクトの要綱を作成・提出しました。",
+    "sourceId": "blog/activity-2026-01-29-24a47f"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 56
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-04-11-fe646c",
+   "fm": {
+    "title": "ポスター表紙撮影会",
+    "image": "/images/imported/img-051c8731d2e4ce7b5b9b.webp",
+    "author": "yurarara",
+    "date": "2026-04-11",
+    "category": "Blog",
+    "excerpt": "春の募集ポスターに使う写真をVRChat内で撮影しました。",
+    "sourceId": "blog/activity-2026-04-11-fe646c"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 521
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-05-28-f690fa",
+   "fm": {
+    "title": "IVRCメタバース部門の初期企画",
+    "image": "/images/imported/img-e3ad543985cf7c26ded6.webp",
+    "author": "yurarara",
+    "date": "2026-05-28",
+    "category": "Blog",
+    "excerpt": "IVRCメタバース部門に向け、探索と物語を組み合わせたVR体験の企画書を作成しました。",
+    "sourceId": "blog/activity-2026-05-28-f690fa"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 618
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-06-05-099b2b",
+   "fm": {
+    "title": "ゲームエフェクト会1",
+    "image": "/images/ogp/member.webp",
+    "author": "yurarara",
+    "date": "2026-06-05",
+    "category": "Blog",
+    "excerpt": "",
+    "sourceId": "blog/activity-2026-06-05-099b2b"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 0
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-06-06-71597c",
+   "fm": {
+    "title": "Shaderどですか会＆ゲームエフェクト会2",
+    "image": "/images/imported/img-87b70cf245d0f71480fc.webp",
+    "author": "yurarara",
+    "date": "2026-06-06",
+    "category": "Blog",
+    "excerpt": "",
+    "sourceId": "blog/activity-2026-06-06-71597c"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-06-08-a26f47",
+   "fm": {
+    "title": "Udon会",
+    "image": "/images/imported/img-80655033f473a032c3ad.webp",
+    "author": "yurarara",
+    "date": "2026-06-08",
+    "category": "Blog",
+    "excerpt": "",
+    "sourceId": "blog/activity-2026-06-08-a26f47"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-06-08-d62351",
+   "fm": {
+    "title": "ゲームサウンド会",
+    "image": "/images/imported/img-930c37f4bd0c0eeb37de.webp",
+    "author": "yurarara",
+    "date": "2026-06-08",
+    "category": "Blog",
+    "excerpt": "",
+    "sourceId": "blog/activity-2026-06-08-d62351"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 0
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-06-12-d3e961",
+   "fm": {
+    "title": "ゲームエフェクト会3",
+    "image": "/images/ogp/member.webp",
+    "author": "yurarara",
+    "date": "2026-06-12",
+    "category": "Blog",
+    "excerpt": "",
+    "sourceId": "blog/activity-2026-06-12-d3e961"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-06-19-a9bc7b",
+   "fm": {
+    "title": "ゲームエフェクト会4",
+    "image": "/images/imported/img-aeeb99b698e354230a40.webp",
+    "author": "yurarara",
+    "date": "2026-06-19",
+    "category": "Blog",
+    "excerpt": "",
+    "sourceId": "blog/activity-2026-06-19-a9bc7b"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-07-20-8c34f0",
+   "fm": {
+    "title": "第1回 ワールド制作ハッカソンを開催しました",
+    "image": "/images/imported/img-0971900384387b9406ec.webp",
+    "author": "yurarara",
+    "date": "2026-07-20",
+    "category": "Blog",
+    "excerpt": "yurarara、syuga、yoshi、iwaが、それぞれのテーマでVRChatワールドを制作。光や水中の表現、謎解きギミック、シェーダー、AIエージェントを使った生成に取り組みました。",
+    "sourceId": "blog/activity-2026-07-20-8c34f0"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 874
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-07-24-50e440",
+   "fm": {
+    "title": "トラストランク上げ会を開催しました",
+    "image": "/images/imported/img-e66cf0a8320e4b006bde.webp",
+    "author": "yurarara",
+    "date": "2026-07-24",
+    "category": "Blog",
+    "excerpt": "新規メンバーを中心にVRChatで交流会を開催。ワールドのアップロード・共有に向けた準備として、VRChatでの交流とワールド巡りを行いました。",
+    "sourceId": "blog/activity-2026-07-24-50e440"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 580
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-08-01-1cc8bf",
+   "fm": {
+    "title": "船橋オープンキャンパスで制作物を展示しました！",
+    "image": "/images/imported/img-2f35af9443eb26053bf2.webp",
+    "author": "yurarara",
+    "date": "2026年8月1〜2日",
+    "category": "Blog",
+    "excerpt": "日本大学理工学部 船橋キャンパスのオープンキャンパスに2日間出展。駿河台での展示に続き、VRやゲームなどの制作物を通じて、学生によるデジタル創作活動を紹介しました。",
+    "sourceId": "blog/activity-2026-08-01-1cc8bf"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1145
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-08-03-cf9870",
+   "fm": {
+    "title": "第2回 Udon勉強会を開催しました！",
+    "image": "/images/imported/img-5ceac8f2142ddcc48e77.webp",
+    "author": "yurarara",
+    "date": "2026-08-03",
+    "category": "Blog",
+    "excerpt": "サンプルギミックを読み解くつもりが、解説だけで1時間。第2回Udon勉強会で感じたことと、その後のワールド巡りについて。",
+    "sourceId": "blog/activity-2026-08-03-cf9870"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1225
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-08-10-c49474",
+   "fm": {
+    "title": "Unityライティング勉強会を開催しました！",
+    "image": "/images/imported/img-0955c4a476a128546019.webp",
+    "author": "yurarara",
+    "date": "2026-08-10",
+    "category": "Blog",
+    "excerpt": "",
+    "sourceId": "blog/activity-2026-08-10-c49474"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 484
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-08-13-9d5dc3",
+   "fm": {
+    "title": "第5回 ゲームエフェクト会",
+    "image": "/images/imported/img-b33c5f7a8f48e168fcec.webp",
+    "author": "yurarara",
+    "date": "2026年8月13日〜22日",
+    "category": "Blog",
+    "excerpt": "シェーダーやエフェクト、武器の制作などがテーマの技術交流会",
+    "sourceId": "blog/activity-2026-08-13-9d5dc3"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 772
+  },
+  {
+   "collection": "blog",
+   "slug": "another",
+   "fm": {
+    "title": "YUVR,KAIT,nu交流会",
+    "image": "/images/imported/img-1098f1aa4e04491aacc9.webp",
+    "author": "yurarara",
+    "date": "2025-12-25",
+    "category": "Blog",
+    "excerpt": "NUMAでつながった他大学のサークルと、VRChat内で交流会を行いました。",
+    "sourceId": "blog/activity-2025-12-25-439871"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 505
+  },
+  {
+   "collection": "blog",
+   "slug": "bennkyou",
+   "fm": {
+    "title": "カテゴリ別勉強会2026",
+    "image": "/images/imported/img-3eced80be705c46004cc.webp",
+    "author": "yurarara",
+    "date": "2026-06-10",
+    "category": "Blog",
+    "excerpt": "団体内ではカテゴリ別の勉強会を開催しています！",
+    "sourceId": "blog/bennkyou"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1242
+  },
+  {
+   "collection": "blog",
+   "slug": "booth",
+   "fm": {
+    "title": "公式Booth開設",
+    "image": "/images/imported/img-c8aa6a28dbc7676ad1f0.webp",
+    "author": "yurarara",
+    "date": "2026-01-10",
+    "category": "Blog",
+    "excerpt": "メタ創で制作したアセットやギミックを、公式Boothにて公開しました。",
+    "sourceId": "blog/booth"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 452
+  },
+  {
+   "collection": "blog",
+   "slug": "busitu",
+   "fm": {
+    "title": "部室制作！",
+    "image": "/images/imported/img-042f4c569102caebe513.webp",
+    "author": "yurarara",
+    "date": "2026-05-21",
+    "category": "Blog",
+    "excerpt": "新規メンバーが増えてきたこともあり、メンバーが集まれる部室の制作を行いました！",
+    "sourceId": "blog/busitu"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1588
+  },
+  {
+   "collection": "blog",
+   "slug": "cedec-2026-scholarship",
+   "fm": {
+    "title": "CEDEC 2026 スカラーシップ採択",
+    "image": "/images/imported/img-3f06d04c2ca3918778cb.webp",
+    "author": "yurarara",
+    "date": "2026年7月22日〜24日",
+    "category": "Blog",
+    "excerpt": "nu_digitalから1名がIGDA日本のスカラーシップ生としてCEDEC 2026に参加。講演や展示、開発者との交流を通じて、ゲーム制作を支える技術と開発環境について学びました。",
+    "sourceId": "blog/cedec-2026-scholarship"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 506
+  },
+  {
+   "collection": "blog",
+   "slug": "dg",
+   "fm": {
+    "title": "VRChatワールド『Dimensions Gate』 公開！",
+    "image": "/images/imported/img-cd1cc3abbbbf2c814d3e.webp",
+    "author": "mizmelon",
+    "date": "2025-09-24",
+    "category": "Blog",
+    "excerpt": "次元を、あるものが動ける方向の数とすると、\n０次元はどこにも動けない点となる。\nそこで、０次元の点を２つ用意すると１次元の線ができる。\nさらに、１次元の線を４つ用意すると２次元が正方形ができる。\nさらにさらに、２次元の正方形を６つ用意すると３次元の立方体ができる。\n同じように、３次元の立方体を８つ用意することで４次元の立方体ができるのです。",
+    "sourceId": "blog/dg"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1331
+  },
+  {
+   "collection": "blog",
+   "slug": "gamedan",
+   "fm": {
+    "title": "ゲームダンジョン11に行ってきた",
+    "image": "/images/imported/img-49d0887e5054bf9a5a0a.webp",
+    "author": "yurarara",
+    "date": "2026-02-08",
+    "category": "Blog",
+    "excerpt": "2月8日に東京・都立産業貿易センター浜松町館で開催された東京ゲームダンジョン11に行ってきました！",
+    "sourceId": "blog/gamedan"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 406
+  },
+  {
+   "collection": "blog",
+   "slug": "houkoku",
+   "fm": {
+    "title": "プロジェクト報告会",
+    "image": "/images/imported/img-c095c5e70d8554513f20.webp",
+    "author": "yurarara",
+    "date": "2026-03-16",
+    "category": "Blog",
+    "excerpt": "1年間の活動を報告し、「N.U.メタバースの可能性を想像しよう！」が優れた学生プロジェクトに認定されました。",
+    "sourceId": "blog/activity-2026-03-16-9f7d4a"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 849
+  },
+  {
+   "collection": "blog",
+   "slug": "ibunya",
+   "fm": {
+    "title": "異分野学会",
+    "image": "/images/imported/img-5de34fe2774e89f17c64.webp",
+    "author": "iwa",
+    "date": "2026-03-07",
+    "category": "Blog",
+    "excerpt": "DimensionsGateの制作と体験から得た知見をポスターにまとめ、異分野学会で発表しました。",
+    "sourceId": "blog/activity-2026-03-07-beeb42"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 2131
+  },
+  {
+   "collection": "blog",
+   "slug": "ivrc_dg",
+   "fm": {
+    "title": "IVRC審査員賞受賞",
+    "image": "/images/imported/img-d1a9c7f44335c66fc964.webp",
+    "author": "nu_digital",
+    "date": "2025-11-02",
+    "category": "Blog",
+    "excerpt": "日本バーチャルリアリティ学会が主催するVR作品の学生コンテスト、IVRC（Interverse Virtual Reality Challenge） 2025 メタバース部門で、私たちが制作した作品『Dimensions Gate』が、 せきぐちあいみ賞 と 入江英嗣賞 の２つを受賞させていただきました。",
+    "sourceId": "blog/ivrc_dg"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1128
+  },
+  {
+   "collection": "blog",
+   "slug": "iwakenlab-5th-mini-exhibit",
+   "fm": {
+    "title": "IwakenLab 5周年記念イベントでプチ展示しました",
+    "image": "/images/imported/img-8059ea1e9c0319b8c901.webp",
+    "author": "yurarara",
+    "date": "2026-07-05",
+    "category": "Blog",
+    "excerpt": "IwakenLab 5周年記念イベントで、ミニゲームやVRChatワールドを展示しました。展示用ゲームランチャーを使用し、コントローラーで作品を選択・体験できる構成にしました。",
+    "sourceId": "blog/iwakenlab-5th-mini-exhibit"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 726
+  },
+  {
+   "collection": "blog",
+   "slug": "kouryuu",
+   "fm": {
+    "title": "新年交流会",
+    "image": "/images/imported/img-0f3311d4b197dc26b23b.webp",
+    "author": "yurarara",
+    "date": "2026-01-07",
+    "category": "Blog",
+    "excerpt": "メンバー同士で交流するため、VRChat内で新年交流会を開きました。",
+    "sourceId": "blog/activity-2026-01-06-de7115"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 583
+  },
+  {
+   "collection": "blog",
+   "slug": "kouryuu2026",
+   "fm": {
+    "title": "新年度交流会",
+    "image": "/images/imported/img-023c3d365360df5f7d59.webp",
+    "author": "yurarara",
+    "date": "2026-05-22",
+    "category": "Blog",
+    "excerpt": "新規メンバーを交えて交流会を開催しました。自己紹介の後、VRChatのワールド巡りとGoose Goose Duckのプレイを行いました。",
+    "sourceId": "blog/kouryuu2026"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 409
+  },
+  {
+   "collection": "blog",
+   "slug": "metacms_article",
+   "fm": {
+    "title": "メタ創専用CMSができました",
+    "image": "/images/imported/img-e88ab2587c1261de9af6.webp",
+    "author": "yurarara",
+    "date": "2025-09-03",
+    "category": "Blog",
+    "excerpt": "「どのフォルダに画像を入れるの？」「そもそも環境構築で詰む」… そんな声に応えるために、 非エンジニアでも記事が書きやすい CMS を開発しました。 その名も MetaCMS 。",
+    "sourceId": "blog/metacms_article"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1698
+  },
+  {
+   "collection": "blog",
+   "slug": "new_digital",
+   "fm": {
+    "title": "自主創造プロジェクト採択",
+    "image": "/images/imported/img-82c1f488f1c49d796d89.webp",
+    "author": "nu_digital",
+    "date": "2026-04-01",
+    "category": "Blog",
+    "excerpt": "このたび、私たちのプロジェクト「日本大学デジタル／メタバース創作発展プロジェクト」が、日本大学の自主創造プロジェクトとして2026年4月1日付で採択されました。",
+    "sourceId": "blog/new_digital"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 493
+  },
+  {
+   "collection": "blog",
+   "slug": "newDocument",
+   "fm": {
+    "title": "ドキュメントを更新しました",
+    "image": "/images/imported/img-fdddc2934ed7438eaf14.webp",
+    "author": "yurarara",
+    "date": "2026-02-01",
+    "category": "Blog",
+    "excerpt": "新しく入ってくるメンバーの方や、既存メンバーが他の分野に取り組むときに迷わず、そして最速で制作の楽しさに触れられるよう、ドキュメントサイトを整理・更新しました。",
+    "sourceId": "blog/newDocument"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1001
+  },
+  {
+   "collection": "blog",
+   "slug": "nu.metasou",
+   "fm": {
+    "title": "公式ページ開設",
+    "image": "/images/imported/img-023c3d365360df5f7d59.webp",
+    "author": "yurarara",
+    "date": "2025-05-20",
+    "category": "Blog",
+    "excerpt": "この度、 メタ創公式ホームページ を開設しました！",
+    "sourceId": "blog/nu-metasou"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 341
+  },
+  {
+   "collection": "blog",
+   "slug": "numa_koushuu",
+   "fm": {
+    "title": "NUMA合同講習会 — VRChatワールド制作講師",
+    "image": "/images/imported/img-76c9601e4419bd380e58.webp",
+    "author": "yurarara",
+    "date": "2026-05-17",
+    "category": "Blog",
+    "excerpt": "NUMA合同講習会に講師として参加し、VRChatワールド制作の解説と実演を行いました。",
+    "sourceId": "blog/numa-world-building-lecture"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 667
+  },
+  {
+   "collection": "blog",
+   "slug": "opencampus-surugadai-2026",
+   "fm": {
+    "title": "オープンキャンパス駿河台 — 展示・ミニ講演",
+    "image": "/images/imported/img-bf76cdcf5bd6cae56382.webp",
+    "author": "nu_digital",
+    "date": "2026-06-21",
+    "category": "Blog",
+    "excerpt": "駿河台のオープンキャンパスで作品を展示し、高校生・保護者に普段の制作活動を紹介しました。",
+    "sourceId": "blog/open-campus-surugadai-2026"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 2588
+  },
+  {
+   "collection": "blog",
+   "slug": "science",
+   "fm": {
+    "title": "サイエンスアゴラに参加",
+    "image": "/images/imported/img-7864cca04db2eae5c568.webp",
+    "author": "yurarara",
+    "date": "2025-11-14",
+    "category": "Blog",
+    "excerpt": "10/25（土）、10/26（日）にテレコムセンターで開催された、科学技術振興機構（JST）主催のサイエンスアゴラにて、作品の現地展示を行いました！",
+    "sourceId": "blog/science"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 727
+  },
+  {
+   "collection": "blog",
+   "slug": "sousaku",
+   "fm": {
+    "title": "創作体験会",
+    "image": "/images/imported/img-5565d147da7f3ea1ae40.webp",
+    "author": "yurarara",
+    "date": "2026-04-29",
+    "category": "Blog",
+    "excerpt": "デジタル創作に興味のある学生に向け、学内で創作体験会を開催しました。",
+    "sourceId": "blog/activity-2026-04-29-90b8eb"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1593
+  },
+  {
+   "collection": "blog",
+   "slug": "student-vr-meetup-2026",
+   "fm": {
+    "title": "全国学生VRサークル活動報告大会 — 活動報告登壇・Webサイト制作",
+    "image": "/images/imported/img-a535007ebd150bc1f148.webp",
+    "author": "yurarara",
+    "date": "2026-10-11",
+    "category": "Blog",
+    "excerpt": "全国学生VRサークル活動報告大会に、nu_digitalからyurararaが登壇しました。また、大会のWebサイト制作に協力しました。",
+    "sourceId": "blog/student-vr-meetup-2026"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 869
+  },
+  {
+   "collection": "blog",
+   "slug": "surugadai-ourisai-2026",
+   "fm": {
+    "title": "駿河台桜理祭2026に出展しました！",
+    "image": "/images/imported/img-6391564d8fe19c7f1089.webp",
+    "author": "yurarara",
+    "date": "2026-10-11",
+    "category": "Blog",
+    "excerpt": "駿河台桜理祭2026。ゲームやVRChatワールドの体験展示に加え、制作物紹介映像やVRChatキャストとの交流体験を実施しました。",
+    "sourceId": "blog/surugadai-ourisai-2026"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 3861
+  },
+  {
+   "collection": "blog",
+   "slug": "svrc",
+   "fm": {
+    "title": "SVRCサークル対談",
+    "image": "/images/imported/img-3629b49d02238b1faa02.webp",
+    "author": "yurarara",
+    "date": "2025-12-10",
+    "category": "Blog",
+    "excerpt": "NUMAでのつながりから、慶應SFCのVRサークルと対談しました。",
+    "sourceId": "blog/activity-2025-12-10-d73e01"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 410
+  },
+  {
+   "collection": "blog",
+   "slug": "vkasai",
+   "fm": {
+    "title": "V化祭に出展しました！",
+    "image": "/images/imported/img-8a330c64d50cfee1087b.webp",
+    "author": "yurarara",
+    "date": "2026-03-28",
+    "category": "Blog",
+    "excerpt": "JVSL（日本仮想学生連盟）とNUMA（全日本大学メタバース連盟）が共同で主催するバーチャル文化祭「V化祭」に参加し、私たちNu.メタ創もブースを出展してきました！",
+    "sourceId": "blog/vkasai"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1136
+  },
+  {
+   "collection": "blog",
+   "slug": "vket",
+   "fm": {
+    "title": "VketWinter出展",
+    "image": "/images/imported/img-81d2e4bfc5bb5c22ad25.webp",
+    "author": "yurarara",
+    "date": "2026-01-20",
+    "category": "Blog",
+    "excerpt": "VketWinterに出展し、IVRCで制作したワールドを紹介しました。",
+    "sourceId": "blog/activity-2026-01-20-9303c5"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 293
+  },
+  {
+   "collection": "blog",
+   "slug": "vketReal",
+   "fm": {
+    "title": "VketRealに参加しました",
+    "image": "/images/imported/img-6125b197b754047e9fec.webp",
+    "author": "yurarara",
+    "date": "2025-10-20",
+    "category": "Blog",
+    "excerpt": "VketReal 2025 Summerに行ってきました！",
+    "sourceId": "blog/vketReal"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 538
+  },
+  {
+   "collection": "blog",
+   "slug": "xr",
+   "fm": {
+    "title": "XR会議",
+    "image": "/images/imported/img-45922bf5628574941b80.webp",
+    "author": "yurarara",
+    "date": "2025-12-01",
+    "category": "Blog",
+    "excerpt": "NUMAを通じてXR会議に参加し、企業展示の体験や他大学の制作者との交流を行いました。",
+    "sourceId": "blog/activity-2025-12-01-44d0b8"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 457
+  },
+  {
+   "collection": "news",
+   "slug": "site-redesign",
+   "fm": {
+    "title": "ホームページをリニューアルしました",
+    "image": "/images/logo.webp",
+    "author": "yurarara",
+    "date": "2026-10-20",
+    "category": "Blog",
+    "excerpt": "トップページとブログの表示を変更し、団体概要・制作物一覧とローカル記事エディターを追加しました。配信先もGitHub Pagesへ移行しました。",
+    "sourceId": "news/site-redesign"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 379
+  },
+  {
+   "collection": "project",
+   "slug": "demo-yura",
+   "fm": {
+    "title": "demo_yura",
+    "image": "/images/ogp/member.webp",
+    "author": "nu_digital",
+    "date": "2026-07-20",
+    "category": "Product",
+    "excerpt": "",
+    "sourceId": "works/demo-yura"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 183
+  },
+  {
+   "collection": "project",
+   "slug": "dimensions-gate",
+   "fm": {
+    "title": "DimensionsGate",
+    "image": "/images/imported/img-f9fae08065a2007d1b92.webp",
+    "author": "yurarara",
+    "date": "2025年9月〜11月",
+    "category": "Product",
+    "excerpt": "重力方向が変化する空間を探索し、バグを探して破壊するVRChatゲームです。",
+    "sourceId": "works/dimensions-gate"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 2698
+  },
+  {
+   "collection": "project",
+   "slug": "exhibition-game-launcher",
+   "fm": {
+    "title": "展示用ゲームランチャー",
+    "image": "/images/imported/img-708b4268fa21269fe1f7.webp",
+    "author": "yurarara",
+    "date": "2026-07-05",
+    "category": "Product",
+    "excerpt": "PS5コントローラーで複数の作品を選択・起動できる展示用ゲームランチャーです。作品紹介画面と、VRChatワールドを三人称視点で見学できる機能を制作しました。",
+    "sourceId": "works/exhibition-game-launcher"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1429
+  },
+  {
+   "collection": "project",
+   "slug": "fogland",
+   "fm": {
+    "title": "FogLand",
+    "image": "/images/imported/img-dab62a7faba773d14fba.webp",
+    "author": "yurarara",
+    "date": "2026-03-25",
+    "category": "Product",
+    "excerpt": "霧に包まれた世界を歩き、NPCや敵と出会い、魔法を集めてボスへ挑むVRChat向けゲームです。",
+    "sourceId": "works/fogland"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 913
+  },
+  {
+   "collection": "project",
+   "slug": "lbe-restaurant-simulator",
+   "fm": {
+    "title": "LBE Restaurant Simulator",
+    "image": "/images/imported/img-a92edf5d38cc6e7b2e87.webp",
+    "author": "yurarara",
+    "date": "2026-08-08",
+    "category": "Product",
+    "excerpt": "現実の空間を歩きながら、複数人で調理・配膳・片付けに取り組むレストランシミュレーター。STYLY NetSyncを使った協力型VR体験のプロトタイプです。",
+    "sourceId": "works/lbe-restaurant-simulator"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1356
+  },
+  {
+   "collection": "project",
+   "slug": "nu-bar",
+   "fm": {
+    "title": "nu_bar",
+    "image": "/images/imported/img-6beb86880a9c560b6b31.webp",
+    "author": "nu_digital",
+    "date": "2026-10-11",
+    "category": "Product",
+    "excerpt": "",
+    "sourceId": "works/nu-bar"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 234
+  },
+  {
+   "collection": "project",
+   "slug": "nu-room",
+   "fm": {
+    "title": "nu_room",
+    "image": "/images/imported/img-4b9d4d592548dbca0567.webp",
+    "author": "yurarara",
+    "date": "2026-05-22",
+    "category": "Product",
+    "excerpt": "メンバーが集まる拠点と、新入生が共同制作に参加する入口を兼ねたVRChatワールドです。",
+    "sourceId": "works/nu-room"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1318
+  },
+  {
+   "collection": "project",
+   "slug": "organization-website",
+   "fm": {
+    "title": "団体ホームページ",
+    "image": "/images/imported/img-d3b57e95dc2f5380d97f.webp",
+    "author": "yurarara",
+    "date": "2025-05-20",
+    "category": "Product",
+    "excerpt": "学生プロジェクトの活動を伝えるため、ブログを備えた団体ホームページを制作しました。",
+    "sourceId": "works/organization-website"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 669
+  },
+  {
+   "collection": "project",
+   "slug": "quick",
+   "fm": {
+    "title": "くいっく！",
+    "image": "/images/imported/img-24fe82b3628db7e590f4.webp",
+    "author": "nu_digital",
+    "date": "2026-07-20",
+    "category": "Product",
+    "excerpt": "",
+    "sourceId": "works/quick"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 237
+  },
+  {
+   "collection": "project",
+   "slug": "recall",
+   "fm": {
+    "title": "ReCall",
+    "image": "/images/imported/img-a537e2d36d5524465939.webp",
+    "author": "yurarara",
+    "date": "2026-09-10",
+    "category": "Product",
+    "excerpt": "記憶と連想から生まれる世界を巡る、物語と空間演出を重視したVR作品です。IVRC 2026メタバース部門で「岸上健人賞」を受賞し、富山のVR学会で展示しました。",
+    "sourceId": "works/recall"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 3838
+  },
+  {
+   "collection": "project",
+   "slug": "recruitment-poster",
+   "fm": {
+    "title": "メンバー募集ポスター",
+    "image": "/images/imported/img-56598ce58df08757456e.webp",
+    "author": "yurarara",
+    "date": "2025-03-20",
+    "category": "Product",
+    "excerpt": "学生プロジェクトの申請準備として、メンバー募集用のポスターを制作しました。",
+    "sourceId": "works/recruitment-poster"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 210
+  },
+  {
+   "collection": "project",
+   "slug": "shadow-interaction",
+   "fm": {
+    "title": "影インタラクション / MediaPipe検証",
+    "image": "/images/imported/img-3db01a22a79d4456006c.webp",
+    "author": "yurarara",
+    "date": "2026-01-20",
+    "category": "Product",
+    "excerpt": "自分の手の影に小人が乗ったり、影同士で物を動かしたりする体験を考え、手の認識とUnityへの連携を検証しました。",
+    "sourceId": "works/shadow-interaction"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 808
+  },
+  {
+   "collection": "project",
+   "slug": "tokyo-open-data-guide",
+   "fm": {
+    "title": "TokyoOpenDataGuide",
+    "image": "/images/imported/img-d8cf7934e2b2b2bddd37.webp",
+    "author": "yurarara",
+    "date": "2025-08-20",
+    "category": "Product",
+    "excerpt": "都知事杯オープンデータ・ハッカソンで制作した、AIキャラクターから話しかけてくる対話システムです。",
+    "sourceId": "works/tokyo-open-data-guide"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1251
+  },
+  {
+   "collection": "project",
+   "slug": "uchatclient-1",
+   "fm": {
+    "title": "UChatClient1",
+    "image": "/images/ogp/member.webp",
+    "author": "yurarara",
+    "date": "2026-04-14",
+    "category": "Product",
+    "excerpt": "キャラクターの返答に合わせたモーションと、ビデオ通話らしいカメラ表現を試しました。",
+    "sourceId": "works/uchatclient-1"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 336
+  },
+  {
+   "collection": "project",
+   "slug": "uchatclient-2",
+   "fm": {
+    "title": "UChatClient2",
+    "image": "/images/imported/img-c4f5d90e5d0770628829.webp",
+    "author": "yurarara",
+    "date": "2026-06-14",
+    "category": "Product",
+    "excerpt": "Unityのキャラクターをデスクトップ上に表示するマスコットを試作しました。",
+    "sourceId": "works/uchatclient-2"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 374
+  },
+  {
+   "collection": "project",
+   "slug": "vkasai-booth",
+   "fm": {
+    "title": "V化祭ブース",
+    "image": "/images/imported/img-cc353feed1e3867286c1.webp",
+    "author": "yurarara",
+    "date": "2026-03-23",
+    "category": "Product",
+    "excerpt": "全国のVR系サークルが集まるV化祭で、「ゲーミング和風」をテーマにブースを制作・出展しました。",
+    "sourceId": "works/vkasai-booth"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 463
+  },
+  {
+   "collection": "project",
+   "slug": "vrc-airsoft",
+   "fm": {
+    "title": "VRC_Airsoft",
+    "image": "/images/imported/img-a4ec9a303fb9a6cf59e9.webp",
+    "author": "nu_digital",
+    "date": "2025年12月",
+    "category": "Product",
+    "excerpt": "",
+    "sourceId": "works/vrc-airsoft"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 113
+  },
+  {
+   "collection": "project",
+   "slug": "vrc-prototypes-2025",
+   "fm": {
+    "title": "プロトタイプワールド制作（2025）",
+    "image": "/images/imported/img-37c2d2cc91ca5dd417b0.webp",
+    "author": "yurarara",
+    "date": "2025年3月〜 6月",
+    "category": "Product",
+    "excerpt": "2025年3月から6月にかけて、VRChatワールドを作りながらUnityとUdonSharpを学びました。",
+    "sourceId": "works/vrc-prototypes-2025"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 541
+  },
+  {
+   "collection": "project",
+   "slug": "vrc-prototypes-2026",
+   "fm": {
+    "title": "プロトタイプワールド（2026）",
+    "image": "/images/imported/img-8f744237155fb277a934.webp",
+    "author": "yurarara",
+    "date": "2026-04-02",
+    "category": "Product",
+    "excerpt": "物語性のあるVR作品に向け、環境変化や視覚効果、NPCとの対話などを試作しました。",
+    "sourceId": "works/vrc-prototypes-2026"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 498
+  },
+  {
+   "collection": "project",
+   "slug": "web-prototypes",
+   "fm": {
+    "title": "Web制作（ToDo・シラバス検索の試作）",
+    "image": "/images/imported/img-3a21a5292a1b7db84148.webp",
+    "author": "yurarara",
+    "date": "2025-02-10",
+    "category": "Product",
+    "excerpt": "Web制作を学び、ToDoリストやシラバス検索サイトを試作しました。",
+    "sourceId": "works/web-prototypes"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 258
+  },
+  {
+   "collection": "project",
+   "slug": "world-hackathon-2-prototype",
+   "fm": {
+    "title": "第2回 ワールド制作ハッカソンを開催しました！",
+    "image": "/images/imported/img-b98d961d9efafb5577fb.webp",
+    "author": "yurarara",
+    "date": "2026-08-07",
+    "category": "Product",
+    "excerpt": "1日でゼロからVRChatワールドを制作するハッカソンの第2回を開催。ゲームシステムや視覚演出、空間の自動生成など、今後の作品に生かす技術を試作・検証しました。",
+    "sourceId": "works/world-hackathon-2-prototype"
+   },
+   "types": {
+    "title": "string",
+    "image": "string",
+    "author": "string",
+    "date": "string",
+    "category": "string",
+    "excerpt": "string",
+    "sourceId": "string"
+   },
+   "bodyLength": 1422
+  }
+ ]
+}
