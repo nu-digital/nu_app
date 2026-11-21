@@ -31,6 +31,8 @@ jobs:
       - run: npm run admin:ci
       - run: npm run admin:lint
       - run: npm run admin:typecheck
+      # プレビューの描画時サニタイズ（共有の事例集・既存67記事・攻撃的な入力）
+      - run: npm run admin:test
       - run: npm run admin:build
       - run: npm audit --prefix apps/admin
       - run: docker build -t nu_app-admin:ci apps/admin

@@ -164,3 +164,27 @@ select.input { padding: 0 var(--space-3); }
 .items.settings .item.setting { display: block; }
 .setting-body h2 { margin-top: 0; }
 .setting-body .actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+/* 記事・作品（CMS）のエディター */
+.editor .tabs { display: flex; gap: var(--space-2); margin: var(--space-4) 0; }
+.editor-grid { display: grid; gap: var(--space-6); grid-template-columns: 1fr; }
+.editor-grid.tab-edit .editor-preview { display: none; }
+.editor-grid.tab-preview .editor-edit { display: none; }
+@media (min-width: 1100px) {
+  .editor .tabs { display: none; }
+  .editor-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .editor-grid.tab-edit .editor-preview, .editor-grid.tab-preview .editor-edit { display: block; }
+  .editor-preview { position: sticky; top: var(--space-4); max-height: calc(100vh - 2 * var(--space-4)); overflow: auto; }
+}
+.md-input { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9375rem; line-height: 1.6; min-height: 22rem; width: 100%; resize: vertical; }
+.editor fieldset { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4); }
+.editor fieldset legend { font-weight: 700; padding: 0 var(--space-2); }
+.sticky-actions { position: sticky; bottom: 0; background: var(--color-bg); padding: var(--space-3) 0; border-top: 1px solid var(--color-border); align-items: center; z-index: 2; }
+.preview { line-height: 1.9; overflow-wrap: anywhere; }
+.preview img { max-width: 100%; height: auto; }
+.preview pre { overflow-x: auto; background: var(--color-surface); padding: var(--space-3); border-radius: var(--radius); }
+.preview table { border-collapse: collapse; display: block; overflow-x: auto; max-width: 100%; }
+.preview th, .preview td { border: 1px solid var(--color-border); padding: .25rem .5rem; }
+.preview details { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-2) var(--space-3); margin: var(--space-3) 0; }
+.preview .embed { position: relative; aspect-ratio: 16 / 9; margin: var(--space-4) 0; }
+.preview .embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
