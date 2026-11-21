@@ -139,6 +139,19 @@ export function repositoryErrors(repositoryRoot = root) {
       if (im && !im[1].includes('${NU_REGISTRY') && !im[1].includes('@sha256:')) errors.push(`infrastructure/compose.prod.yaml の外部イメージ ${im[1]} はdigestで固定してください。`);
     }
   }
+  // deployワークフロー: 既定で無効（DEPLOY_ENABLED）・PRで動かない・ジョブはすべて、変数による有効化か、有効化済みのジョブへの依存を持つ
+  const deployWorkflow = resolve(repositoryRoot, '.github/workflows/deploy.yml');
+  if (existsSync(deployWorkflow)) {
+    const y = readFileSync(deployWorkflow, 'utf8');
+    const on = (y.match(/^on:\n([\s\S]*?)^\S/m) ?? [, ''])[1];
+    if (/pull_request/.test(on)) errors.push('.github/workflows/deploy.yml はPRで動かさないでください（本番のsecretをPRに渡さない）。');
+    const jobsBlock = y.split(/^jobs:\n/m)[1] ?? '';
+    for (const m of jobsBlock.matchAll(/^  (\w+):\n([\s\S]*?)(?=^  \w+:\n|(?![\s\S]))/gm)) {
+      const body = m[2];
+      if (!/^    if:.*vars\.DEPLOY_ENABLED == 'true'/m.test(body) && !/^    needs:/m.test(body)) errors.push(`.github/workflows/deploy.yml のジョブ ${m[1]} は、vars.DEPLOY_ENABLED == 'true' の条件か、有効化済みジョブへのneedsが必要です（既定で無効にするため）。`);
+    }
+    if (!/environment:\s*production/.test(y)) errors.push('.github/workflows/deploy.yml の本番へのジョブには environment: production（承認者の確認）が必要です。');
+  }
   // 公開サイトと管理画面のプレビューの許可リストは、バイト単位で同一でなければならない（p3-web.md §3）
   const shared = ['apps/web/lib/markdown-sanitize.mjs', 'apps/admin/lib/markdown-sanitize.mjs'].map(f => resolve(repositoryRoot, f));
   if (shared.every(f => existsSync(f))) {

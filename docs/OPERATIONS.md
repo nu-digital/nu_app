@@ -157,3 +157,23 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 9. 公開前: `docs/TESTING.md`のP4の確認、バックアップの手動実行と`restore-verify.sh`、4GBでの実測（メモリ・CPU・ディスク）、`/healthz`・`/readyz`の監視の設定。
 
 **Nginxの自動テスト**（CI `ops / nginx`、`scripts/nginx-test.sh`）: 使い捨てのNginxと擬似のバックエンドで、HTTP→HTTPS・公開ホストにAPIを出さない（画像の公開配信だけ）・GET/HEADだけ・Cookieを渡さない・X-Forwarded-Forの上書き・12MiB上限・ログインの回数制限・HSTS・キャッシュしない、を確認する。`nginx:1.30.6-alpine`（digest固定）で試験し、ホストのNginxはUbuntuのパッケージ（版は`nginx -v`で確認して記録）。CSP（Content-Security-Policy）は、Nextのインラインスクリプトに依存するため初期は付けない（導入時はnonce方式を別途検討）。
+
+## デプロイ・切り戻し（P4-01b）
+
+**仕組み**（`.github/workflows/deploy.yml`、`infrastructure/deploy/deploy.sh`。**どちらも既定では動かない**）:
+1. mainへのマージ（pushのみ。PRでは動かない・本番のsecretをPRに渡さない）。**`verify`**: そのコミットのCI（go・web・admin・compose・harness・opsの全チェック）がすべて成功してから進む（1つでも失敗なら止まる）。
+2. **`build`**: GHCRへイメージをビルド・push（api・bot・migrate・web・admin。タグ＝コミットSHA）。VPSではビルドしない。
+3. **`deploy`**: GitHubの環境`production`（**必須レビュアー＝承認者**）の承認後、SSH（`deploy`ユーザー・ホスト鍵は事前登録・鍵認証のみ）で`sudo deploy.sh <SHA>`だけを実行する。
+4. **`deploy.sh`**（VPS上）: 引数は40桁の16進だけ → 直列化（`flock`。別のデプロイ中は何もしない）→ リポジトリを同じコミットへ → イメージを`pull`（失敗したら何も変えない）→ **更新前のバックアップ**（失敗したら更新しない。初回は無し）→ `up -d`（db→migrate→api→…）→ ヘルスチェック（api `/readyz`・web `/healthz/`・admin `/healthz`・公開サイト`/blog/`が200）→ 成功なら`current_tag`を更新して**成功通知**。
+5. **失敗時**: 動いていた版（`current_tag`）のイメージへ戻し、失敗と復帰の結果をDiscordへ通知（成功通知は送らない）。**DBのmigrationは戻らない**。
+6. **切り戻し**は、同じワークフローを`workflow_dispatch`（入力: 戻したいコミットSHA。そのSHAのイメージがGHCRに残っていること）で実行する（承認つき）。
+
+**DBの互換性のルール**: 前版のイメージは**新しいスキーマで動く**必要がある（migrationは前進のみ）。破壊的なスキーマ変更（列・テーブルの削除、型の変更、NOT NULLの追加）は、(1) 新旧両対応のコードとスキーマ追加をデプロイ → (2) 移行 → (3) 旧を使わないコードをデプロイ → (4) 後始末のmigration、の段階に分ける。前版への復帰が「DBの完全な巻き戻し」ではないことを、PRのレビューで確認する。完全な巻き戻しが必要な場合は、直前のバックアップからの復旧（前述）になる。
+
+**有効にする手順（運用責任者が実施。実施前に確認が必要）**:
+1. VPSのセットアップ（前節）と、`deploy`ユーザーの`sudoers`（`deploy ALL=(root) NOPASSWD: /srv/nu_app/infrastructure/deploy/deploy.sh *`）。サーバーのリポジトリは読み取り専用のdeploy keyで`git fetch`できること。
+2. GitHubの設定: 環境`production`を作り**必須レビュアー**を設定、環境のsecret `DEPLOY_HOST`・`DEPLOY_USER`・`DEPLOY_SSH_KEY`（このデプロイ専用の鍵）・`DEPLOY_KNOWN_HOSTS`（`ssh-keyscan`の結果を、**VPSで鍵の指紋を確かめてから**登録）。GHCRのパッケージの読み取り権限（サーバーの`docker login`用トークン）。
+3. リポジトリの変数`DEPLOY_ENABLED`を`true`にする。**この変数を設定する前は、ワークフローのジョブはすべてスキップされる**。
+4. 最初のデプロイは、承認者がワークフローの内容・SHAを確認して承認する。
+
+**自動テスト**（CI `ops / deploy-script`、`scripts/deploy-test.sh`: 偽のdocker・curl・gitで26項目）: 不正な引数の拒否・直列化・初回/通常の成功・取得失敗・バックアップ失敗・ヘルスチェック失敗での前版復帰・通知にsecretを含めない。`check.mjs`が、deployワークフローの「既定で無効・PRで動かない・本番のジョブに承認の環境」を検査する。
