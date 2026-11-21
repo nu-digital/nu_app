@@ -20,6 +20,7 @@ import (
 	"github.com/nu-digital/nu_app/services/api/internal/auth/password"
 	"github.com/nu-digital/nu_app/services/api/internal/auth/ratelimit"
 	"github.com/nu-digital/nu_app/services/api/internal/auth/session"
+	"github.com/nu-digital/nu_app/services/api/internal/notify"
 	"github.com/nu-digital/nu_app/services/api/internal/platform/config"
 	"github.com/nu-digital/nu_app/services/api/internal/platform/httpserver"
 )
@@ -52,6 +53,25 @@ func run(log *slog.Logger) error {
 	}
 	defer pool.Close()
 
+	// Discord送信worker。tokenが無ければ起動せず、通知はoutboxに溜まる（tokenを設定して再起動すると送られる）。
+	var sender notify.Sender
+	workerDone := make(chan struct{})
+	if cfg.DiscordBotToken != "" {
+		c, err := notify.NewClient(cfg.DiscordBotToken, "")
+		if err != nil {
+			return err
+		}
+		sender = c
+		go func() {
+			defer close(workerDone)
+			notify.NewWorker(pool, c, log).Run(ctx)
+		}()
+		log.Info("Discord通知workerを起動しました")
+	} else {
+		close(workerDone)
+		log.Warn("DISCORD_BOT_TOKENが未設定のため、Discord通知workerは起動しません（通知はoutboxに溜まります）")
+	}
+
 	// /healthz・/readyz（インフラ用）と /api/v1（認証付きAPI）を1つのサーバーで提供する。
 	root := http.NewServeMux()
 	root.Handle("/api/v1/", http.StripPrefix("/api/v1", api.New(api.Deps{
@@ -59,9 +79,10 @@ func run(log *slog.Logger) error {
 		Cfg:      cfg,
 		Sessions: session.New(pool, session.DefaultConfig),
 		// 同時にArgon2idを計算する数と、順番待ちの上限時間（超えたら503）。暫定値: DECISIONS P1-02-3。
-		Hasher:  password.NewHasher(password.DefaultParams, 4, 3*time.Second),
-		Limiter: ratelimit.New(ratelimit.DefaultConfig, nil),
-		Log:     log,
+		Hasher:   password.NewHasher(password.DefaultParams, 4, 3*time.Second),
+		Limiter:  ratelimit.New(ratelimit.DefaultConfig, nil),
+		Log:      log,
+		Notifier: sender,
 	})))
 	root.Handle("/", httpserver.New(pool, cfg.ReadyTimeout))
 
@@ -89,6 +110,8 @@ func run(log *slog.Logger) error {
 			return err
 		}
 	}
+	stop()
+	<-workerDone
 	log.Info("APIを停止しました")
 	return nil
 }

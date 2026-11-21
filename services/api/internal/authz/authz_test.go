@@ -76,6 +76,7 @@ var wantNoRelation = map[string][]string{
 	"notifications.settings.update":       adminUp,
 	"notifications.deliveries.list":       adminUp,
 	"notifications.deliveries.retry":      adminUp,
+	"notifications.test":                  adminUp,
 	"admin.notifications.settings.get":    adminUp,
 	"admin.notifications.settings.update": adminUp,
 	"admin.notifications.test":            adminUp,

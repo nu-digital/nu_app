@@ -6,9 +6,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/nu-digital/nu_app/services/api/internal/notify"
 )
 
 func (e *env) outboxPayloads(eventType string) []string {
@@ -235,5 +241,114 @@ func TestNotificationDeliveriesListAndRetry(t *testing.T) {
 	}
 	if n := e.count(`SELECT count(*)::int FROM audit_logs WHERE action='notifications.delivery_retried'`); n != 1 {
 		t.Errorf("監査ログ: %d", n)
+	}
+}
+
+type stubSender struct {
+	mu    sync.Mutex
+	err   error
+	calls []string
+}
+
+func (s *stubSender) Send(_ context.Context, channelID, content string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls = append(s.calls, channelID+"|"+content)
+	return s.err
+}
+
+func TestNotificationTestEndpoint(t *testing.T) {
+	e, admin, member := invSetup(t)
+	const ch = `{"discordChannelId":"123456789012345678"}`
+	if rec := e.do("POST", "/admin/notifications/test", ch); rec.Code != 401 {
+		t.Errorf("匿名: %d", rec.Code)
+	}
+	if rec := e.as(member, "POST", "/admin/notifications/test", ch); rec.Code != 403 {
+		t.Errorf("Member: %d", rec.Code)
+	}
+	// Botが未設定の環境
+	if rec := e.as(admin, "POST", "/admin/notifications/test", ch); rec.Code != 503 || !strings.Contains(rec.Body.String(), "BOT_NOT_CONFIGURED") {
+		t.Errorf("Bot未設定: %d %s", rec.Code, rec.Body.String())
+	}
+	st := &stubSender{}
+	e.notifier = st
+	e.h = e.build()
+	for name, body := range map[string]string{"空": `{}`, "数字以外": `{"discordChannelId":"../x"}`, "未知のフィールド": `{"discordChannelId":"123456789012345678","x":1}`} {
+		if rec := e.as(admin, "POST", "/admin/notifications/test", body); rec.Code != 422 && rec.Code != 400 {
+			t.Errorf("%s: %d", name, rec.Code)
+		}
+	}
+	if len(st.calls) != 0 {
+		t.Fatalf("不正な入力で送信された: %v", st.calls)
+	}
+	if rec := e.as(admin, "POST", "/admin/notifications/test", ch); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"ok":true`) {
+		t.Fatalf("成功: %d %s", rec.Code, rec.Body.String())
+	}
+	if len(st.calls) != 1 || !strings.HasPrefix(st.calls[0], "123456789012345678|【接続テスト】") {
+		t.Errorf("送信内容: %v", st.calls)
+	}
+	// Discord側の失敗は、種類ごとに分かる応答にする（応答にDiscordの本文・tokenは出ない）
+	for _, c := range []struct {
+		err    error
+		status int
+		code   string
+	}{
+		{&notify.SendError{Kind: notify.KindPermanent, Summary: "Discordが拒否しました（HTTP 403）。Botの権限と送信先チャンネルを確認してください"}, 502, "DISCORD_REJECTED"},
+		{&notify.SendError{Kind: notify.KindRateLimited, RetryAfter: 3, Summary: "Discordの送信上限（429）。1秒後に再試行"}, 429, "DISCORD_RATE_LIMITED"},
+		{&notify.SendError{Kind: notify.KindTransient, Summary: "通信エラー（タイムアウト）"}, 502, "DISCORD_UNAVAILABLE"},
+		{fmt.Errorf("想定外のエラー TOKEN-LEAK"), 502, "DISCORD_UNAVAILABLE"},
+	} {
+		st.err = c.err
+		rec := e.as(admin, "POST", "/admin/notifications/test", ch)
+		if rec.Code != c.status || !strings.Contains(rec.Body.String(), c.code) || strings.Contains(rec.Body.String(), "TOKEN-LEAK") {
+			t.Errorf("%v: %d %s", c.err, rec.Code, rec.Body.String())
+		}
+	}
+	if n := e.count(`SELECT count(*)::int FROM audit_logs WHERE action='notifications.test_sent'`); n != 5 {
+		t.Errorf("監査ログ %d件（成功1・失敗4の計5件のはず。Bot未設定は送らないので記録なし）", n)
+	}
+}
+
+// Discordが落ちていても、貸出・返却は確定し、通知は送信待ちに残る（失敗が業務を巻き戻さない）。
+func TestDiscordOutageDoesNotAffectLoans(t *testing.T) {
+	e, admin, _ := invSetup(t)
+	m := borrowers(t, e, 2)
+	if rec := e.as(admin, "PUT", "/admin/notifications/settings/inventory.loan_created", `{"enabled":true,"discordChannelId":"123456789012345678"}`); rec.Code != 200 {
+		t.Fatal(rec.Code)
+	}
+	if rec := e.as(admin, "PUT", "/admin/notifications/settings/inventory.loan_returned", `{"enabled":true,"discordChannelId":"123456789012345678"}`); rec.Code != 200 {
+		t.Fatal(rec.Code)
+	}
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(503) }))
+	defer down.Close()
+	cl, _ := notify.NewClient("TEST-TOKEN-0123456789", down.URL)
+	w := notify.NewWorker(e.pool, cl, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	it := quantityItem(t, e, admin, 5)
+	c, l := e.loan(m[0], fmt.Sprintf(`{"itemId":%q,"quantity":2}`, it.ID))
+	if c != 201 {
+		t.Fatalf("貸出: %d", c)
+	}
+	if _, err := w.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.ret(m[1], l.ID, `{"quantity":1}`); got != 200 { // 障害中の返却も成功する
+		t.Fatalf("返却: %d", got)
+	}
+	if _, err := w.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.item(m[1], it.ID); got.Outstanding != 1 || got.Available != 4 {
+		t.Errorf("貸出・返却が確定していない: %+v", got)
+	}
+	if n := e.count(`SELECT count(*)::int FROM notification_outbox WHERE status='pending' AND attempts >= 1 AND last_error LIKE '%503%'`); n < 1 {
+		t.Errorf("失敗が記録されていない")
+	}
+	if n := e.count(`SELECT count(*)::int FROM notification_outbox WHERE status='sent'`); n != 0 {
+		t.Errorf("障害中に送信済みになった: %d", n)
+	}
+	// 管理者は送信状況で失敗を確認できる
+	rec := e.as(admin, "GET", "/admin/notifications/deliveries?status=pending", "")
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "503") {
+		t.Errorf("一覧: %d %s", rec.Code, rec.Body.String())
 	}
 }

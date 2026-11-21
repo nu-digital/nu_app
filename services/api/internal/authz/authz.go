@@ -226,6 +226,7 @@ var table = []Action{
 	{"notifications.settings.list", "GET", "/admin/notifications/settings", adminOnly},
 	{"notifications.settings.update", "PUT", "/admin/notifications/settings/{eventType}", adminOnly},
 	{"notifications.deliveries.list", "GET", "/admin/notifications/deliveries", adminOnly},
+	{"notifications.test", "POST", "/admin/notifications/test", adminOnly},
 	{"notifications.deliveries.retry", "POST", "/admin/notifications/deliveries/{id}/retry", adminOnly},
 
 	// 4. CMS（記事・作品。D01: 記事と作品は共通）

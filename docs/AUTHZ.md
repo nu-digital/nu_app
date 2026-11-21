@@ -58,6 +58,7 @@
 | `notifications.settings.list` | GET | `/admin/notifications/settings` | Admin / Owner |
 | `notifications.settings.update` | PUT | `/admin/notifications/settings/{eventType}` | Admin / Owner |
 | `notifications.deliveries.list` | GET | `/admin/notifications/deliveries` | Admin / Owner |
+| `notifications.test` | POST | `/admin/notifications/test` | Admin / Owner |
 | `notifications.deliveries.retry` | POST | `/admin/notifications/deliveries/{id}/retry` | Admin / Owner |
 | `contents.list` | GET | `/contents` | 有効なユーザー（Member以上） |
 | `contents.create` | POST | `/contents` | 有効なユーザー（Member以上） |

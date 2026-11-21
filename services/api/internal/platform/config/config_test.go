@@ -77,3 +77,34 @@ func TestTrustedProxyParsing(t *testing.T) {
 		t.Fatal("既定では誰も信頼しない")
 	}
 }
+
+func TestDiscordBotToken(t *testing.T) {
+	c, err := Load(env(with(nil)))
+	if err != nil || c.DiscordBotToken != "" {
+		t.Fatalf("未設定は空（workerを起動しない）: %v %q", err, c.DiscordBotToken)
+	}
+	c, err = Load(env(with(map[string]string{"DISCORD_BOT_TOKEN": "  abc.def-ghi_123 \n"})))
+	if err != nil || c.DiscordBotToken != "abc.def-ghi_123" {
+		t.Fatalf("前後の空白は除く: %v %q", err, c.DiscordBotToken)
+	}
+	// ヘッダーを壊す文字は拒否する。エラーにtokenの値を含めない
+	for _, bad := range []string{"abc def", "abc\r\nX-Evil: 1", "ab\x00c"} {
+		_, err := Load(env(with(map[string]string{"DISCORD_BOT_TOKEN": bad})))
+		if err == nil {
+			t.Errorf("不正なtokenを受け付けた: %q", bad)
+		} else if bad != "" && len(bad) > 3 && containsAny(err.Error(), "abc", "X-Evil") {
+			t.Errorf("エラーにtokenの値が出る: %v", err)
+		}
+	}
+}
+
+func containsAny(s string, subs ...string) bool {
+	for _, x := range subs {
+		for i := 0; i+len(x) <= len(s); i++ {
+			if s[i:i+len(x)] == x {
+				return true
+			}
+		}
+	}
+	return false
+}
