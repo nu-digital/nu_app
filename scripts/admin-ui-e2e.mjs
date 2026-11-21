@@ -625,6 +625,40 @@ export async function runAdminUiE2E(o) {
       }
       await ctx.close();
     }
+    // 既存記事の投稿者（D14。Admin/Owner。PC・スマホ・320px）。架空の名前だけを使う
+    if (o.dbExec) {
+      for (const [label, width, height] of [['pc', 1440, 900], ['sp', 390, 844], ['narrow', 320, 640]]) {
+        const nm = `架空投稿者${label}`;
+        o.dbExec(`DELETE FROM legacy_authors WHERE source_name='${nm}'`);
+        o.dbExec(`INSERT INTO legacy_authors (source_name) VALUES ('${nm}')`);
+        const mctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+        const mp = await mctx.newPage();
+        await login(mp, o.memberLogin, o.memberPass);
+        await mp.goto(`${adminUrl}/admin/legacy-authors`);
+        await mp.locator('.notice.error').waitFor();
+        check(`[${label}] 一般メンバーには投稿者の一覧が出ない`, (await mp.locator('li.item[data-author]').count()) === 0);
+        await mctx.close();
+        const ctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+        const page = await ctx.newPage();
+        await login(page, o.ownerLogin, o.ownerPass);
+        await page.goto(`${adminUrl}/admin/legacy-authors`);
+        const row = page.locator(`li.item[data-author="${nm}"]`);
+        await row.waitFor();
+        check(`[${label}] 未確認の投稿者は「nu_digital」と表示される案内が出る`, /未確認/.test(await row.innerText()));
+        const btn = row.getByRole('button', { name: '本人の許可を確認した（公開する）' });
+        check(`[${label}] 確認の記録が空のあいだは公開できない`, await btn.isDisabled());
+        await row.getByLabel(/本人の許可をどう確認したか/).fill('本人に口頭で確認');
+        await btn.click();
+        await page.locator('.notice.success').filter({ hasText: '公開の許可を記録しました' }).waitFor();
+        check(`[${label}] 許可を記録すると「公開を許可」になる`, /公開を許可/.test(await row.innerText()));
+        check(`[${label}] 投稿者の画面で横スクロールが出ない`, (await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0);
+        if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-legacy-authors.png`), fullPage: true });
+        await row.getByRole('button', { name: '公開を止める' }).click();
+        await page.locator('.notice.success').filter({ hasText: '公開を止めました' }).waitFor();
+        o.dbExec(`DELETE FROM legacy_authors WHERE source_name='${nm}'`);
+        await ctx.close();
+      }
+    }
     // 記事・作品（CMS）: 下書き・プレビュー（描画時のサニタイズ）・保存の競合・公開（PC・スマホ・320px）
     for (const [label, width, height] of [['pc', 1440, 900], ['sp', 390, 844], ['narrow', 320, 640]]) {
       const own = { cookie: o.ownerCookie, csrf: o.ownerCsrf };
