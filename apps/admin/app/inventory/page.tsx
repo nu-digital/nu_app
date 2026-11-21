@@ -8,7 +8,7 @@ import Notice from "@/components/Notice";
 import { describe, listItems, type Item } from "@/lib/api";
 
 export default function InventoryPage() {
-  return <AppShell>{() => <Inventory />}</AppShell>;
+  return <AppShell>{(me) => <Inventory canManage={me.user.roles.includes("admin") || me.user.roles.includes("owner")} />}</AppShell>;
 }
 
 function availability(it: Item) {
@@ -19,7 +19,7 @@ function availability(it: Item) {
   return { text: it.mode === "individual" && it.unitCount === 0 ? "個体が未登録" : "貸出中", ok: false };
 }
 
-function Inventory() {
+function Inventory({ canManage }: { canManage: boolean }) {
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [next, setNext] = useState<string | null>(null);
@@ -57,6 +57,7 @@ function Inventory() {
       <nav className="subnav" aria-label="物品のメニュー">
         <Link className="btn secondary inline" href="/inventory/loans">貸出中の一覧</Link>
         <Link className="btn secondary inline" href="/inventory/history">履歴</Link>
+        {canManage && <Link className="btn secondary inline" href="/admin/inventory">物品の管理</Link>}
       </nav>
       {error && <Notice kind="error">{error}</Notice>}
       <form className="filters" role="search" onSubmit={(e) => { e.preventDefault(); setLoading(true); setApplied({ q: q.trim(), category, onlyAvailable }); }}>
