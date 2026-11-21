@@ -11,6 +11,27 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const clearPersonalProfile = `-- name: ClearPersonalProfile :execrows
+UPDATE personal_profiles SET legal_name = NULL, student_number = NULL, university_email = NULL, nearest_station = NULL, updated_at = now() WHERE user_id = $1
+`
+
+func (q *Queries) ClearPersonalProfile(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, clearPersonalProfile, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const clearProfileExtras = `-- name: ClearProfileExtras :exec
+UPDATE profiles SET bio = NULL, faculty = NULL, department = NULL, school_year = NULL, updated_at = now() WHERE user_id = $1
+`
+
+func (q *Queries) ClearProfileExtras(ctx context.Context, userID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, clearProfileExtras, userID)
+	return err
+}
+
 const countPersonalDevices = `-- name: CountPersonalDevices :one
 SELECT count(*) FROM personal_devices WHERE user_id = $1
 `
@@ -108,6 +129,42 @@ func (q *Queries) CreateProfileLink(ctx context.Context, arg CreateProfileLinkPa
 	return i, err
 }
 
+const deleteAllFieldVisibility = `-- name: DeleteAllFieldVisibility :execrows
+DELETE FROM profile_field_visibility WHERE user_id = $1
+`
+
+func (q *Queries) DeleteAllFieldVisibility(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAllFieldVisibility, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteAllPersonalDevices = `-- name: DeleteAllPersonalDevices :execrows
+DELETE FROM personal_devices WHERE user_id = $1
+`
+
+func (q *Queries) DeleteAllPersonalDevices(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAllPersonalDevices, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteAllProfileLinks = `-- name: DeleteAllProfileLinks :execrows
+DELETE FROM profile_links WHERE user_id = $1
+`
+
+func (q *Queries) DeleteAllProfileLinks(ctx context.Context, userID pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAllProfileLinks, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deletePersonalDevice = `-- name: DeletePersonalDevice :execrows
 DELETE FROM personal_devices WHERE id = $1 AND user_id = $2
 `
@@ -140,6 +197,52 @@ func (q *Queries) DeleteProfileLink(ctx context.Context, arg DeleteProfileLinkPa
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const getMember = `-- name: GetMember :one
+SELECT u.id, p.display_name,
+       p.bio AS bio, (vb.field_key IS NOT NULL)::bool AS bio_public,
+       p.faculty AS faculty, (vf.field_key IS NOT NULL)::bool AS faculty_public,
+       p.department AS department, (vd.field_key IS NOT NULL)::bool AS department_public,
+       p.school_year AS school_year, (vy.field_key IS NOT NULL)::bool AS school_year_public
+FROM users u
+JOIN profiles p ON p.user_id = u.id
+LEFT JOIN profile_field_visibility vb ON vb.user_id = u.id AND vb.field_key = 'bio' AND vb.visibility = 'members'
+LEFT JOIN profile_field_visibility vf ON vf.user_id = u.id AND vf.field_key = 'faculty' AND vf.visibility = 'members'
+LEFT JOIN profile_field_visibility vd ON vd.user_id = u.id AND vd.field_key = 'department' AND vd.visibility = 'members'
+LEFT JOIN profile_field_visibility vy ON vy.user_id = u.id AND vy.field_key = 'school_year' AND vy.visibility = 'members'
+WHERE u.id = $1 AND u.status = 'active'
+`
+
+type GetMemberRow struct {
+	ID               pgtype.UUID
+	DisplayName      string
+	Bio              pgtype.Text
+	BioPublic        bool
+	Faculty          pgtype.Text
+	FacultyPublic    bool
+	Department       pgtype.Text
+	DepartmentPublic bool
+	SchoolYear       pgtype.Int2
+	SchoolYearPublic bool
+}
+
+func (q *Queries) GetMember(ctx context.Context, id pgtype.UUID) (GetMemberRow, error) {
+	row := q.db.QueryRow(ctx, getMember, id)
+	var i GetMemberRow
+	err := row.Scan(
+		&i.ID,
+		&i.DisplayName,
+		&i.Bio,
+		&i.BioPublic,
+		&i.Faculty,
+		&i.FacultyPublic,
+		&i.Department,
+		&i.DepartmentPublic,
+		&i.SchoolYear,
+		&i.SchoolYearPublic,
+	)
+	return i, err
 }
 
 const getPersonalDeviceForUpdate = `-- name: GetPersonalDeviceForUpdate :one
@@ -292,6 +395,158 @@ func (q *Queries) ListFieldVisibility(ctx context.Context, userID pgtype.UUID) (
 	return items, nil
 }
 
+const listMemberDevices = `-- name: ListMemberDevices :many
+SELECT id, category, name, specs_json, sort_order FROM personal_devices WHERE user_id = $1 AND visibility = 'members' ORDER BY sort_order, id
+`
+
+type ListMemberDevicesRow struct {
+	ID        pgtype.UUID
+	Category  string
+	Name      string
+	SpecsJson []byte
+	SortOrder int32
+}
+
+func (q *Queries) ListMemberDevices(ctx context.Context, userID pgtype.UUID) ([]ListMemberDevicesRow, error) {
+	rows, err := q.db.Query(ctx, listMemberDevices, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMemberDevicesRow{}
+	for rows.Next() {
+		var i ListMemberDevicesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Category,
+			&i.Name,
+			&i.SpecsJson,
+			&i.SortOrder,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMemberLinks = `-- name: ListMemberLinks :many
+SELECT id, label, url, sort_order FROM profile_links WHERE user_id = $1 AND visibility = 'members' ORDER BY sort_order, id
+`
+
+type ListMemberLinksRow struct {
+	ID        pgtype.UUID
+	Label     string
+	Url       string
+	SortOrder int32
+}
+
+func (q *Queries) ListMemberLinks(ctx context.Context, userID pgtype.UUID) ([]ListMemberLinksRow, error) {
+	rows, err := q.db.Query(ctx, listMemberLinks, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMemberLinksRow{}
+	for rows.Next() {
+		var i ListMemberLinksRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Label,
+			&i.Url,
+			&i.SortOrder,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMembers = `-- name: ListMembers :many
+SELECT u.id, p.display_name,
+       p.bio AS bio, (vb.field_key IS NOT NULL)::bool AS bio_public,
+       p.faculty AS faculty, (vf.field_key IS NOT NULL)::bool AS faculty_public,
+       p.department AS department, (vd.field_key IS NOT NULL)::bool AS department_public,
+       p.school_year AS school_year, (vy.field_key IS NOT NULL)::bool AS school_year_public
+FROM users u
+JOIN profiles p ON p.user_id = u.id
+LEFT JOIN profile_field_visibility vb ON vb.user_id = u.id AND vb.field_key = 'bio' AND vb.visibility = 'members'
+LEFT JOIN profile_field_visibility vf ON vf.user_id = u.id AND vf.field_key = 'faculty' AND vf.visibility = 'members'
+LEFT JOIN profile_field_visibility vd ON vd.user_id = u.id AND vd.field_key = 'department' AND vd.visibility = 'members'
+LEFT JOIN profile_field_visibility vy ON vy.user_id = u.id AND vy.field_key = 'school_year' AND vy.visibility = 'members'
+WHERE u.status = 'active'
+  AND ($1::text = '' OR p.display_name ILIKE '%' || $1 || '%' ESCAPE '\')
+  AND (NOT $5::bool OR (p.display_name, u.id) > ($2::text, $3::uuid))
+ORDER BY p.display_name, u.id
+LIMIT $4
+`
+
+type ListMembersParams struct {
+	Column1 string
+	Column2 string
+	Column3 pgtype.UUID
+	Limit   int32
+	Column5 bool
+}
+
+type ListMembersRow struct {
+	ID               pgtype.UUID
+	DisplayName      string
+	Bio              pgtype.Text
+	BioPublic        bool
+	Faculty          pgtype.Text
+	FacultyPublic    bool
+	Department       pgtype.Text
+	DepartmentPublic bool
+	SchoolYear       pgtype.Int2
+	SchoolYearPublic bool
+}
+
+// 有効(active)なユーザーだけ。メンバー内公開(members)にした項目だけを返す（それ以外はNULL）。ログインID・個人情報は返さない。
+func (q *Queries) ListMembers(ctx context.Context, arg ListMembersParams) ([]ListMembersRow, error) {
+	rows, err := q.db.Query(ctx, listMembers,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Limit,
+		arg.Column5,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMembersRow{}
+	for rows.Next() {
+		var i ListMembersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.DisplayName,
+			&i.Bio,
+			&i.BioPublic,
+			&i.Faculty,
+			&i.FacultyPublic,
+			&i.Department,
+			&i.DepartmentPublic,
+			&i.SchoolYear,
+			&i.SchoolYearPublic,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPersonalDevices = `-- name: ListPersonalDevices :many
 SELECT id, user_id, category, name, specs_json, sort_order, visibility, created_at, updated_at FROM personal_devices WHERE user_id = $1 ORDER BY sort_order, id
 `
@@ -357,6 +612,20 @@ func (q *Queries) ListProfileLinks(ctx context.Context, userID pgtype.UUID) ([]P
 		return nil, err
 	}
 	return items, nil
+}
+
+const setDisplayName = `-- name: SetDisplayName :exec
+UPDATE profiles SET display_name = $2, updated_at = now() WHERE user_id = $1
+`
+
+type SetDisplayNameParams struct {
+	UserID      pgtype.UUID
+	DisplayName string
+}
+
+func (q *Queries) SetDisplayName(ctx context.Context, arg SetDisplayNameParams) error {
+	_, err := q.db.Exec(ctx, setDisplayName, arg.UserID, arg.DisplayName)
+	return err
 }
 
 const updatePersonalDevice = `-- name: UpdatePersonalDevice :one
@@ -520,6 +789,26 @@ type WithdrawPublicCreditConsentParams struct {
 
 func (q *Queries) WithdrawPublicCreditConsent(ctx context.Context, arg WithdrawPublicCreditConsentParams) (int64, error) {
 	result, err := q.db.Exec(ctx, withdrawPublicCreditConsent, arg.UpdatedBy, arg.WithdrawnAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const withdrawPublicCreditConsentByAdmin = `-- name: WithdrawPublicCreditConsentByAdmin :execrows
+UPDATE public_credit_consents SET withdrawn_at = $3, updated_by = $2
+WHERE user_id = $1 AND withdrawn_at IS NULL
+`
+
+type WithdrawPublicCreditConsentByAdminParams struct {
+	UserID      pgtype.UUID
+	UpdatedBy   pgtype.UUID
+	WithdrawnAt pgtype.Timestamptz
+}
+
+// 管理者による個人情報削除に伴う撤回（対象と操作者が別）。
+func (q *Queries) WithdrawPublicCreditConsentByAdmin(ctx context.Context, arg WithdrawPublicCreditConsentByAdminParams) (int64, error) {
+	result, err := q.db.Exec(ctx, withdrawPublicCreditConsentByAdmin, arg.UserID, arg.UpdatedBy, arg.WithdrawnAt)
 	if err != nil {
 		return 0, err
 	}
