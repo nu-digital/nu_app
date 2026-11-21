@@ -89,6 +89,7 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("POST /inventory/loans/{id}/returns", s.returnLoan)
 	mux.HandleFunc("GET /inventory/loans", s.listLoans)
 	mux.HandleFunc("GET /inventory/history", s.history)
+	mux.HandleFunc("POST /admin/inventory/corrections", s.createCorrection)
 	mux.HandleFunc("GET /members", s.listMembers)
 	mux.HandleFunc("GET /members/{id}", s.getMember)
 	mux.HandleFunc("GET /admin/users/{id}/private-profile", s.getPrivateProfile)

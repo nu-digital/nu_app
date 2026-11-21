@@ -165,6 +165,29 @@ func (q *Queries) CreateInventoryUnit(ctx context.Context, arg CreateInventoryUn
 	return i, err
 }
 
+const getCorrectionByKey = `-- name: GetCorrectionByKey :one
+SELECT id, item_id, target_type, target_id, kind, delta_quantity, reason, actor_user_id, idempotency_key, request_fingerprint, created_at FROM inventory_correction_events WHERE idempotency_key = $1
+`
+
+func (q *Queries) GetCorrectionByKey(ctx context.Context, idempotencyKey string) (InventoryCorrectionEvent, error) {
+	row := q.db.QueryRow(ctx, getCorrectionByKey, idempotencyKey)
+	var i InventoryCorrectionEvent
+	err := row.Scan(
+		&i.ID,
+		&i.ItemID,
+		&i.TargetType,
+		&i.TargetID,
+		&i.Kind,
+		&i.DeltaQuantity,
+		&i.Reason,
+		&i.ActorUserID,
+		&i.IdempotencyKey,
+		&i.RequestFingerprint,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getInventoryItem = `-- name: GetInventoryItem :one
 SELECT id, name, description, category, location, cover_media_id, mode, total_quantity, archived_at, created_at, updated_at FROM inventory_items WHERE id = $1
 `
@@ -254,6 +277,109 @@ func (q *Queries) GetInventoryUnitForUpdate(ctx context.Context, arg GetInventor
 	return i, err
 }
 
+const getLoanEff = `-- name: GetLoanEff :one
+SELECT id, item_id, unit_id, borrower_user_id, borrowed_at, original_quantity, quantity FROM inventory_loans_eff WHERE id = $1
+`
+
+func (q *Queries) GetLoanEff(ctx context.Context, id pgtype.UUID) (InventoryLoansEff, error) {
+	row := q.db.QueryRow(ctx, getLoanEff, id)
+	var i InventoryLoansEff
+	err := row.Scan(
+		&i.ID,
+		&i.ItemID,
+		&i.UnitID,
+		&i.BorrowerUserID,
+		&i.BorrowedAt,
+		&i.OriginalQuantity,
+		&i.Quantity,
+	)
+	return i, err
+}
+
+const getRawReturn = `-- name: GetRawReturn :one
+SELECT id, loan_id, actor_user_id, quantity, returned_at FROM inventory_returns WHERE id = $1
+`
+
+func (q *Queries) GetRawReturn(ctx context.Context, id pgtype.UUID) (InventoryReturn, error) {
+	row := q.db.QueryRow(ctx, getRawReturn, id)
+	var i InventoryReturn
+	err := row.Scan(
+		&i.ID,
+		&i.LoanID,
+		&i.ActorUserID,
+		&i.Quantity,
+		&i.ReturnedAt,
+	)
+	return i, err
+}
+
+const getReturnEff = `-- name: GetReturnEff :one
+SELECT id, loan_id, actor_user_id, returned_at, original_quantity, quantity FROM inventory_returns_eff WHERE id = $1
+`
+
+func (q *Queries) GetReturnEff(ctx context.Context, id pgtype.UUID) (InventoryReturnsEff, error) {
+	row := q.db.QueryRow(ctx, getReturnEff, id)
+	var i InventoryReturnsEff
+	err := row.Scan(
+		&i.ID,
+		&i.LoanID,
+		&i.ActorUserID,
+		&i.ReturnedAt,
+		&i.OriginalQuantity,
+		&i.Quantity,
+	)
+	return i, err
+}
+
+const insertCorrection = `-- name: InsertCorrection :one
+INSERT INTO inventory_correction_events (item_id, target_type, target_id, kind, delta_quantity, reason, actor_user_id, idempotency_key, request_fingerprint, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id, item_id, target_type, target_id, kind, delta_quantity, reason, actor_user_id, idempotency_key, request_fingerprint, created_at
+`
+
+type InsertCorrectionParams struct {
+	ItemID             pgtype.UUID
+	TargetType         string
+	TargetID           pgtype.UUID
+	Kind               string
+	DeltaQuantity      pgtype.Int4
+	Reason             string
+	ActorUserID        pgtype.UUID
+	IdempotencyKey     string
+	RequestFingerprint string
+	CreatedAt          pgtype.Timestamptz
+}
+
+func (q *Queries) InsertCorrection(ctx context.Context, arg InsertCorrectionParams) (InventoryCorrectionEvent, error) {
+	row := q.db.QueryRow(ctx, insertCorrection,
+		arg.ItemID,
+		arg.TargetType,
+		arg.TargetID,
+		arg.Kind,
+		arg.DeltaQuantity,
+		arg.Reason,
+		arg.ActorUserID,
+		arg.IdempotencyKey,
+		arg.RequestFingerprint,
+		arg.CreatedAt,
+	)
+	var i InventoryCorrectionEvent
+	err := row.Scan(
+		&i.ID,
+		&i.ItemID,
+		&i.TargetType,
+		&i.TargetID,
+		&i.Kind,
+		&i.DeltaQuantity,
+		&i.Reason,
+		&i.ActorUserID,
+		&i.IdempotencyKey,
+		&i.RequestFingerprint,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const insertInventoryAdjustment = `-- name: InsertInventoryAdjustment :exec
 INSERT INTO inventory_adjustments (item_id, actor_user_id, before_quantity, after_quantity, reason)
 VALUES ($1, $2, $3, $4, $5)
@@ -290,8 +416,8 @@ func (q *Queries) ItemLoanCount(ctx context.Context, itemID pgtype.UUID) (int64,
 }
 
 const itemOutstanding = `-- name: ItemOutstanding :one
-SELECT (COALESCE((SELECT SUM(l.quantity) FROM inventory_loans l WHERE l.item_id = $1), 0)
-      - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r JOIN inventory_loans l ON l.id = r.loan_id WHERE l.item_id = $1), 0))::bigint
+SELECT (COALESCE((SELECT SUM(l.quantity) FROM inventory_loans_eff l WHERE l.item_id = $1), 0)
+      - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r JOIN inventory_loans_eff l ON l.id = r.loan_id WHERE l.item_id = $1), 0))::bigint
 `
 
 // 物品の貸出中の数量（貸出数の合計 − 返却数の合計）。呼び出し側が物品行をロックしてから使う。
@@ -327,23 +453,34 @@ func (q *Queries) ListInventoryCategories(ctx context.Context) ([]string, error)
 }
 
 const listInventoryHistory = `-- name: ListInventoryHistory :many
-SELECT event_id, kind, item_id, item_name, asset_tag, borrower_display_name, actor_display_name, quantity, at FROM (
+SELECT event_id, kind, item_id, item_name, asset_tag, borrower_display_name, actor_display_name, quantity, at, correction_kind, target_type, reason FROM (
   SELECT l.id AS event_id, 'loan'::text AS kind, l.item_id, i.name AS item_name, COALESCE(un.asset_tag, '') AS asset_tag,
          COALESCE(pb.display_name, '') AS borrower_display_name, COALESCE(pb.display_name, '') AS actor_display_name,
-         l.quantity, l.borrowed_at AS at
+         l.quantity, l.borrowed_at AS at, ''::text AS correction_kind, ''::text AS target_type, ''::text AS reason
   FROM inventory_loans l
   JOIN inventory_items i ON i.id = l.item_id
   LEFT JOIN inventory_units un ON un.id = l.unit_id
   LEFT JOIN profiles pb ON pb.user_id = l.borrower_user_id
   UNION ALL
   SELECT r.id, 'return'::text, l.item_id, i.name, COALESCE(un.asset_tag, ''),
-         COALESCE(pb.display_name, ''), COALESCE(pa.display_name, ''), r.quantity, r.returned_at
+         COALESCE(pb.display_name, ''), COALESCE(pa.display_name, ''), r.quantity, r.returned_at, ''::text, ''::text, ''::text
   FROM inventory_returns r
   JOIN inventory_loans l ON l.id = r.loan_id
   JOIN inventory_items i ON i.id = l.item_id
   LEFT JOIN inventory_units un ON un.id = l.unit_id
   LEFT JOIN profiles pb ON pb.user_id = l.borrower_user_id
   LEFT JOIN profiles pa ON pa.user_id = r.actor_user_id
+  UNION ALL
+  SELECT c.id, 'correction'::text, c.item_id, i.name, COALESCE(un.asset_tag, ''),
+         COALESCE(pb.display_name, ''), COALESCE(pc.display_name, ''), COALESCE(c.delta_quantity, 0), c.created_at, c.kind, c.target_type, c.reason
+  FROM inventory_correction_events c
+  JOIN inventory_items i ON i.id = c.item_id
+  LEFT JOIN inventory_loans tl ON c.target_type = 'loan' AND tl.id = c.target_id
+  LEFT JOIN inventory_returns tr ON c.target_type = 'return' AND tr.id = c.target_id
+  LEFT JOIN inventory_loans tl2 ON tl2.id = tr.loan_id
+  LEFT JOIN inventory_units un ON un.id = COALESCE(tl.unit_id, tl2.unit_id)
+  LEFT JOIN profiles pb ON pb.user_id = COALESCE(tl.borrower_user_id, tl2.borrower_user_id)
+  LEFT JOIN profiles pc ON pc.user_id = c.actor_user_id
 ) h
 WHERE ($1::uuid IS NULL OR h.item_id = $1::uuid)
   AND (NOT $2::bool OR (h.at, h.event_id) < ($3::timestamptz, $4::uuid))
@@ -369,6 +506,9 @@ type ListInventoryHistoryRow struct {
 	ActorDisplayName    string
 	Quantity            int32
 	At                  pgtype.Timestamptz
+	CorrectionKind      string
+	TargetType          string
+	Reason              string
 }
 
 // 貸出と返却の履歴（新しい順）。借りた人(borrower)と返却した人(actor)を別に返す。
@@ -397,6 +537,9 @@ func (q *Queries) ListInventoryHistory(ctx context.Context, arg ListInventoryHis
 			&i.ActorDisplayName,
 			&i.Quantity,
 			&i.At,
+			&i.CorrectionKind,
+			&i.TargetType,
+			&i.Reason,
 		); err != nil {
 			return nil, err
 		}
@@ -411,8 +554,8 @@ func (q *Queries) ListInventoryHistory(ctx context.Context, arg ListInventoryHis
 const listInventoryItems = `-- name: ListInventoryItems :many
 WITH base AS (
   SELECT i.id, i.name, i.description, i.category, i.location, i.cover_media_id, i.mode, i.total_quantity, i.archived_at, i.created_at, i.updated_at,
-    (COALESCE((SELECT SUM(l.quantity) FROM inventory_loans l WHERE l.item_id = i.id), 0)
-     - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r JOIN inventory_loans l ON l.id = r.loan_id WHERE l.item_id = i.id), 0))::bigint AS outstanding,
+    (COALESCE((SELECT SUM(l.quantity) FROM inventory_loans_eff l WHERE l.item_id = i.id), 0)
+     - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r JOIN inventory_loans_eff l ON l.id = r.loan_id WHERE l.item_id = i.id), 0))::bigint AS outstanding,
     (SELECT count(*) FROM inventory_units u WHERE u.item_id = i.id AND u.state = 'active')::bigint AS unit_count,
     (SELECT count(*) FROM inventory_units u WHERE u.item_id = i.id AND u.state = 'active' AND u.current_loan_id IS NULL)::bigint AS units_available
   FROM inventory_items i
@@ -504,11 +647,11 @@ func (q *Queries) ListInventoryItems(ctx context.Context, arg ListInventoryItems
 
 const listItemLoansOutstanding = `-- name: ListItemLoansOutstanding :many
 SELECT l.id, l.quantity, l.borrowed_at, l.borrower_user_id, COALESCE(p.display_name, '') AS borrower_display_name,
-       (l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r WHERE r.loan_id = l.id), 0))::int AS outstanding
-FROM inventory_loans l
+       (l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r WHERE r.loan_id = l.id), 0))::int AS outstanding
+FROM inventory_loans_eff l
 LEFT JOIN profiles p ON p.user_id = l.borrower_user_id
 WHERE l.item_id = $1 AND l.unit_id IS NULL
-  AND l.quantity > COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r WHERE r.loan_id = l.id), 0)
+  AND l.quantity > COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r WHERE r.loan_id = l.id), 0)
 ORDER BY l.borrowed_at, l.id
 `
 
@@ -600,12 +743,12 @@ func (q *Queries) ListItemUnits(ctx context.Context, itemID pgtype.UUID) ([]List
 const listOutstandingLoans = `-- name: ListOutstandingLoans :many
 SELECT l.id, l.item_id, i.name AS item_name, l.unit_id, COALESCE(un.asset_tag, '') AS asset_tag,
        l.borrower_user_id, COALESCE(p.display_name, '') AS borrower_display_name, l.borrowed_at,
-       (l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r WHERE r.loan_id = l.id), 0))::int AS outstanding
-FROM inventory_loans l
+       (l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r WHERE r.loan_id = l.id), 0))::int AS outstanding
+FROM inventory_loans_eff l
 JOIN inventory_items i ON i.id = l.item_id
 LEFT JOIN inventory_units un ON un.id = l.unit_id
 LEFT JOIN profiles p ON p.user_id = l.borrower_user_id
-WHERE l.quantity > COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r WHERE r.loan_id = l.id), 0)
+WHERE l.quantity > COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r WHERE r.loan_id = l.id), 0)
   AND (NOT $1::bool OR l.borrower_user_id = $2::uuid)
   AND ($3::text = '' OR i.name ILIKE '%' || $3 || '%' ESCAPE '\' OR p.display_name ILIKE '%' || $3 || '%' ESCAPE '\')
   AND ($4::uuid IS NULL OR l.item_id = $4::uuid)
@@ -678,8 +821,8 @@ func (q *Queries) ListOutstandingLoans(ctx context.Context, arg ListOutstandingL
 }
 
 const loanOutstanding = `-- name: LoanOutstanding :one
-SELECT (l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns r WHERE r.loan_id = l.id), 0))::int
-FROM inventory_loans l WHERE l.id = $1
+SELECT (l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r WHERE r.loan_id = l.id), 0))::int
+FROM inventory_loans_eff l WHERE l.id = $1
 `
 
 // 貸出ごとの未返却数。

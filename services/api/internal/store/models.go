@@ -41,6 +41,20 @@ type InventoryAdjustment struct {
 	CreatedAt      pgtype.Timestamptz
 }
 
+type InventoryCorrectionEvent struct {
+	ID                 pgtype.UUID
+	ItemID             pgtype.UUID
+	TargetType         string
+	TargetID           pgtype.UUID
+	Kind               string
+	DeltaQuantity      pgtype.Int4
+	Reason             string
+	ActorUserID        pgtype.UUID
+	IdempotencyKey     string
+	RequestFingerprint string
+	CreatedAt          pgtype.Timestamptz
+}
+
 type InventoryItem struct {
 	ID            pgtype.UUID
 	Name          string
@@ -64,12 +78,31 @@ type InventoryLoan struct {
 	BorrowedAt     pgtype.Timestamptz
 }
 
+type InventoryLoansEff struct {
+	ID               pgtype.UUID
+	ItemID           pgtype.UUID
+	UnitID           pgtype.UUID
+	BorrowerUserID   pgtype.UUID
+	BorrowedAt       pgtype.Timestamptz
+	OriginalQuantity int32
+	Quantity         int32
+}
+
 type InventoryReturn struct {
 	ID          pgtype.UUID
 	LoanID      pgtype.UUID
 	ActorUserID pgtype.UUID
 	Quantity    int32
 	ReturnedAt  pgtype.Timestamptz
+}
+
+type InventoryReturnsEff struct {
+	ID               pgtype.UUID
+	LoanID           pgtype.UUID
+	ActorUserID      pgtype.UUID
+	ReturnedAt       pgtype.Timestamptz
+	OriginalQuantity int32
+	Quantity         int32
 }
 
 type InventoryUnit struct {

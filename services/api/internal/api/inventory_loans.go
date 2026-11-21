@@ -325,8 +325,15 @@ func (s *server) listLoans(w http.ResponseWriter, r *http.Request) {
 
 // history は GET /inventory/history（貸出・返却の履歴。新しい順）。借りた人と返却した人を別に表示する。
 func (s *server) history(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.authorize(w, r, "inventory.history", authz.Resource{}); !ok {
+	a, ok := s.authorize(w, r, "inventory.history", authz.Resource{})
+	if !ok {
 		return
+	}
+	isAdmin := false
+	for _, ro := range a.Identity.Roles {
+		if ro == authz.RoleAdmin || ro == authz.RoleOwner {
+			isAdmin = true
+		}
 	}
 	limit, ok := pageLimit(w, r)
 	if !ok {
@@ -367,11 +374,23 @@ func (s *server) history(w http.ResponseWriter, r *http.Request) {
 		ActorDisplayName    string    `json:"actorDisplayName"` // 貸出=借りた人、返却=返却した人
 		Quantity            int32     `json:"quantity"`
 		At                  time.Time `json:"at"`
+		// 訂正イベントのとき: kind=correction、correctionKind=adjust/void、targetType=loan/return。actor=訂正した人。
+		CorrectionKind string `json:"correctionKind,omitempty"`
+		TargetType     string `json:"targetType,omitempty"`
+		Reason         string `json:"reason,omitempty"` // 理由は管理者にだけ返す（自由記述のため）
 	}
 	items := make([]event, 0, len(rows))
 	for _, x := range rows {
 		items = append(items, event{ID: x.EventID.String(), Kind: x.Kind, ItemID: x.ItemID.String(), ItemName: x.ItemName, AssetTag: x.AssetTag,
-			BorrowerDisplayName: x.BorrowerDisplayName, ActorDisplayName: x.ActorDisplayName, Quantity: x.Quantity, At: x.At.Time})
+			BorrowerDisplayName: x.BorrowerDisplayName, ActorDisplayName: x.ActorDisplayName, Quantity: x.Quantity, At: x.At.Time,
+			CorrectionKind: x.CorrectionKind, TargetType: x.TargetType, Reason: reasonFor(isAdmin, x.Reason)})
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": next})
+}
+
+func reasonFor(admin bool, reason string) string {
+	if admin {
+		return reason
+	}
+	return ""
 }

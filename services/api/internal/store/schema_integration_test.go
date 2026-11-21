@@ -279,3 +279,37 @@ func TestInventoryConstraints(t *testing.T) {
 	wantViolation(t, pool, "inventory_adjustments_changed", `INSERT INTO inventory_adjustments (item_id, actor_user_id, before_quantity, after_quantity, reason) VALUES ($1,$2,3,3,'x')`, qty, u.ID)
 	wantViolation(t, pool, "inventory_adjustments_reason_valid", `INSERT INTO inventory_adjustments (item_id, actor_user_id, before_quantity, after_quantity, reason) VALUES ($1,$2,3,4,' ')`, qty, u.ID)
 }
+
+func TestInventoryCorrectionConstraints(t *testing.T) {
+	pool, _ := pgtest.New(t)
+	ctx := context.Background()
+	u := mustUser(t, pool, "alice.example", "active")
+	var item, loan string
+	if err := pool.QueryRow(ctx, `INSERT INTO inventory_items (name, mode, total_quantity) VALUES ('ケーブル','quantity',5) RETURNING id::text`).Scan(&item); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `INSERT INTO inventory_loans (item_id, borrower_user_id, quantity) VALUES ($1,$2,2) RETURNING id::text`, item, u.ID).Scan(&loan); err != nil {
+		t.Fatal(err)
+	}
+	ins := `INSERT INTO inventory_correction_events (item_id, target_type, target_id, kind, delta_quantity, reason, actor_user_id, idempotency_key, request_fingerprint) VALUES ($1,'loan',$2,$3,$4,$5,$6,$7,'fp')`
+	if _, err := pool.Exec(ctx, ins, item, loan, "adjust", 1, "数え間違い", u.ID, "key-000001"); err != nil {
+		t.Fatal(err)
+	}
+	wantViolation(t, pool, "inventory_corrections_key_unique", ins, item, loan, "adjust", 1, "x", u.ID, "key-000001")
+	wantViolation(t, pool, "inventory_corrections_delta_matches_kind", ins, item, loan, "adjust", 0, "x", u.ID, "key-000002")
+	wantViolation(t, pool, "inventory_corrections_delta_matches_kind", ins, item, loan, "adjust", nil, "x", u.ID, "key-000003")
+	wantViolation(t, pool, "inventory_corrections_delta_matches_kind", ins, item, loan, "void", 1, "x", u.ID, "key-000004")
+	wantViolation(t, pool, "inventory_corrections_reason_valid", ins, item, loan, "adjust", 1, "  ", u.ID, "key-000005")
+	wantViolation(t, pool, "inventory_corrections_key_valid", ins, item, loan, "adjust", 1, "x", u.ID, "short")
+	if _, err := pool.Exec(ctx, ins, item, loan, "void", nil, "誤登録", u.ID, "key-000006"); err != nil {
+		t.Fatal(err)
+	}
+	wantViolation(t, pool, "inventory_corrections_one_void_idx", ins, item, loan, "void", nil, "二重", u.ID, "key-000007")
+	wantViolation(t, pool, "23001", `UPDATE inventory_correction_events SET reason = '改ざん'`)
+	wantViolation(t, pool, "23001", `DELETE FROM inventory_correction_events`)
+	// 有効数量のビュー: voidされた貸出は0
+	var eff int
+	if err := pool.QueryRow(ctx, `SELECT quantity FROM inventory_loans_eff WHERE id=$1`, loan).Scan(&eff); err != nil || eff != 0 {
+		t.Fatalf("取消した貸出の有効数量が0でない: %d %v", eff, err)
+	}
+}
