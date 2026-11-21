@@ -55,15 +55,23 @@ func newMediaFixture(t *testing.T) *mediaFixture {
 // add は画像の行とファイルを作る。ageHoursだけ前にアップロードされたことにする。
 func (f *mediaFixture) add(id string, ageHours int, refs bool) string {
 	f.t.Helper()
-	key, err := media.NewKey(id, "png")
-	if err != nil {
-		f.t.Fatal(err)
+	// 移行前に保存した jpg/png も、gc・verify・redact で扱えること（末尾の文字で拡張子を変える）
+	ext, mime := "webp", "image/webp"
+	switch id[len(id)-1] {
+	case 'a':
+		ext, mime = "png", "image/png"
+	case 'c':
+		ext, mime = "jpg", "image/jpeg"
+	}
+	key := id[:2] + "/" + id + "." + ext
+	if !media.ValidKey(key) {
+		f.t.Fatalf("storage_keyが不正: %s", key)
 	}
 	if err := f.st.Put(key, []byte("png-bytes-"+id)); err != nil {
 		f.t.Fatal(err)
 	}
 	f.exec(`INSERT INTO media_assets (id, public_id, storage_key, mime_type, byte_size, width, height, sha256, purpose, uploaded_by, created_at)
-		VALUES ($1, substr(md5($4::text) || md5($4::text), 1, 22), $2, 'image/png', 20, 10, 10, repeat('a', 64), 'cms', (SELECT id FROM users LIMIT 1), now() - make_interval(hours => $3))`, id, key, ageHours, id)
+		VALUES ($1, substr(md5($4::text) || md5($4::text), 1, 22), $2, $5, 20, 10, 10, repeat('a', 64), 'cms', (SELECT id FROM users LIMIT 1), now() - make_interval(hours => $3))`, id, key, ageHours, id, mime)
 	if refs {
 		f.exec(`INSERT INTO media_references (media_id, owner_type, owner_id, purpose) VALUES ($1, 'content_revision', gen_random_uuid(), 'inline')`, id)
 	}
