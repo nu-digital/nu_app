@@ -97,6 +97,13 @@ head -c 2048 /dev/zero > "$tmp/2k.bin"
 n429=0; for _ in $(seq 1 25); do c=$(app -s -o /dev/null -w '%{http_code}' -X POST -d '{}' "$A/api/v1/auth/login"); [ "$c" = 429 ] || [ "$c" = 503 ] && n429=$((n429+1)); done
 [ "$n429" -ge 5 ]; check "ログインへの連続アクセスはNginxで制限される（$n429/25件が拒否）" $?
 
+# アクセスログにクエリ文字列・Cookie・Authorizationを残さない
+site -s -o /dev/null -H 'Cookie: session=LOGSECRET1' -H 'Authorization: Bearer LOGSECRET2' "$S/blog/?token=LOGSECRET3&email=a@example.invalid" >/dev/null
+sleep 1
+docker exec "$cid" cat /var/log/nginx/nu_app.access.log > "$tmp/access.log" 2>/dev/null
+grep -q '"GET /blog/"' "$tmp/access.log"; check "アクセスログにパス（クエリなし）が残る" $?
+! grep -q 'LOGSECRET\|a@example.invalid\|token=' "$tmp/access.log"; check "アクセスログにクエリ文字列・Cookie・Authorizationが残らない" $?
+
 echo
 echo "合格 $pass・失敗 $failed"
 [ "$failed" = 0 ]
