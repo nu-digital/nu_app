@@ -139,6 +139,8 @@ type myProfileView struct {
 	Links               []linkView   `json:"links"`
 	Devices             []deviceView `json:"devices"`
 	PublicCreditConsent consentView  `json:"publicCreditConsent"`
+	// Works は制作実績（公開版が本人をクレジットしている作品）。本人には同意の有無にかかわらず見せる。
+	Works []memberWork `json:"works"`
 }
 
 var visibilityKeys = map[string]string{"bio": "bio", "faculty": "faculty", "department": "department", "schoolYear": "school_year"}
@@ -225,6 +227,11 @@ func (s *server) loadMyProfile(ctx context.Context, q *store.Queries, uid pgtype
 		return myProfileView{}, err
 	}
 	v.PublicCreditConsent = toConsentView(c, err == nil)
+	works, err := q.ListPublishedWorksOfUser(ctx, uid)
+	if err != nil {
+		return myProfileView{}, err
+	}
+	v.Works = toMemberWorks(works)
 	return v, nil
 }
 

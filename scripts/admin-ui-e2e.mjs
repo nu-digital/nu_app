@@ -579,7 +579,7 @@ export async function runAdminUiE2E(o) {
       await page.getByRole('link', { name: '通知の設定' }).click();
       await page.waitForURL('**/admin/notifications');
       await page.locator('li.setting').first().waitFor();
-      check(`[${label}] 通知の設定に3種別が出る`, (await page.locator('li.setting').count()) === 3);
+      check(`[${label}] 通知の設定に4種別が出る`, (await page.locator('li.setting').count()) === 4);
       const row = page.locator('li.setting[data-event="inventory.loan_created"]');
       check(`[${label}] 変更が無いあいだは「保存する」が押せない`, await row.getByRole('button', { name: '保存する' }).isDisabled());
       check(`[${label}] チャンネル未設定の案内が出る`, /送信待ちとして溜まります/.test(await row.innerText()));
