@@ -338,3 +338,15 @@ export async function putContributors(id: string, baseRevision: number, contribu
   if (r.status !== 200 && r.status !== 201) throw toError(r);
   return r.json as ContentDetail;
 }
+
+// ---- 既存記事の投稿者（D14） ----
+
+export type LegacyAuthor = {
+  id: string; name: string; publicationState: "unconfirmed" | "permitted" | "withdrawn"; confirmedAt: string | null; withdrawnAt: string | null;
+  erased: boolean; linkedUserId: string | null; linkedDisplayName: string | null; contentCount: number;
+};
+export const listLegacyAuthors = async () => ok<{ items: LegacyAuthor[] }>(await call("GET", "/admin/legacy-authors"), 200);
+export const permitLegacyAuthor = async (id: string, note: string) => { await ok<unknown>(await call("POST", `/admin/legacy-authors/${id}/permit`, { note }), 204); };
+export const withdrawLegacyAuthor = async (id: string) => { await ok<unknown>(await call("POST", `/admin/legacy-authors/${id}/withdraw`), 204); };
+export const linkLegacyAuthor = async (id: string, userId: string) => { await ok<unknown>(await call("PUT", `/admin/legacy-authors/${id}/link`, { userId }), 204); };
+export const unlinkLegacyAuthor = async (id: string) => { await ok<unknown>(await call("DELETE", `/admin/legacy-authors/${id}/link`), 204); };
