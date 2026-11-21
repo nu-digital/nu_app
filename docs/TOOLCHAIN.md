@@ -18,6 +18,8 @@
 | 実行イメージ | `gcr.io/distroless/static-debian12:nonroot`（digest固定） | 静的バイナリのみを非rootで実行。シェル・パッケージ管理を持たず攻撃面が小さい |
 | 配信イメージ（web） | `nginxinc/nginx-unprivileged:1.30.6-alpine`（digest固定） | nginx stable 1.30系（[endoflife.date](https://endoflife.date/nginx)でサポート中）。1.30.7は同イメージ未公開のため1.30.6 |
 | Nodeイメージ | `node:22.23.5-alpine`（digest固定） | `.node-version`と同版 |
+| react-markdown / remark-gfm / rehype-raw / rehype-sanitize | 10.1.0 / 4.0.1 / 7.0.0 / 6.0.0（`apps/admin`。いずれも完全固定。P3-03a） | CMSのプレビュー。react-markdown・remark-gfm・rehype-rawは既存サイト（`apps/web`）と同じ版。`rehype-sanitize`は描画時のサニタイズ（保存型XSSの防壁）のため。`npm audit`は0件 |
+| unified / remark-parse / remark-rehype / rehype-stringify | 11.0.5 / 11.0.0 / 11.1.2 / 10.0.1（`apps/admin`のdevDependency。P3-03a） | サニタイズのテスト（`node --test`）で、プレビューと同じプラグインのパイプラインをHTML文字列にするため |
 | Playwright | 1.65.1（`apps/web`のdevDependency） | P0-02b。ブラウザー確認用 |
 | Next.js / eslint-config-next | 16.4.6 | P0-02b。[legacy-baseline](legacy-baseline/README.md) |
 

@@ -7,12 +7,17 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"lib/*.test.mjs\""
   },
   "dependencies": {
     "next": "16.4.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "react-markdown": "10.1.0",
+    "rehype-raw": "7.0.0",
+    "rehype-sanitize": "6.0.0",
+    "remark-gfm": "4.0.1"
   },
   "devDependencies": {
     "@types/node": "20.19.39",
@@ -21,6 +26,10 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.6",
     "playwright": "1.65.1",
-    "typescript": "5.8.3"
+    "rehype-stringify": "10.0.1",
+    "remark-parse": "11.0.0",
+    "remark-rehype": "11.1.2",
+    "typescript": "5.8.3",
+    "unified": "11.0.5"
   }
 }

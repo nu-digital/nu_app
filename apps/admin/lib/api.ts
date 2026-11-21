@@ -6,7 +6,7 @@ export type Me = {
   sessionExpiresAt: string;
 };
 
-export type ApiError = { status: number; code: string; message: string; retryAfter?: number };
+export type ApiError = { status: number; code: string; message: string; retryAfter?: number; body?: unknown };
 
 let csrfToken = "";
 
@@ -40,7 +40,7 @@ async function call(method: string, path: string, body?: unknown, extraHeaders?:
 
 function toError(r: { status: number; json: unknown; retryAfter?: number }): ApiError {
   const e = (r.json as { error?: { code?: string; message?: string } } | null)?.error;
-  return { status: r.status, code: e?.code ?? "UNKNOWN", message: e?.message ?? "通信に失敗しました。もう一度お試しください。", retryAfter: r.retryAfter };
+  return { status: r.status, code: e?.code ?? "UNKNOWN", message: e?.message ?? "通信に失敗しました。もう一度お試しください。", retryAfter: r.retryAfter, body: r.json };
 }
 
 export async function fetchMe(): Promise<Me | null> {
@@ -258,4 +258,51 @@ export const listDeliveries = async (status?: string) =>
 export async function retryDelivery(id: string): Promise<void> {
   const r = await call("POST", `/admin/notifications/deliveries/${id}/retry`);
   if (r.status !== 204) throw toError(r);
+}
+
+// --- CMS（記事・作品）。権限・検査はAPIが強制する ---
+export type ContentListItem = {
+  id: string; type: "article" | "project"; section: "blog" | "news" | "project"; slug: string; title: string; summary: string;
+  revisionNo: number; isPublished: boolean; canEdit: boolean; hasUnpublishedChanges: boolean; updatedAt: string;
+};
+export type ContentDate = { label: string; kind: "day" | "month" | "range" | "unknown"; sortDate: string | null; sortDateIsEstimated: boolean };
+export type MediaInfo = { id: string; publicUrl: string; url: string; publicId: string; width: number; height: number; mimeType: string; byteSize: number; purpose: string };
+export type ContentRevision = {
+  revisionNo: number; title: string; summary: string; markdown: string; metadata: Record<string, string>; date: ContentDate;
+  editedBy: string; createdAt: string; coverMedia: MediaInfo | null; contributors?: { userId: string; displayName: string; roleLabel: string }[];
+};
+export type ContentDetail = {
+  id: string; type: "article" | "project"; section: "blog" | "news" | "project"; slug: string;
+  creator: { userId: string; displayName: string }; workingRevision: ContentRevision; publishedRevisionNo: number | null;
+  collaborators: { userId: string; displayName: string }[]; revisions?: { revisionNo: number; title: string; editedBy: string; createdAt: string }[];
+  canManageCollaborators: boolean; canPublish: boolean; createdAt: string; updatedAt: string;
+};
+export type RevisionInput = {
+  baseRevision: number; title: string; summary: string; markdown: string;
+  metadata: Record<string, string | null>; date: { label: string; kind: string; sortDate: string | null };
+  coverMediaId?: string | null;
+};
+export async function listContents(p: { section?: string; mine?: boolean; cursor?: string }) {
+  const params = new URLSearchParams({ limit: "50" });
+  if (p.section) params.set("section", p.section);
+  if (p.mine) params.set("mine", "true");
+  if (p.cursor) params.set("cursor", p.cursor);
+  return ok<{ items: ContentListItem[]; nextCursor: string | null }>(await call("GET", `/contents?${params.toString()}`), 200);
+}
+export const createContent = async (b: { type: string; section: string; slug: string; title: string; markdown: string }) =>
+  ok<ContentDetail>(await call("POST", "/contents", b), 201);
+export const getContent = async (id: string, revision?: number) =>
+  ok<ContentDetail>(await call("GET", `/contents/${id}${revision ? `?revision=${revision}` : ""}`), 200);
+/** 版を保存する。他の人が先に保存していたら、ApiError（code=REVISION_CONFLICT、body.current＝現在の作業版）を投げる。 */
+export async function saveRevision(id: string, b: RevisionInput): Promise<{ content: ContentDetail; changed: boolean }> {
+  const r = await call("POST", `/contents/${id}/revisions`, b);
+  if (r.status !== 200 && r.status !== 201) throw toError(r);
+  return { content: r.json as ContentDetail, changed: r.status === 201 };
+}
+export const publishContent = async (id: string, revisionNo: number) => ok<ContentDetail>(await call("POST", `/contents/${id}/publish`, { revisionNo }), 200);
+export const unpublishContent = async (id: string) => ok<ContentDetail>(await call("POST", `/contents/${id}/unpublish`), 200);
+export function conflictRevision(e: unknown): ContentRevision | null {
+  const err = e as Partial<ApiError>;
+  if (err?.code !== "REVISION_CONFLICT") return null;
+  return ((err.body as { current?: ContentRevision } | undefined)?.current) ?? null;
 }

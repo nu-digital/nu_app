@@ -19,6 +19,7 @@
     "dev:up": "docker compose --env-file .env -f infrastructure/compose.yaml up --build -d --wait",
     "dev:down": "docker compose --env-file .env -f infrastructure/compose.yaml down",
     "dev:reset": "docker compose --env-file .env -f infrastructure/compose.yaml down -v",
-    "compose:smoke": "node scripts/compose-smoke.mjs"
+    "compose:smoke": "node scripts/compose-smoke.mjs",
+    "admin:test": "npm test --prefix apps/admin"
   }
 }

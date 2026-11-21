@@ -60,7 +60,7 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] キーボードだけでログインできる`, true);
       const h1 = await page.getByRole('heading', { level: 1 }).innerText();
       check(`[${label}] ランチャーに表示名が出る`, h1.includes(o.memberName), h1);
-      check(`[${label}] 全員共通のカードが5枚あり、未実装の1つ（記事と作品）は「準備中」で、物品は開ける`, (await page.locator('.cards li').count()) === 5 && (await page.getByText('準備中').count()) === 1);
+      check(`[${label}] 全員共通のカードが5枚あり、すべての機能が開ける（準備中のカードは無い）`, (await page.locator('.cards li').count()) === 5 && (await page.getByText('準備中').count()) === 0);
       const broken = await page.evaluate(() => [...document.images].filter((i) => !i.complete || i.naturalWidth === 0).map((i) => i.getAttribute('src')));
       check(`[${label}] 画像（ロゴ・団体写真）がすべて読み込まれる`, broken.length === 0, broken.join(','));
       const wrapped = await page.getByRole('button', { name: 'ログアウト' }).evaluate((el) => el.getBoundingClientRect().height <= 60);
@@ -624,6 +624,126 @@ export async function runAdminUiE2E(o) {
         check(`[${label}] 再送すると停止の一覧から消え、送信待ちに戻る`, (await page.locator('li.item[data-delivery][data-status="pending"]').count()) >= 1);
       }
       await ctx.close();
+    }
+    // 記事・作品（CMS）: 下書き・プレビュー（描画時のサニタイズ）・保存の競合・公開（PC・スマホ・320px）
+    for (const [label, width, height] of [['pc', 1440, 900], ['sp', 390, 844], ['narrow', 320, 640]]) {
+      const own = { cookie: o.ownerCookie, csrf: o.ownerCsrf };
+      const pw = 'ui-cms-passphrase-1';
+      const mk = async (id, name, role) => {
+        const c = await o.apiCall('POST', '/admin/users', { body: { loginId: id, displayName: name }, ...own });
+        await o.apiCall('POST', '/auth/accept-invite', { body: { token: c.json.url.split('#token=')[1], password: pw } });
+        if (role) { const rr = await o.apiCall('PUT', `/admin/users/${c.json.user.id}/editor-role`, { body: { enabled: true }, ...own }); if (rr.status !== 200) throw new Error(`編集者の役割を付けられない: ${rr.status}`); }
+      };
+      const wid = `ui.${label}.cmsw`, eid = `ui.${label}.cmse`, xid = `ui.${label}.cmsx`;
+      await mk(wid, `書き手(${label})`);
+      await mk(eid, `編集者(${label})`, true);
+      await mk(xid, `無関係(${label})`);
+      const slug = `ui-cms-${label}`;
+      const title = `画面の確認の記事(${label})`;
+
+      const wctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const wp = await wctx.newPage();
+      await wp.route('https://www.youtube-nocookie.com/**', (r) => r.abort());
+      await login(wp, wid, pw);
+      await wp.getByRole('link', { name: /^記事・作品/ }).click();
+      await wp.waitForURL('**/contents');
+      await wp.getByRole('link', { name: '新しく書く' }).click();
+      await wp.waitForURL('**/contents/new');
+      await wp.getByLabel('タイトル（必須）').fill(title);
+      await wp.getByLabel('URL用の名前（必須）').fill(slug);
+      await wp.getByRole('button', { name: '下書きを作る' }).click();
+      await wp.getByRole('heading', { level: 1, name: title }).waitFor();
+      const url = wp.url();
+      const cid = url.split('/').pop();
+      check(`[${label}] 下書きを作ると編集画面に移り、保存ボタンは変更があるまで押せない`, await wp.getByRole('button', { name: '保存する' }).isDisabled());
+      check(`[${label}] 一般メンバーには公開ボタンが無く、公開できるのは編集者以上と案内される`, (await wp.getByRole('button', { name: /を公開する/ }).count()) === 0 && /公開できるのは編集者/.test(await wp.locator('main').innerText()));
+
+      // 本文を書いて保存 → 版が増える。保存後は保存ボタンが押せない
+      const tab = async (name) => { if (width < 1100) await wp.getByRole('tab', { name }).click(); };
+      await wp.getByLabel('本文（Markdown）').fill('## 見出しです\n\n本文の**強調**と、動画:\n\n<div data-youtube="ZEguS-om_Ec"></div>\n');
+      check(`[${label}] 変更があると保存ボタンが押せて、「保存していない変更」と出る`, !(await wp.getByRole('button', { name: '保存する' }).isDisabled()) && /保存していない変更があります/.test(await wp.locator('main').innerText()));
+      await tab('プレビュー');
+      await wp.locator('[data-testid="preview"] h2').filter({ hasText: '見出しです' }).waitFor();
+      check(`[${label}] プレビューに見出し・強調・YouTubeの埋め込み（youtube-nocookie）が出る`, (await wp.locator('[data-testid="preview"] strong').count()) === 1 && (await wp.locator('[data-testid="preview"] iframe[src^="https://www.youtube-nocookie.com/embed/ZEguS-om_Ec"]').count()) === 1);
+      if (o.shotsDir) await wp.screenshot({ path: join(o.shotsDir, `${label}-cms-preview.png`), fullPage: true });
+      await tab('編集');
+      await wp.getByRole('button', { name: '保存する' }).click();
+      await wp.locator('.notice.success').filter({ hasText: '保存しました（版2）' }).waitFor();
+      check(`[${label}] 保存すると版2になり、保存ボタンが押せなくなる`, await wp.getByRole('button', { name: '保存する' }).isDisabled());
+
+      // 危険な記述は、保存前でもプレビューの段階で取り除かれ（描画時のサニタイズ）、保存はAPIが拒否する
+      await wp.evaluate(() => { window.__xss = undefined; });
+      const evil = '<img src=x onerror="window.__xss=1">\n\n<script>window.__xss=2</script>\n\n[リンク](javascript:window.__xss=3)\n\n<iframe src="https://evil.example/"></iframe>\n\n<a href="javascript:window.__xss=4" onclick="window.__xss=5">x</a>\n';
+      await wp.getByLabel('本文（Markdown）').fill(evil);
+      await tab('プレビュー');
+      await wp.locator('[data-testid="preview"]').waitFor();
+      await wp.waitForTimeout(300);
+      const pv = await wp.locator('[data-testid="preview"]').innerHTML();
+      check(`[${label}] プレビューは、script・iframe・イベント属性・javascript:を表示の段階で取り除く（保存前の入力でも）`, !/<script|<iframe|onerror|onclick|javascript:/i.test(pv) && (await wp.evaluate(() => window.__xss)) === undefined, pv.slice(0, 160));
+      await tab('編集');
+      await wp.getByRole('button', { name: '保存する' }).click();
+      await wp.locator('.notice.error').filter({ hasText: '本文に使えない記述があります' }).waitFor();
+      check(`[${label}] 危険な記述の保存はAPIが422で拒否し、入力は保持される`, (await wp.getByLabel('本文（Markdown）').inputValue()) === evil);
+      await wp.getByLabel('本文（Markdown）').fill('## 見出しです\n\n本文の**強調**と、動画:\n\n<div data-youtube="ZEguS-om_Ec"></div>\n');
+      check(`[${label}] 編集画面に横溢れがない・操作対象が44px以上`, (await overflowOf(wp)) <= 0 && (await smallOf(wp)) === 0, `overflow=${await overflowOf(wp)} small=${await smallOf(wp)}`);
+      if (o.shotsDir) await wp.screenshot({ path: join(o.shotsDir, `${label}-cms-editor.png`), fullPage: true });
+
+      // 保存の競合: 編集者が先に保存 → 書き手の保存は競合になり、最新を読み込める
+      const ectx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const ep = await ectx.newPage();
+      await login(ep, eid, pw);
+      await ep.goto(`${adminUrl}/contents/${cid}`);
+      await ep.getByRole('heading', { level: 1, name: title }).waitFor();
+      await ep.getByLabel('タイトル（必須）').fill(`${title}・編集者が直した`);
+      await ep.getByRole('button', { name: '保存する' }).click();
+      await ep.locator('.notice.success').filter({ hasText: '保存しました（版3）' }).waitFor();
+      await wp.getByLabel('タイトル（必須）').fill(`${title}・書き手の変更`);
+      await wp.getByRole('button', { name: '保存する' }).click();
+      await wp.getByRole('region', { name: '保存の競合' }).waitFor();
+      check(`[${label}] 他の人が先に保存していると、競合の案内と2つの選択肢が出る（保存は成立しない）`, (await wp.getByRole('button', { name: /最新を読み込む/ }).count()) === 1 && (await wp.getByRole('button', { name: /最新の上に保存し直す/ }).count()) === 1 && /編集者\(/.test(await wp.locator('.notice.error').innerText()));
+      await wp.getByRole('button', { name: /最新を読み込む/ }).click();
+      await wp.waitForFunction((t) => document.querySelector('#e-title')?.value === t, `${title}・編集者が直した`);
+      check(`[${label}] 「最新を読み込む」で、編集者の保存した内容になる`, (await wp.getByLabel('タイトル（必須）').inputValue()) === `${title}・編集者が直した`);
+
+      // 公開: 編集者だけ。公開すると公開APIに出る。公開後の編集は再公開まで反映されない
+      await ep.reload();
+      await ep.getByRole('button', { name: '版3を公開する' }).waitFor();
+      ep.once('dialog', (d) => d.accept());
+      await ep.getByRole('button', { name: '版3を公開する' }).click();
+      await ep.locator('.notice.success').filter({ hasText: '版3を公開しました' }).waitFor();
+      const pubGet = () => ectx.request.get(`${adminUrl}/api/v1/public/contents/blog/${slug}`);
+      let pr = await pubGet();
+      check(`[${label}] 公開すると、匿名で読める公開APIに出る`, pr.status() === 200 && (await pr.json()).title === `${title}・編集者が直した`);
+      await wp.getByLabel('タイトル（必須）').fill(`${title}・公開後の編集`);
+      await wp.getByRole('button', { name: '保存する' }).click();
+      await wp.locator('.notice.success').filter({ hasText: '保存しました（版4）' }).waitFor();
+      pr = await pubGet();
+      check(`[${label}] 公開後に書き手が保存しても、再公開まで公開APIは旧版のまま`, (await pr.json()).title === `${title}・編集者が直した`);
+      await wp.goto(`${adminUrl}/contents`);
+      await wp.locator(`li.item[data-slug="${slug}"]`).waitFor();
+      const liText = await wp.locator(`li.item[data-slug="${slug}"]`).innerText();
+      check(`[${label}] 一覧に「公開中」と「公開後の変更あり（未公開）」が出る`, /公開中/.test(liText) && /公開後の変更あり/.test(liText));
+      check(`[${label}] 記事・作品の一覧に横溢れがない・操作対象が44px以上`, (await overflowOf(wp)) <= 0 && (await smallOf(wp)) === 0, `overflow=${await overflowOf(wp)} small=${await smallOf(wp)}`);
+      if (o.shotsDir) await wp.screenshot({ path: join(o.shotsDir, `${label}-cms-list.png`), fullPage: true });
+      await ep.reload();
+      ep.once('dialog', (d) => d.accept());
+      await ep.getByRole('button', { name: '公開を止める' }).click();
+      await ep.locator('.notice.success').filter({ hasText: '公開を止めました' }).waitFor();
+      pr = await pubGet();
+      check(`[${label}] 公開を止めると、公開APIは404になる`, pr.status() === 404);
+
+      // 無関係なメンバーには、下書きの編集画面が開かない（存在を漏らさない）
+      const xctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+      const xp = await xctx.newPage();
+      await login(xp, xid, pw);
+      await xp.goto(`${adminUrl}/contents/${cid}`);
+      await xp.locator('.notice.error').waitFor();
+      check(`[${label}] 無関係なメンバーには、下書きの編集画面が開かず本文も出ない`, /見つからない/.test(await xp.locator('.notice.error').innerText()) && !(await xp.locator('body').innerText()).includes('公開後の編集'));
+      await xp.goto(`${adminUrl}/contents`);
+      await xp.getByRole('heading', { level: 1, name: '記事・作品' }).waitFor();
+      await xp.waitForTimeout(300);
+      check(`[${label}] 無関係なメンバーの一覧に、他人の下書きが出ない`, (await xp.locator(`li.item[data-slug="${slug}"]`).count()) === 0);
+      await wctx.close(); await ectx.close(); await xctx.close();
     }
     // 権限が無い人（一般メンバー）にはAPIが拒否し、画面は案内を表示する
     {
