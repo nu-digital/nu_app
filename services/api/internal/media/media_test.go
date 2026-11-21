@@ -17,6 +17,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	xwebp "golang.org/x/image/webp"
 )
 
 // ---- 画像の生成 ----
@@ -384,12 +386,13 @@ func TestProcessStripsMetadataAndTrailingData(t *testing.T) {
 			t.Errorf("出力に %q が残っている", leak)
 		}
 	}
-	if res.Mime != "image/jpeg" || res.Ext != "jpg" || res.W != 80 || res.H != 60 {
-		t.Errorf("%+v", res)
+	if res.Mime != "image/webp" || res.Ext != "webp" || res.W != 80 || res.H != 60 {
+		t.Errorf("%+v", res.Mime)
 	}
-	if _, err := jpeg.Decode(bytes.NewReader(res.Data)); err != nil {
+	if _, err := xwebp.Decode(bytes.NewReader(res.Data)); err != nil {
 		t.Errorf("出力が読めない: %v", err)
 	}
+	assertWebPChunks(t, res.Data, false)
 	// PNG: tEXt/eXIf・末尾
 	p := pngBytes(t, gradient(40, 30))
 	p2 := insertBeforeIEND(p, pngChunk("tEXt", []byte("Comment\x00秘密のコメント")))
@@ -404,9 +407,10 @@ func TestProcessStripsMetadataAndTrailingData(t *testing.T) {
 			t.Errorf("PNGの出力に %q が残っている", leak)
 		}
 	}
-	if res.Mime != "image/png" {
-		t.Errorf("PNGはPNGのまま: %s", res.Mime)
+	if res.Mime != "image/webp" {
+		t.Errorf("PNGもWebPで出る: %s", res.Mime)
 	}
+	assertWebPChunks(t, res.Data, false)
 }
 
 func TestProcessOrientation(t *testing.T) {
@@ -432,7 +436,7 @@ func TestProcessOrientation(t *testing.T) {
 		if res.W != want[o][0] || res.H != want[o][1] {
 			t.Errorf("o=%d: 寸法 %dx%d", o, res.W, res.H)
 		}
-		img, err := png.Decode(bytes.NewReader(res.Data))
+		img, err := xwebp.Decode(bytes.NewReader(res.Data))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -473,18 +477,63 @@ func TestProcessResizeOnlyWhenLarger(t *testing.T) {
 	}
 }
 
+// 出力のチャンクが画像の符号化に必要なものだけ（EXIF・ICC・XMPを含まない）で、アルファの有無が期待どおりであること。
+func assertWebPChunks(t *testing.T, b []byte, wantAlpha bool) {
+	t.Helper()
+	if len(b) < 12 || string(b[:4]) != "RIFF" || string(b[8:12]) != "WEBP" {
+		t.Fatalf("WebPではない")
+	}
+	alpha := false
+	for pos := 12; pos+8 <= len(b); {
+		cc := string(b[pos : pos+4])
+		size := int(uint32(b[pos+4]) | uint32(b[pos+5])<<8 | uint32(b[pos+6])<<16 | uint32(b[pos+7])<<24)
+		switch cc {
+		case "VP8X", "VP8 ", "VP8L":
+		case "ALPH":
+			alpha = true
+		default:
+			t.Errorf("出力に余分なチャンク %q", cc)
+		}
+		pos += 8 + size + size%2
+	}
+	info, err := scanWebP(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wantAlpha != (alpha || info.HasAlphaHint) {
+		t.Errorf("アルファの有無が期待と違う（want=%v alphaChunk=%v hint=%v）", wantAlpha, alpha, info.HasAlphaHint)
+	}
+}
+
+func webpChunkKinds(b []byte) string {
+	kinds := ""
+	for pos := 12; pos+8 <= len(b); {
+		size := int(uint32(b[pos+4]) | uint32(b[pos+5])<<8 | uint32(b[pos+6])<<16 | uint32(b[pos+7])<<24)
+		kinds += string(b[pos:pos+4]) + ","
+		pos += 8 + size + size%2
+	}
+	return kinds
+}
+
 func TestProcessWebPAndColorTypes(t *testing.T) {
-	// WebP: アルファ無し→JPEG、アルファあり→PNG
-	if res, err := process(t, webpLossy(t), CMS); err != nil || res.Mime != "image/jpeg" {
-		t.Errorf("WebP(不透明): %+v %v", res, err)
+	// どの入力形式でも、出力はWebP
+	for name, b := range map[string][]byte{"WebP(ロッシー)": webpLossy(t), "WebP(ロスレス)": webpLossless(t), "JPEG": jpegBytes(t, gradient(30, 20)), "PNG": pngBytes(t, gradient(30, 20))} {
+		res, err := process(t, b, CMS)
+		if err != nil || res.Mime != "image/webp" || res.Ext != "webp" {
+			t.Errorf("%s: %+v %v", name, res.Mime, err)
+			continue
+		}
+		if name != "WebP(ロスレス)" { // この固定データはアルファのビットを持つ
+			assertWebPChunks(t, res.Data, false)
+		}
 	}
-	if res, err := process(t, webpAlpha(t), CMS); err != nil || res.Mime != "image/png" {
-		t.Errorf("WebP(アルファ): %+v %v", res, err)
+	// アルファ付きのWebPは、アルファを保つ
+	res, err := process(t, webpAlpha(t), CMS)
+	if err != nil || res.Mime != "image/webp" {
+		t.Fatalf("WebP(アルファ): %v", err)
 	}
-	if res, err := process(t, webpLossless(t), CMS); err != nil || (res.Mime != "image/png" && res.Mime != "image/jpeg") {
-		t.Errorf("WebP(ロスレス): %+v %v", res, err)
-	}
-	// 16bit PNG・グレースケール・パレット+tRNS・アルファ付きPNGが落ちない（画素が妥当）
+	assertWebPChunks(t, res.Data, true)
+	// 16bit PNG・グレースケール・パレット+tRNSが落ちない（画素が妥当）
 	rgba64 := image.NewNRGBA64(image.Rect(0, 0, 20, 10))
 	for i := range rgba64.Pix {
 		rgba64.Pix[i] = byte(i * 7)
@@ -499,29 +548,120 @@ func TestProcessWebPAndColorTypes(t *testing.T) {
 	}
 	for name, m := range map[string]image.Image{"16bit": rgba64, "gray": gray, "palette": pal} {
 		res, err := process(t, pngBytes(t, m), CMS)
-		if err != nil || res.W != 20 || res.H != 10 || res.Mime != "image/png" {
-			t.Errorf("%s: %+v %v", name, res, err)
+		if err != nil || res.W != 20 || res.H != 10 || res.Mime != "image/webp" {
+			t.Errorf("%s: %v", name, err)
 			continue
 		}
-		if _, err := png.Decode(bytes.NewReader(res.Data)); err != nil {
+		if _, err := xwebp.Decode(bytes.NewReader(res.Data)); err != nil {
 			t.Errorf("%s: 出力が読めない: %v", name, err)
 		}
 	}
-	// 透明画素の下の色は残らない（隠しデータの除去）
+	// 透明画素の下の色は残らない（隠しデータの除去）。透明は透明のまま
 	hidden := image.NewNRGBA(image.Rect(0, 0, 8, 8))
 	for i := 0; i < len(hidden.Pix); i += 4 {
-		hidden.Pix[i], hidden.Pix[i+1], hidden.Pix[i+2], hidden.Pix[i+3] = 11, 22, 33, 0 // 完全に透明だが色を持つ
+		hidden.Pix[i], hidden.Pix[i+1], hidden.Pix[i+2], hidden.Pix[i+3] = 11, 22, 33, 0
 	}
-	res, err := process(t, pngBytes(t, hidden), CMS)
+	res, err = process(t, pngBytes(t, hidden), CMS)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, _ := png.Decode(bytes.NewReader(res.Data))
-	if c := color.NRGBAModel.Convert(out.At(0, 0)).(color.NRGBA); c.A != 0 {
-		t.Errorf("透明のまま: %v", c)
+	out, err := xwebp.Decode(bytes.NewReader(res.Data))
+	if err != nil {
+		t.Fatal(err)
 	}
-	// CMYK JPEG: Goは読める。落ちずにJPEGで出る
-	_ = res
+	if c := color.NRGBAModel.Convert(out.At(0, 0)).(color.NRGBA); c.A != 0 || c.R != 0 || c.G != 0 || c.B != 0 {
+		t.Errorf("透明の下の色が残っている: %v", c)
+	}
+}
+
+// 圧縮方式の選択: 文字・ロゴ風（低色数）は画素が完全に一致するロスレス、写真風はロッシー。透過は維持され、不透明な画像にアルファは付かない。
+func TestProcessChoosesLosslessForGraphicsAndLossyForPhotos(t *testing.T) {
+	logo := image.NewNRGBA(image.Rect(0, 0, 200, 100)) // 3色＋透明
+	for y := 0; y < 100; y++ {
+		for x := 0; x < 200; x++ {
+			switch {
+			case (x/10+y/10)%3 == 0:
+				logo.SetNRGBA(x, y, color.NRGBA{20, 20, 20, 255})
+			case x%40 < 8:
+				logo.SetNRGBA(x, y, color.NRGBA{230, 40, 40, 255})
+			}
+		}
+	}
+	res, err := process(t, pngBytes(t, logo), CMS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if k := webpChunkKinds(res.Data); !strings.Contains(k, "VP8L") || strings.Contains(k, "VP8 ") {
+		t.Errorf("低色数がロスレスにならない: %s", k)
+	}
+	assertWebPChunks(t, res.Data, true) // 透明の画素がある
+	out, err := xwebp.Decode(bytes.NewReader(res.Data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for y := 0; y < 100; y++ {
+		for x := 0; x < 200; x++ {
+			if got, want := color.NRGBAModel.Convert(out.At(x, y)).(color.NRGBA), logo.NRGBAAt(x, y); got != want {
+				t.Fatalf("ロスレスなのに画素が違う (%d,%d): %v != %v", x, y, got, want)
+			}
+		}
+	}
+	// 写真風（連続階調＋ノイズ。色数が多い）はロッシー
+	photo := gradient(300, 200)
+	for i := 0; i < len(photo.Pix); i += 4 {
+		photo.Pix[i] ^= byte(i / 4 % 13)
+	}
+	res, err = process(t, pngBytes(t, photo), CMS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if k := webpChunkKinds(res.Data); !strings.Contains(k, "VP8 ") || strings.Contains(k, "VP8L") {
+		t.Errorf("写真がロッシーにならない: %s", k)
+	}
+	assertWebPChunks(t, res.Data, false)
+	// 半透明の写真風画像: アルファが保たれる
+	soft := gradient(300, 200)
+	for i := 3; i < len(soft.Pix); i += 4 {
+		soft.Pix[i] = byte(100 + i/4%100)
+	}
+	res, err = process(t, pngBytes(t, soft), CMS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertWebPChunks(t, res.Data, true)
+}
+
+// 透過画像は長辺1600までに縮む（メモリの上限。不透明は2560まで）。
+func TestProcessAlphaImagesAreDownscaledMore(t *testing.T) {
+	a := gradient(3000, 1500)
+	for i := 3; i < len(a.Pix); i += 4 {
+		a.Pix[i] = 128
+	}
+	res, err := process(t, pngBytes(t, a), CMS)
+	if err != nil || res.W != 1600 || res.H != 800 {
+		t.Errorf("透過: %dx%d %v", res.W, res.H, err)
+	}
+	res, err = process(t, pngBytes(t, gradient(3000, 1500)), CMS)
+	if err != nil || res.W != 2560 {
+		t.Errorf("不透明: %dx%d %v", res.W, res.H, err)
+	}
+}
+
+func TestStorageKeys(t *testing.T) {
+	id := "0b8f3a52-1111-4222-8333-444455556666"
+	if k, err := NewKey(id, "webp"); err != nil || !ValidKey(k) {
+		t.Errorf("webp: %v", err)
+	}
+	for _, ext := range []string{"jpg", "png", "gif", "", "webp/../x"} {
+		if _, err := NewKey(id, ext); err == nil {
+			t.Errorf("新規の保存で %q を許してしまう", ext)
+		}
+	}
+	for _, ext := range []string{"jpg", "png", "webp"} { // 移行前に保存した既存ファイルは、読み出し・削除・検証で扱える
+		if !ValidKey(id[:2] + "/" + id + "." + ext) {
+			t.Errorf("既存の .%s を扱えない", ext)
+		}
+	}
 }
 
 func TestProcessBrokenInputsDoNotPanic(t *testing.T) {
@@ -555,8 +695,8 @@ func TestStore(t *testing.T) {
 	}
 	defer s.Close()
 	id := "0a1b2c3d-1111-2222-3333-444455556666"
-	key, err := NewKey(id, "png")
-	if err != nil || key != "0a/"+id+".png" {
+	key, err := NewKey(id, "webp")
+	if err != nil || key != "0a/"+id+".webp" {
 		t.Fatalf("%q %v", key, err)
 	}
 	if err := s.Put(key, []byte("data")); err != nil {

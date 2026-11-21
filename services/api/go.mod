@@ -13,6 +13,8 @@ require (
 )
 
 require (
+	github.com/ebitengine/purego v0.10.1 // indirect
+	github.com/gen2brain/webp v0.6.4 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.3 // indirect

@@ -22,15 +22,16 @@ type Store struct {
 	root *os.Root
 }
 
-var keyRe = regexp.MustCompile(`^[0-9a-f]{2}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png)$`)
+var keyRe = regexp.MustCompile(`^[0-9a-f]{2}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$`)
 
 // ValidKey はstorage_keyの形式を検査する（DBの値でも、読み出し・削除の前に必ず確認する）。
 func ValidKey(key string) bool { return keyRe.MatchString(key) }
 
-// NewKey はUUID（小文字・ハイフン付き）と拡張子（jpg/png）からstorage_keyを作る。
+// NewKey はUUID（小文字・ハイフン付き）からstorage_keyを作る。新規の保存はWebPだけ。
+// （読み出し・削除・検証は、移行前に保存した jpg/png も扱えるよう ValidKey が許す。）
 func NewKey(id, ext string) (string, error) {
 	k := id[:min(2, len(id))] + "/" + id + "." + ext
-	if !ValidKey(k) {
+	if ext != "webp" || !ValidKey(k) {
 		return "", errors.New("storage_keyの形式が正しくありません")
 	}
 	return k, nil

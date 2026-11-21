@@ -13,4 +13,4 @@ docker run -d --name "$name" --network "$net" -e POSTGRES_PASSWORD=itest-only-no
 for _ in $(seq 1 60); do docker exec "$name" pg_isready -U postgres >/dev/null 2>&1 && break; sleep 1; done
 "$root/scripts/go-docker.sh" --network "$net" services/api \
   env TEST_DATABASE_URL="postgres://postgres:itest-only-not-secret@$name:5432/postgres?sslmode=disable" \
-  go test -tags integration -race -count=1 ./... "$@"
+  go test -tags integration,nodynamic -race -count=1 ./... "$@"

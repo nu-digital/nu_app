@@ -2,14 +2,17 @@ package media
 
 import (
 	"bytes"
+	"encoding/binary"
 	"image"
 	"image/color"
-	"image/jpeg"
-	"image/png"
+	_ "image/jpeg" // デコード（出力はWebPのみ）
+	_ "image/png"
+	"io"
 	"net/http"
 
+	"github.com/gen2brain/webp"
 	"golang.org/x/image/draw"
-	_ "golang.org/x/image/webp" // WebPのデコード
+	xwebp "golang.org/x/image/webp" // 入力のWebPのデコード（エンコーダー側のgen2brain/webpにもデコーダーがあるため、入力の解釈は明示的にこちらを使う）
 )
 
 // Purpose は用途。縮小の上限が違う。
@@ -36,6 +39,15 @@ func longEdge(p Purpose) int {
 	return 2560
 }
 
+// 圧縮方式の選択（docs/design/p3-media.md §10）。
+const (
+	losslessMaxPixels = 2_500_000 // これを超える低色数画像はロッシー高品質（ロスレスは遅く重い。実測: 2.5Mpx・1.3秒）
+	lowColorMax       = 1500      // これ以下の色数（透明は1色）の画像は、文字・ロゴ・図としてロスレス
+	qualityPhoto      = 82        // 写真（実測: 入力比約53%・q90とのPSNR差は小さい）
+	qualityLarge      = 90        // 画素数の大きい低色数画像（文字のにじみを抑える）
+	alphaLongEdge     = 1600      // 透過画像は縮小の上限を下げる（実測: 6.5Mpxの透過ロッシーは約930MiB・12秒。2.5Mpxは約370MiB・2.8秒）
+)
+
 // Result は再エンコード後の画像。メタデータ（EXIF・GPS・ICC・コメント・末尾の付加データ）を含まない。
 type Result struct {
 	Data   []byte
@@ -55,11 +67,16 @@ func Process(data []byte, info Info, p Purpose) (res Result, err error) {
 		}
 	}()
 	// 宣言された寸法と、デコーダーが読む寸法が一致すること
-	cfg, _, derr := image.DecodeConfig(bytes.NewReader(data))
+	decodeConfig, decode := image.DecodeConfig, image.Decode
+	if info.Format == WebP {
+		decodeConfig = func(r io.Reader) (image.Config, string, error) { c, e := xwebp.DecodeConfig(r); return c, "webp", e }
+		decode = func(r io.Reader) (image.Image, string, error) { m, e := xwebp.Decode(r); return m, "webp", e }
+	}
+	cfg, _, derr := decodeConfig(bytes.NewReader(data))
 	if derr != nil || cfg.Width != info.W || cfg.Height != info.H {
 		return Result{}, invalid("画像の寸法が正しくありません")
 	}
-	src, _, derr := image.Decode(bytes.NewReader(data))
+	src, _, derr := decode(bytes.NewReader(data))
 	if derr != nil {
 		return Result{}, invalid("画像を読み込めませんでした（壊れているか、対応していない形式です）")
 	}
@@ -69,7 +86,11 @@ func Process(data []byte, info Info, p Purpose) (res Result, err error) {
 	}
 	// 縮小（長辺が上限を超えるときだけ。拡大しない）
 	img := src
-	if limit := longEdge(p); b.Dx() > limit || b.Dy() > limit {
+	limit := longEdge(p)
+	if !isOpaque(src) {
+		limit = min(limit, alphaLongEdge)
+	}
+	if limit < max(b.Dx(), b.Dy()) {
 		w, h := b.Dx(), b.Dy()
 		if w >= h {
 			h = max(1, h*limit/w)
@@ -87,20 +108,20 @@ func Process(data []byte, info Info, p Purpose) (res Result, err error) {
 	if o := orientation(info.Exif); o != 1 {
 		img = orient(img, o)
 	}
-	opaque := isOpaque(img)
+	src = nil // 元の画素を、エンコードの前に解放できるようにする
+	nrgba, ok := img.(*image.NRGBA)
+	if !ok {
+		nrgba = toNRGBA(img)
+	}
+	img = nil
 	var buf bytes.Buffer
-	switch {
-	case info.Format == PNG || (info.Format == WebP && !opaque):
-		enc := png.Encoder{CompressionLevel: png.DefaultCompression}
-		if err := enc.Encode(&buf, img); err != nil {
-			return Result{}, invalid("画像を変換できませんでした")
-		}
-		res = Result{Mime: "image/png", Ext: "png"}
-	default:
-		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 85}); err != nil {
-			return Result{}, invalid("画像を変換できませんでした")
-		}
-		res = Result{Mime: "image/jpeg", Ext: "jpg"}
+	if err := webp.Encode(&buf, nrgba, chooseOptions(nrgba)); err != nil {
+		return Result{}, invalid("画像を変換できませんでした")
+	}
+	img = nrgba
+	res = Result{Mime: "image/webp", Ext: "webp"}
+	if err := checkOutput(buf.Bytes(), nrgba); err != nil {
+		return Result{}, err
 	}
 	nb := img.Bounds()
 	res.Data, res.W, res.H, res.Source = buf.Bytes(), nb.Dx(), nb.Dy(), info.Format
@@ -180,4 +201,59 @@ func orient(m image.Image, o int) image.Image {
 		}
 	}
 	return dst
+}
+
+// chooseOptions は圧縮方式を選ぶ（全画素を数えるので結果は決定的）。透明な画素は1色として数える。
+// 低色数（文字・ロゴ・図）→ロスレス（画素数の上限あり）、それ以外→ロッシー。Exact=false（透明な画素の下の色は捨てる）。
+func chooseOptions(m *image.NRGBA) webp.Options {
+	px := m.Bounds().Dx() * m.Bounds().Dy()
+	if !lowColor(m, lowColorMax) {
+		return webp.Options{Quality: qualityPhoto, Method: 4}
+	}
+	if px <= losslessMaxPixels {
+		return webp.Options{Lossless: true, Quality: 75, Method: 4}
+	}
+	return webp.Options{Quality: qualityLarge, Method: 4}
+}
+
+// lowColor は異なる色が max 以下か（超えた時点で打ち切る）。
+func lowColor(m *image.NRGBA, max int) bool {
+	seen := make(map[uint32]struct{}, 64)
+	for i := 0; i+3 < len(m.Pix); i += 4 {
+		var k uint32
+		if m.Pix[i+3] != 0 {
+			k = uint32(m.Pix[i])<<24 | uint32(m.Pix[i+1])<<16 | uint32(m.Pix[i+2])<<8 | uint32(m.Pix[i+3])
+		} else {
+			k = 0 // 完全に透明な画素は1色
+		}
+		if _, ok := seen[k]; !ok {
+			if len(seen) >= max {
+				return false
+			}
+			seen[k] = struct{}{}
+		}
+	}
+	return true
+}
+
+// checkOutput は出力のWebPを検査する: 構造が正しい・寸法が一致・チャンクが画像の符号化に必要なものだけ（EXIF・ICC・XMP等を含まない）・不透明な画像にアルファが無い。
+func checkOutput(b []byte, m *image.NRGBA) error {
+	info, err := scanWebP(b)
+	if err != nil || info.W != m.Bounds().Dx() || info.H != m.Bounds().Dy() {
+		return &Error{http.StatusInternalServerError, "画像を変換できませんでした"}
+	}
+	for pos := uint64(12); pos+8 <= uint64(len(b)); {
+		cc := string(b[pos : pos+4])
+		size := uint64(binary.LittleEndian.Uint32(b[pos+4 : pos+8]))
+		switch cc {
+		case "VP8X", "VP8 ", "VP8L", "ALPH":
+		default:
+			return &Error{http.StatusInternalServerError, "画像を変換できませんでした"}
+		}
+		pos += 8 + size + size%2
+	}
+	if m.Opaque() && info.HasAlphaHint {
+		return &Error{http.StatusInternalServerError, "画像を変換できませんでした"}
+	}
+	return nil
 }

@@ -24,6 +24,7 @@ import (
 
 	"github.com/nu-digital/nu_app/services/api/internal/api"
 	"github.com/nu-digital/nu_app/services/api/internal/media"
+	xwebp "golang.org/x/image/webp"
 )
 
 func testGradient(w, h int, seed int) *image.NRGBA {
@@ -142,7 +143,7 @@ func TestMediaUploadValidation(t *testing.T) {
 	}
 	// 成功: 応答に保存先のパスを出さない。ファイルは0640で、再エンコード後
 	m := e.uploadOK(as.author, png1)
-	if m.Width != 40 || m.Height != 30 || m.MimeType != "image/png" || m.Purpose != "cms" || len(m.PublicID) != 22 || m.PublicURL != "/api/v1/public/media/"+m.PublicID || m.URL != "/api/v1/media/"+m.ID {
+	if m.Width != 40 || m.Height != 30 || m.MimeType != "image/webp" || m.Purpose != "cms" || len(m.PublicID) != 22 || m.PublicURL != "/api/v1/public/media/"+m.PublicID || m.URL != "/api/v1/media/"+m.ID {
 		t.Fatalf("応答: %+v", m)
 	}
 	rec := e.upload(as.author, "cms", "image/png", png1)
@@ -202,7 +203,7 @@ func TestMediaStripsMetadataAndTrailingData(t *testing.T) {
 			t.Errorf("保存したファイルに %q が残っている", leak)
 		}
 	}
-	if _, err := jpeg.Decode(bytes.NewReader(out)); err != nil {
+	if _, err := xwebp.Decode(bytes.NewReader(out)); err != nil {
 		t.Errorf("保存したファイルが読めない: %v", err)
 	}
 	// 長辺が上限を超える画像は縮む
@@ -364,7 +365,7 @@ func TestMediaServeAuthorization(t *testing.T) {
 		}
 		for name, a := range map[string]actor{"アップロード者": as.author, "Editor": as.editor, "Admin": as.admin} {
 			rec := e.mediaGet(a, path)
-			if rec.Code != 200 || rec.Header().Get("Content-Type") != "image/png" {
+			if rec.Code != 200 || rec.Header().Get("Content-Type") != "image/webp" {
 				t.Errorf("%s %s: %d %s", name, path, rec.Code, rec.Header().Get("Content-Type"))
 			}
 			h := rec.Header()
@@ -372,7 +373,7 @@ func TestMediaServeAuthorization(t *testing.T) {
 				h.Get("Cross-Origin-Resource-Policy") != "same-origin" || h.Get("Content-Disposition") != "inline" || h.Get("Referrer-Policy") != "no-referrer" {
 				t.Errorf("%s: ヘッダー %v", path, h)
 			}
-			if _, err := png.Decode(bytes.NewReader(rec.Body.Bytes())); err != nil {
+			if _, err := xwebp.Decode(bytes.NewReader(rec.Body.Bytes())); err != nil {
 				t.Errorf("%s: 本文が画像でない", path)
 			}
 		}
@@ -466,7 +467,7 @@ func TestPublicMediaBoundary(t *testing.T) {
 	}
 	rec := e.pubMedia(m.PublicID)
 	h := rec.Header()
-	if rec.Code != 200 || h.Get("Content-Type") != "image/png" || h.Get("X-Content-Type-Options") != "nosniff" || h.Get("Cache-Control") != "no-cache" ||
+	if rec.Code != 200 || h.Get("Content-Type") != "image/webp" || h.Get("X-Content-Type-Options") != "nosniff" || h.Get("Cache-Control") != "no-cache" ||
 		h.Get("Cross-Origin-Resource-Policy") != "cross-origin" || !strings.HasPrefix(h.Get("ETag"), `"`) || strings.HasPrefix(h.Get("ETag"), "W/") || !strings.Contains(h.Get("Content-Security-Policy"), "sandbox") {
 		t.Fatalf("公開配信: %d %v", rec.Code, h)
 	}
