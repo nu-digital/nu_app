@@ -96,6 +96,7 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 
 - `nuctl import-legacy --content-dir <dir> --inventory <inventory.json> --as <ownerのログインID> [--apply]`（既定はdry-run）。運用者がサーバー上で手動で実行する（workflowから呼ばない。`check.mjs`が禁止）。`api`イメージは`content/`を含まないため**読み取り専用でマウント**する: `docker compose run --rm --no-deps -v "$PWD/apps/web/content:/content:ro" -v "$PWD/docs/legacy-baseline/inventory.json:/inventory.json:ro" --entrypoint /nuctl api import-legacy --content-dir /content --inventory /inventory.json --as <オーナー> [--apply]`。ゴールデン（`docs/legacy-baseline/`）と食い違えば何も書かずに失敗する。再実行は冪等（既存の記事は触らない）。
 - **投稿者名は`legacy_authors`にだけ置き、記事の版・監査ログ・Discordには入れない**。移行直後はすべて公開許可が**未確認**で、公開APIの`author`は「nu_digital」。名前の公開は、管理者が本人の許可を確認して記録した後だけ（P3-04a-2の管理画面）。ユーザーへの紐付けは公開可否と独立で、表示名での自動紐付けはしない。
+- **投稿者の管理API（P3-04a-2）**: `GET /admin/legacy-authors`（未確認が先頭）、`POST .../permit`（確認の方法の記録が必須。確認者・日時を保存）、`POST .../withdraw`、`PUT/DELETE .../link`（ユーザーIDで紐付け。表示名では紐付けない）。紐付けと公開可否は互いに変えない。**同意の撤回**で紐付く投稿者は撤回状態になり（再同意しても自動では再公開しない）、**個人情報の削除**で名前は匿名の記号へ置換され再許可・再紐付けもできない。監査に名前・確認の記録内容は入らない。画面（確認一覧）は次のPR。
 - 取り下げ: `docs/legacy-baseline/takedown.json`に載せた記事は移行しない（災害復旧後の再実行でも再公開されない）。
 - **ロールバック**: 移行は追加のみ。誤りは記事を公開停止する（`unpublish`）。CMS更新後に静的イメージへ戻さない（更新が失われ、取り下げ済みの内容が復活し得る）。
 

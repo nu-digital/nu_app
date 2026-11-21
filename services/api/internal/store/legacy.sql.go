@@ -22,6 +22,40 @@ func (q *Queries) CountContentImportedAudit(ctx context.Context) (int64, error) 
 	return column_1, err
 }
 
+const eraseLegacyAuthorsOfUser = `-- name: EraseLegacyAuthorsOfUser :many
+UPDATE legacy_authors
+SET source_name = 'erased-' || id::text, erased_at = $2,
+    publication_state = 'withdrawn', withdrawn_at = COALESCE(withdrawn_at, $2)
+WHERE linked_user_id = $1 AND erased_at IS NULL
+RETURNING id
+`
+
+type EraseLegacyAuthorsOfUserParams struct {
+	LinkedUserID pgtype.UUID
+	ErasedAt     pgtype.Timestamptz
+}
+
+// 個人情報の削除に連動して、紐付く投稿者の名前を匿名の記号へ置換し公開不能にする（紐付けは残す）。
+func (q *Queries) EraseLegacyAuthorsOfUser(ctx context.Context, arg EraseLegacyAuthorsOfUserParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, eraseLegacyAuthorsOfUser, arg.LinkedUserID, arg.ErasedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getActiveUserByLoginIDForShare = `-- name: GetActiveUserByLoginIDForShare :one
 SELECT id, status FROM users WHERE login_id = $1 FOR SHARE
 `
@@ -68,6 +102,152 @@ func (q *Queries) GetContentBySectionSlug(ctx context.Context, arg GetContentByS
 	return i, err
 }
 
+const getLegacyAuthorForUpdate = `-- name: GetLegacyAuthorForUpdate :one
+SELECT id, source_name, publication_state, confirmed_by, confirmed_at, confirm_note, withdrawn_at, linked_user_id, linked_by, linked_at, erased_at, created_at FROM legacy_authors WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) GetLegacyAuthorForUpdate(ctx context.Context, id pgtype.UUID) (LegacyAuthor, error) {
+	row := q.db.QueryRow(ctx, getLegacyAuthorForUpdate, id)
+	var i LegacyAuthor
+	err := row.Scan(
+		&i.ID,
+		&i.SourceName,
+		&i.PublicationState,
+		&i.ConfirmedBy,
+		&i.ConfirmedAt,
+		&i.ConfirmNote,
+		&i.WithdrawnAt,
+		&i.LinkedUserID,
+		&i.LinkedBy,
+		&i.LinkedAt,
+		&i.ErasedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const linkLegacyAuthor = `-- name: LinkLegacyAuthor :execrows
+UPDATE legacy_authors SET linked_user_id = $2, linked_by = $3, linked_at = $4 WHERE id = $1
+`
+
+type LinkLegacyAuthorParams struct {
+	ID           pgtype.UUID
+	LinkedUserID pgtype.UUID
+	LinkedBy     pgtype.UUID
+	LinkedAt     pgtype.Timestamptz
+}
+
+// ユーザーIDを明示して紐付ける。公開可否は変えない。
+func (q *Queries) LinkLegacyAuthor(ctx context.Context, arg LinkLegacyAuthorParams) (int64, error) {
+	result, err := q.db.Exec(ctx, linkLegacyAuthor,
+		arg.ID,
+		arg.LinkedUserID,
+		arg.LinkedBy,
+		arg.LinkedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const listLegacyAuthors = `-- name: ListLegacyAuthors :many
+SELECT a.id, a.source_name, a.publication_state, a.confirmed_at, a.confirm_note, a.withdrawn_at, a.erased_at, a.created_at,
+       a.linked_user_id, a.linked_at,
+       COALESCE((SELECT p.display_name FROM profiles p WHERE p.user_id = a.linked_user_id), '')::text AS linked_display_name,
+       (SELECT count(*) FROM contents c WHERE c.legacy_author_id = a.id)::int AS content_count
+FROM legacy_authors a
+ORDER BY (a.publication_state = 'unconfirmed') DESC, a.created_at, a.id
+`
+
+type ListLegacyAuthorsRow struct {
+	ID                pgtype.UUID
+	SourceName        string
+	PublicationState  string
+	ConfirmedAt       pgtype.Timestamptz
+	ConfirmNote       pgtype.Text
+	WithdrawnAt       pgtype.Timestamptz
+	ErasedAt          pgtype.Timestamptz
+	CreatedAt         pgtype.Timestamptz
+	LinkedUserID      pgtype.UUID
+	LinkedAt          pgtype.Timestamptz
+	LinkedDisplayName string
+	ContentCount      int32
+}
+
+// 管理者向けの確認一覧。名前は管理者にだけ返す（公開APIには出さない）。
+func (q *Queries) ListLegacyAuthors(ctx context.Context) ([]ListLegacyAuthorsRow, error) {
+	rows, err := q.db.Query(ctx, listLegacyAuthors)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLegacyAuthorsRow{}
+	for rows.Next() {
+		var i ListLegacyAuthorsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceName,
+			&i.PublicationState,
+			&i.ConfirmedAt,
+			&i.ConfirmNote,
+			&i.WithdrawnAt,
+			&i.ErasedAt,
+			&i.CreatedAt,
+			&i.LinkedUserID,
+			&i.LinkedAt,
+			&i.LinkedDisplayName,
+			&i.ContentCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const permitLegacyAuthor = `-- name: PermitLegacyAuthor :execrows
+UPDATE legacy_authors
+SET publication_state = 'permitted', confirmed_by = $2, confirmed_at = $3, confirm_note = $4, withdrawn_at = NULL
+WHERE id = $1 AND erased_at IS NULL
+`
+
+type PermitLegacyAuthorParams struct {
+	ID          pgtype.UUID
+	ConfirmedBy pgtype.UUID
+	ConfirmedAt pgtype.Timestamptz
+	ConfirmNote pgtype.Text
+}
+
+// 管理者が本人の公開許可を確認して記録する（削除済みは不可）。紐付けは変えない。
+func (q *Queries) PermitLegacyAuthor(ctx context.Context, arg PermitLegacyAuthorParams) (int64, error) {
+	result, err := q.db.Exec(ctx, permitLegacyAuthor,
+		arg.ID,
+		arg.ConfirmedBy,
+		arg.ConfirmedAt,
+		arg.ConfirmNote,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const unlinkLegacyAuthor = `-- name: UnlinkLegacyAuthor :execrows
+UPDATE legacy_authors SET linked_user_id = NULL, linked_by = NULL, linked_at = NULL WHERE id = $1
+`
+
+func (q *Queries) UnlinkLegacyAuthor(ctx context.Context, id pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, unlinkLegacyAuthor, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const upsertLegacyAuthor = `-- name: UpsertLegacyAuthor :one
 
 INSERT INTO legacy_authors (source_name) VALUES ($1)
@@ -95,4 +275,54 @@ func (q *Queries) UpsertLegacyAuthor(ctx context.Context, sourceName string) (Le
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const withdrawLegacyAuthor = `-- name: WithdrawLegacyAuthor :execrows
+UPDATE legacy_authors SET publication_state = 'withdrawn', withdrawn_at = $2
+WHERE id = $1 AND publication_state <> 'withdrawn'
+`
+
+type WithdrawLegacyAuthorParams struct {
+	ID          pgtype.UUID
+	WithdrawnAt pgtype.Timestamptz
+}
+
+func (q *Queries) WithdrawLegacyAuthor(ctx context.Context, arg WithdrawLegacyAuthorParams) (int64, error) {
+	result, err := q.db.Exec(ctx, withdrawLegacyAuthor, arg.ID, arg.WithdrawnAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const withdrawLegacyAuthorsOfUser = `-- name: WithdrawLegacyAuthorsOfUser :many
+UPDATE legacy_authors SET publication_state = 'withdrawn', withdrawn_at = $2
+WHERE linked_user_id = $1 AND publication_state <> 'withdrawn'
+RETURNING id
+`
+
+type WithdrawLegacyAuthorsOfUserParams struct {
+	LinkedUserID pgtype.UUID
+	WithdrawnAt  pgtype.Timestamptz
+}
+
+// 公開クレジット同意の撤回に連動して、そのユーザーに紐付く投稿者の公開を止める。
+func (q *Queries) WithdrawLegacyAuthorsOfUser(ctx context.Context, arg WithdrawLegacyAuthorsOfUserParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, withdrawLegacyAuthorsOfUser, arg.LinkedUserID, arg.WithdrawnAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

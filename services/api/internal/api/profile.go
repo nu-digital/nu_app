@@ -490,6 +490,9 @@ func (s *server) putConsent(w http.ResponseWriter, r *http.Request) {
 			if _, err := q.WithdrawPublicCreditConsent(r.Context(), store.WithdrawPublicCreditConsentParams{UpdatedBy: uid, WithdrawnAt: now}); err != nil {
 				return err
 			}
+			if err := s.withdrawLegacyAuthorsOf(r.Context(), q, uid, uid); err != nil {
+				return err
+			}
 			if err := s.auditEvent(r.Context(), q, uid, uid, "profile.public_credit_consent_changed", map[string]any{"granted": false}); err != nil {
 				return err
 			}
