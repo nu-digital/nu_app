@@ -124,3 +124,27 @@ D11に従い、移設(P0-02)とは別PRで実施。`audit fix --force`・メジ�
 - `/project/` の見出しは「CONTENTS」、記事カテゴリ表示は「Product」。
 - `nu_bar`（`/project/nu-bar/`）は本文にカバーと同じ画像が2回並ぶ（本文が画像のみのため）。
 - L3（ライトボックスでロゴと枚数表示が重なる）は`pc-gallery-lightbox-open.png`で確認。
+
+## ページの指紋・ゴールデン・取り下げ一覧（P3-04-0 / Issue #91）
+
+公開サイトを静的exportからAPI接続（動的配信）へ置き換える（[設計](../design/p3-web.md)）前に固定した、「移設前と同じ」を機械的に検査するための基準。**サイトのコードを変える前の状態**から作ってある。
+
+| ファイル | 内容 | 再生成・検査 |
+|---|---|---|
+| `pages.json` | 全74URL（`/`・一覧3・記事67・`/terms/`・`/404/`・`/_not-found/`）の**指紋**: `title`・`meta`（description・og・twitter・canonical。ボットのUAの生HTMLから）・`h1`・記事本文/`article`/`main`のDOM（タグ＋許可した属性＋テキストに正規化）のsha256・`<time datetime>`と表示日付・画像（src・alt）・リンク・iframe・見出し・カード（href・文字・画像）の並び。URLの変種（スラッシュなし・`/index.html`・未知のslug・`%2F`）のステータスと`Location`。本文そのものは含まない | 下記の手順。**2回取って一致**することを確認してある（フレークなし） |
+| `frontmatter.json` | 各記事のfrontmatter（今のサイトと同じ`gray-matter`の読み方。値は`String()`、型つき）。移行CLI（`yaml.v3`）の出力の正解 | `node scripts/legacy-goldens.mjs`（生成）・`--check`（CIの`web / lint-typecheck-build`で、記事の現状とずれていないことを検査） |
+| `dates.json` | 各記事の`formatArticleDate`（表示）・`articleDateOrder`（並び用の開始日）・`<time dateTime>`（labelがYYYY-MM-DDのときだけ）。移行CLIの日付（kind・sort_date）の正解 | 同上 |
+| `takedown.json` | 取り下げる記事・静的画像の一覧（空）。`web-verify`は「一覧の画像は存在しないこと、それ以外はsha256まで一致」を検査し、移行CLIは一覧の記事を移行しない（D08・個人情報の対応。理由に個人情報を書かない） | 手で追記する（OPERATIONS） |
+
+### 指紋の取得・比較
+
+```sh
+docker build -t nu_app-web:baseline apps/web && docker run -d --rm --name nu-web-baseline -p 127.0.0.1:18080:8080 nu_app-web:baseline
+# 取得（2回取って一致を確認）。PLAYWRIGHT_DIRは既定でapps/web。Chromium用のライブラリ・フォントは上の「環境と注意」と同じ
+node scripts/legacy-fingerprint-capture.mjs --base http://127.0.0.1:18080 --out docs/legacy-baseline/pages.json --twice
+# 比較（API接続後のサイトに対して。意図した差だけを--knownのJSON（"URL|項目"の配列）で許す）
+node scripts/legacy-fingerprint-capture.mjs --base <サイトのURL> --compare docs/legacy-baseline/pages.json [--known known-diffs.json]
+```
+
+- 取得元は、現行の静的イメージ（nginx）。URLの変種の挙動（301・`/index.html`が200・`/404/`が200等）も、本物の配信サーバーで取っている。API接続後に変わると設計で分かっている差（スラッシュなしが301→308、`/x/index.html`・`/404/`・`/_not-found/`が404になる）は、比較時の`--known`で明示する（P3-04c）。
+- フレークの原因（HeroSlider・MotionReveal・遅延読み込み・YouTubeのiframe）を避けるため、画像の読み込みは待たず、`style`・`id`を指紋に含めない。

@@ -1,0 +1,541 @@
+{
+ "note": "formatArticleDate・articleDateOrderの出力。再生成: node scripts/legacy-goldens.mjs",
+ "articles": [
+  {
+   "collection": "blog",
+   "slug": "activity-2025-12-22-6db7c7",
+   "label": "2025-12-22",
+   "formatted": "2025.12.22",
+   "order": 1766361600000,
+   "timeDatetime": "2025-12-22"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-01-20-2f9241",
+   "label": "2026-01-20",
+   "formatted": "2026.01.20",
+   "order": 1768867200000,
+   "timeDatetime": "2026-01-20"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-01-29-24a47f",
+   "label": "2026-01-29",
+   "formatted": "2026.01.29",
+   "order": 1769644800000,
+   "timeDatetime": "2026-01-29"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-04-11-fe646c",
+   "label": "2026-04-11",
+   "formatted": "2026.04.11",
+   "order": 1775865600000,
+   "timeDatetime": "2026-04-11"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-05-28-f690fa",
+   "label": "2026-05-28",
+   "formatted": "2026.05.28",
+   "order": 1779926400000,
+   "timeDatetime": "2026-05-28"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-06-05-099b2b",
+   "label": "2026-06-05",
+   "formatted": "2026.06.05",
+   "order": 1780617600000,
+   "timeDatetime": "2026-06-05"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-06-06-71597c",
+   "label": "2026-06-06",
+   "formatted": "2026.06.06",
+   "order": 1780704000000,
+   "timeDatetime": "2026-06-06"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-06-08-a26f47",
+   "label": "2026-06-08",
+   "formatted": "2026.06.08",
+   "order": 1780876800000,
+   "timeDatetime": "2026-06-08"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-06-08-d62351",
+   "label": "2026-06-08",
+   "formatted": "2026.06.08",
+   "order": 1780876800000,
+   "timeDatetime": "2026-06-08"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-06-12-d3e961",
+   "label": "2026-06-12",
+   "formatted": "2026.06.12",
+   "order": 1781222400000,
+   "timeDatetime": "2026-06-12"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-06-19-a9bc7b",
+   "label": "2026-06-19",
+   "formatted": "2026.06.19",
+   "order": 1781827200000,
+   "timeDatetime": "2026-06-19"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-07-20-8c34f0",
+   "label": "2026-07-20",
+   "formatted": "2026.07.20",
+   "order": 1784505600000,
+   "timeDatetime": "2026-07-20"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-07-24-50e440",
+   "label": "2026-07-24",
+   "formatted": "2026.07.24",
+   "order": 1784851200000,
+   "timeDatetime": "2026-07-24"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-08-01-1cc8bf",
+   "label": "2026年8月1〜2日",
+   "formatted": "2026.08.01–02",
+   "order": 1785542400000,
+   "timeDatetime": null
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-08-03-cf9870",
+   "label": "2026-08-03",
+   "formatted": "2026.08.03",
+   "order": 1785715200000,
+   "timeDatetime": "2026-08-03"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-08-10-c49474",
+   "label": "2026-08-10",
+   "formatted": "2026.08.10",
+   "order": 1786320000000,
+   "timeDatetime": "2026-08-10"
+  },
+  {
+   "collection": "blog",
+   "slug": "activity-2026-08-13-9d5dc3",
+   "label": "2026年8月13日〜22日",
+   "formatted": "2026.08.13–22",
+   "order": 1786579200000,
+   "timeDatetime": null
+  },
+  {
+   "collection": "blog",
+   "slug": "another",
+   "label": "2025-12-25",
+   "formatted": "2025.12.25",
+   "order": 1766620800000,
+   "timeDatetime": "2025-12-25"
+  },
+  {
+   "collection": "blog",
+   "slug": "bennkyou",
+   "label": "2026-06-10",
+   "formatted": "2026.06.10",
+   "order": 1781049600000,
+   "timeDatetime": "2026-06-10"
+  },
+  {
+   "collection": "blog",
+   "slug": "booth",
+   "label": "2026-01-10",
+   "formatted": "2026.01.10",
+   "order": 1768003200000,
+   "timeDatetime": "2026-01-10"
+  },
+  {
+   "collection": "blog",
+   "slug": "busitu",
+   "label": "2026-05-21",
+   "formatted": "2026.05.21",
+   "order": 1779321600000,
+   "timeDatetime": "2026-05-21"
+  },
+  {
+   "collection": "blog",
+   "slug": "cedec-2026-scholarship",
+   "label": "2026年7月22日〜24日",
+   "formatted": "2026.07.22–24",
+   "order": 1784678400000,
+   "timeDatetime": null
+  },
+  {
+   "collection": "blog",
+   "slug": "dg",
+   "label": "2025-09-24",
+   "formatted": "2025.09.24",
+   "order": 1758672000000,
+   "timeDatetime": "2025-09-24"
+  },
+  {
+   "collection": "blog",
+   "slug": "gamedan",
+   "label": "2026-02-08",
+   "formatted": "2026.02.08",
+   "order": 1770508800000,
+   "timeDatetime": "2026-02-08"
+  },
+  {
+   "collection": "blog",
+   "slug": "houkoku",
+   "label": "2026-03-16",
+   "formatted": "2026.03.16",
+   "order": 1773619200000,
+   "timeDatetime": "2026-03-16"
+  },
+  {
+   "collection": "blog",
+   "slug": "ibunya",
+   "label": "2026-03-07",
+   "formatted": "2026.03.07",
+   "order": 1772841600000,
+   "timeDatetime": "2026-03-07"
+  },
+  {
+   "collection": "blog",
+   "slug": "ivrc_dg",
+   "label": "2025-11-02",
+   "formatted": "2025.11.02",
+   "order": 1762041600000,
+   "timeDatetime": "2025-11-02"
+  },
+  {
+   "collection": "blog",
+   "slug": "iwakenlab-5th-mini-exhibit",
+   "label": "2026-07-05",
+   "formatted": "2026.07.05",
+   "order": 1783209600000,
+   "timeDatetime": "2026-07-05"
+  },
+  {
+   "collection": "blog",
+   "slug": "kouryuu",
+   "label": "2026-01-07",
+   "formatted": "2026.01.07",
+   "order": 1767744000000,
+   "timeDatetime": "2026-01-07"
+  },
+  {
+   "collection": "blog",
+   "slug": "kouryuu2026",
+   "label": "2026-05-22",
+   "formatted": "2026.05.22",
+   "order": 1779408000000,
+   "timeDatetime": "2026-05-22"
+  },
+  {
+   "collection": "blog",
+   "slug": "metacms_article",
+   "label": "2025-09-03",
+   "formatted": "2025.09.03",
+   "order": 1756857600000,
+   "timeDatetime": "2025-09-03"
+  },
+  {
+   "collection": "blog",
+   "slug": "new_digital",
+   "label": "2026-04-01",
+   "formatted": "2026.04.01",
+   "order": 1775001600000,
+   "timeDatetime": "2026-04-01"
+  },
+  {
+   "collection": "blog",
+   "slug": "newDocument",
+   "label": "2026-02-01",
+   "formatted": "2026.02.01",
+   "order": 1769904000000,
+   "timeDatetime": "2026-02-01"
+  },
+  {
+   "collection": "blog",
+   "slug": "nu.metasou",
+   "label": "2025-05-20",
+   "formatted": "2025.05.20",
+   "order": 1747699200000,
+   "timeDatetime": "2025-05-20"
+  },
+  {
+   "collection": "blog",
+   "slug": "numa_koushuu",
+   "label": "2026-05-17",
+   "formatted": "2026.05.17",
+   "order": 1778976000000,
+   "timeDatetime": "2026-05-17"
+  },
+  {
+   "collection": "blog",
+   "slug": "opencampus-surugadai-2026",
+   "label": "2026-06-21",
+   "formatted": "2026.06.21",
+   "order": 1782000000000,
+   "timeDatetime": "2026-06-21"
+  },
+  {
+   "collection": "blog",
+   "slug": "science",
+   "label": "2025-11-14",
+   "formatted": "2025.11.14",
+   "order": 1763078400000,
+   "timeDatetime": "2025-11-14"
+  },
+  {
+   "collection": "blog",
+   "slug": "sousaku",
+   "label": "2026-04-29",
+   "formatted": "2026.04.29",
+   "order": 1777420800000,
+   "timeDatetime": "2026-04-29"
+  },
+  {
+   "collection": "blog",
+   "slug": "student-vr-meetup-2026",
+   "label": "2026-10-11",
+   "formatted": "2026.10.11",
+   "order": 1791676800000,
+   "timeDatetime": "2026-10-11"
+  },
+  {
+   "collection": "blog",
+   "slug": "surugadai-ourisai-2026",
+   "label": "2026-10-11",
+   "formatted": "2026.10.11",
+   "order": 1791676800000,
+   "timeDatetime": "2026-10-11"
+  },
+  {
+   "collection": "blog",
+   "slug": "svrc",
+   "label": "2025-12-10",
+   "formatted": "2025.12.10",
+   "order": 1765324800000,
+   "timeDatetime": "2025-12-10"
+  },
+  {
+   "collection": "blog",
+   "slug": "vkasai",
+   "label": "2026-03-28",
+   "formatted": "2026.03.28",
+   "order": 1774656000000,
+   "timeDatetime": "2026-03-28"
+  },
+  {
+   "collection": "blog",
+   "slug": "vket",
+   "label": "2026-01-20",
+   "formatted": "2026.01.20",
+   "order": 1768867200000,
+   "timeDatetime": "2026-01-20"
+  },
+  {
+   "collection": "blog",
+   "slug": "vketReal",
+   "label": "2025-10-20",
+   "formatted": "2025.10.20",
+   "order": 1760918400000,
+   "timeDatetime": "2025-10-20"
+  },
+  {
+   "collection": "blog",
+   "slug": "xr",
+   "label": "2025-12-01",
+   "formatted": "2025.12.01",
+   "order": 1764547200000,
+   "timeDatetime": "2025-12-01"
+  },
+  {
+   "collection": "news",
+   "slug": "site-redesign",
+   "label": "2026-10-20",
+   "formatted": "2026.10.20",
+   "order": 1792454400000,
+   "timeDatetime": "2026-10-20"
+  },
+  {
+   "collection": "project",
+   "slug": "demo-yura",
+   "label": "2026-07-20",
+   "formatted": "2026.07.20",
+   "order": 1784505600000,
+   "timeDatetime": "2026-07-20"
+  },
+  {
+   "collection": "project",
+   "slug": "dimensions-gate",
+   "label": "2025年9月〜11月",
+   "formatted": "2025.09–11",
+   "order": 1756684800000,
+   "timeDatetime": null
+  },
+  {
+   "collection": "project",
+   "slug": "exhibition-game-launcher",
+   "label": "2026-07-05",
+   "formatted": "2026.07.05",
+   "order": 1783209600000,
+   "timeDatetime": "2026-07-05"
+  },
+  {
+   "collection": "project",
+   "slug": "fogland",
+   "label": "2026-03-25",
+   "formatted": "2026.03.25",
+   "order": 1774396800000,
+   "timeDatetime": "2026-03-25"
+  },
+  {
+   "collection": "project",
+   "slug": "lbe-restaurant-simulator",
+   "label": "2026-08-08",
+   "formatted": "2026.08.08",
+   "order": 1786147200000,
+   "timeDatetime": "2026-08-08"
+  },
+  {
+   "collection": "project",
+   "slug": "nu-bar",
+   "label": "2026-10-11",
+   "formatted": "2026.10.11",
+   "order": 1791676800000,
+   "timeDatetime": "2026-10-11"
+  },
+  {
+   "collection": "project",
+   "slug": "nu-room",
+   "label": "2026-05-22",
+   "formatted": "2026.05.22",
+   "order": 1779408000000,
+   "timeDatetime": "2026-05-22"
+  },
+  {
+   "collection": "project",
+   "slug": "organization-website",
+   "label": "2025-05-20",
+   "formatted": "2025.05.20",
+   "order": 1747699200000,
+   "timeDatetime": "2025-05-20"
+  },
+  {
+   "collection": "project",
+   "slug": "quick",
+   "label": "2026-07-20",
+   "formatted": "2026.07.20",
+   "order": 1784505600000,
+   "timeDatetime": "2026-07-20"
+  },
+  {
+   "collection": "project",
+   "slug": "recall",
+   "label": "2026-09-10",
+   "formatted": "2026.09.10",
+   "order": 1788998400000,
+   "timeDatetime": "2026-09-10"
+  },
+  {
+   "collection": "project",
+   "slug": "recruitment-poster",
+   "label": "2025-03-20",
+   "formatted": "2025.03.20",
+   "order": 1742428800000,
+   "timeDatetime": "2025-03-20"
+  },
+  {
+   "collection": "project",
+   "slug": "shadow-interaction",
+   "label": "2026-01-20",
+   "formatted": "2026.01.20",
+   "order": 1768867200000,
+   "timeDatetime": "2026-01-20"
+  },
+  {
+   "collection": "project",
+   "slug": "tokyo-open-data-guide",
+   "label": "2025-08-20",
+   "formatted": "2025.08.20",
+   "order": 1755648000000,
+   "timeDatetime": "2025-08-20"
+  },
+  {
+   "collection": "project",
+   "slug": "uchatclient-1",
+   "label": "2026-04-14",
+   "formatted": "2026.04.14",
+   "order": 1776124800000,
+   "timeDatetime": "2026-04-14"
+  },
+  {
+   "collection": "project",
+   "slug": "uchatclient-2",
+   "label": "2026-06-14",
+   "formatted": "2026.06.14",
+   "order": 1781395200000,
+   "timeDatetime": "2026-06-14"
+  },
+  {
+   "collection": "project",
+   "slug": "vkasai-booth",
+   "label": "2026-03-23",
+   "formatted": "2026.03.23",
+   "order": 1774224000000,
+   "timeDatetime": "2026-03-23"
+  },
+  {
+   "collection": "project",
+   "slug": "vrc-airsoft",
+   "label": "2025年12月",
+   "formatted": "2025.12",
+   "order": 1764547200000,
+   "timeDatetime": null
+  },
+  {
+   "collection": "project",
+   "slug": "vrc-prototypes-2025",
+   "label": "2025年3月〜 6月",
+   "formatted": "2025.03–06",
+   "order": 1740787200000,
+   "timeDatetime": null
+  },
+  {
+   "collection": "project",
+   "slug": "vrc-prototypes-2026",
+   "label": "2026-04-02",
+   "formatted": "2026.04.02",
+   "order": 1775088000000,
+   "timeDatetime": "2026-04-02"
+  },
+  {
+   "collection": "project",
+   "slug": "web-prototypes",
+   "label": "2025-02-10",
+   "formatted": "2025.02.10",
+   "order": 1739145600000,
+   "timeDatetime": "2025-02-10"
+  },
+  {
+   "collection": "project",
+   "slug": "world-hackathon-2-prototype",
+   "label": "2026-08-07",
+   "formatted": "2026.08.07",
+   "order": 1786060800000,
+   "timeDatetime": "2026-08-07"
+  }
+ ]
+}
