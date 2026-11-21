@@ -55,6 +55,10 @@
 | `inventory.loans.list` | GET | `/inventory/loans` | 有効なユーザー（Member以上） |
 | `inventory.history` | GET | `/inventory/history` | 有効なユーザー（Member以上） |
 | `inventory.corrections.create` | POST | `/admin/inventory/corrections` | Admin / Owner |
+| `notifications.settings.list` | GET | `/admin/notifications/settings` | Admin / Owner |
+| `notifications.settings.update` | PUT | `/admin/notifications/settings/{eventType}` | Admin / Owner |
+| `notifications.deliveries.list` | GET | `/admin/notifications/deliveries` | Admin / Owner |
+| `notifications.deliveries.retry` | POST | `/admin/notifications/deliveries/{id}/retry` | Admin / Owner |
 | `contents.list` | GET | `/contents` | 有効なユーザー（Member以上） |
 | `contents.create` | POST | `/contents` | 有効なユーザー（Member以上） |
 | `contents.get` | GET | `/contents/{id}` | 作者 / 共同編集者 / Editor / Admin / Owner |

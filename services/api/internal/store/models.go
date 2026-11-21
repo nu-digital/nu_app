@@ -116,6 +116,27 @@ type InventoryUnit struct {
 	CreatedAt     pgtype.Timestamptz
 }
 
+type NotificationOutbox struct {
+	ID            pgtype.UUID
+	EventType     string
+	DedupeKey     string
+	PayloadJson   []byte
+	Status        string
+	Attempts      int32
+	NextAttemptAt pgtype.Timestamptz
+	LastError     pgtype.Text
+	CreatedAt     pgtype.Timestamptz
+	SentAt        pgtype.Timestamptz
+}
+
+type NotificationSetting struct {
+	EventType        string
+	Enabled          bool
+	DiscordChannelID pgtype.Text
+	UpdatedBy        pgtype.UUID
+	UpdatedAt        pgtype.Timestamptz
+}
+
 type OneTimeToken struct {
 	ID        pgtype.UUID
 	UserID    pgtype.UUID

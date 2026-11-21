@@ -221,6 +221,15 @@ func (s *server) createCorrection(w http.ResponseWriter, r *http.Request) {
 		if err := s.auditEvent(r.Context(), q, a.Identity.UserID, a.Identity.UserID, "inventory.correction_created", map[string]any{"itemId": item.ID.String(), "targetType": req.TargetType, "targetId": targetID.String(), "kind": req.Kind}); err != nil {
 			return err
 		}
+		// 通知に訂正の理由は入れない（理由は管理者にだけ見せる自由記述。P2-03-1）
+		notifyDelta := 0
+		if ev.DeltaQuantity.Valid {
+			notifyDelta = int(ev.DeltaQuantity.Int32)
+		}
+		if err := s.enqueueNotification(r.Context(), q, EventCorrectionCreated, "correction:"+ev.ID.String(), NotificationPayload{
+			ItemName: item.Name, Kind: req.Kind, Target: req.TargetType, Delta: notifyDelta, Actor: s.displayName(r.Context(), q, a.Identity.UserID)}); err != nil {
+			return err
+		}
 		return s.fillCorrection(r, q, item, ev, false, &out)
 	})
 	if err != nil {

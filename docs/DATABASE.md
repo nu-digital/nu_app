@@ -70,7 +70,7 @@
 | `media_assets` | `id`, `storage_key`, `visibility`, `mime_type`, `byte_size`, `width`, `height`, `purpose`, `uploaded_by`, `created_at` | private/public。mime_typeはimage/jpeg・png・webpのみ（CHECK）。purpose=avatar/inventory/cms。保存先への絶対パスはAPIで返さない。保存は再エンコード後の値（元ファイルのEXIFを保持しない） |
 | `media_references` | `media_id`, `owner_type`, `owner_id`, `purpose` | 公開済み画像の参照管理や安全な削除用 |
 | `notification_settings` | `event_type`, `enabled`, `discord_channel_id`, `updated_by` | Adminが変更可能 |
-| `notification_outbox` | `id`, `event_type`, `payload_json`, `status`, `attempts`, `next_attempt_at`, `created_at`, `sent_at` | DB処理と同一トランザクションで作成 |
+| `notification_outbox` | `id`, `event_type`, `dedupe_key`（1イベント1行・UNIQUE）, `payload_json`（機密を入れない）, `status`（pending/sent/dead）, `attempts`, `next_attempt_at`, `last_error`（要約のみ）, `created_at`, `sent_at` | DB処理と同一トランザクションで作成。チャンネル未設定の間はpendingで待機 |
 | `audit_logs` | `id`, `actor_user_id`, `action`, `target_type`, `target_id`, `summary_json`, `created_at` | 追記専用。トークン・パスワード・学生証番号の値を保存しない |
 | `dashboard_events` | `id`, `event_type`, `title`, `target_url`, `created_at` | 公開作品やアプリ更新を自動表示 |
 

@@ -223,6 +223,10 @@ var table = []Action{
 	{"inventory.loans.list", "GET", "/inventory/loans", anyMember},
 	{"inventory.history", "GET", "/inventory/history", anyMember},
 	{"inventory.corrections.create", "POST", "/admin/inventory/corrections", adminOnly},
+	{"notifications.settings.list", "GET", "/admin/notifications/settings", adminOnly},
+	{"notifications.settings.update", "PUT", "/admin/notifications/settings/{eventType}", adminOnly},
+	{"notifications.deliveries.list", "GET", "/admin/notifications/deliveries", adminOnly},
+	{"notifications.deliveries.retry", "POST", "/admin/notifications/deliveries/{id}/retry", adminOnly},
 
 	// 4. CMS（記事・作品。D01: 記事と作品は共通）
 	{"contents.list", "GET", "/contents", anyMember},

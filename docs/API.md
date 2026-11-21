@@ -168,9 +168,10 @@ Markdownは許可リスト方式でサニタイズする。生のiframe/script/v
 | GET | `/public/media/{opaqueId}` | Public | 公開されている画像のみ |
 | GET | `/dashboard/feed` | Member | CMS公開・アプリ更新等のイベント |
 | GET | `/admin/notifications/settings` | Admin | イベント種別と通知先チャンネル一覧 |
-| PUT | `/admin/notifications/settings/{eventType}` | Admin | ON/OFF、チャンネルID変更 |
+| PUT | `/admin/notifications/settings/{eventType}` | Admin | `{enabled, discordChannelId?}`。ON/OFFと送信チャンネル変更（数字5〜25桁。空/nullで未設定＝送信せず待機）。未知の種別は404、入力不正は422。監査ログに変更の事実だけ残す |
 | POST | `/admin/notifications/test` | Admin | Bot接続・送信先設定のテスト |
-| GET | `/admin/notifications/deliveries` | Admin | 通知送信失敗一覧（個人情報除外） |
+| GET | `/admin/notifications/deliveries` | Admin | 通知の送信状況一覧（`status`=pending/sent/dead、`limit`≤100、新しい順。**本文は返さない**。種別・状態・試行回数・次回試行・失敗の要約） |
+| POST | `/admin/notifications/deliveries/{id}/retry` | Admin | 送信に失敗して止まった(dead)通知だけを再送待ちに戻す。204／dead以外は409 `NOT_RETRYABLE` |
 | GET | `/healthz` | Infra | 単純なLiveness |
 | GET | `/readyz` | Infra | DB依存を含めたReadiness、公開範囲制限 |
 
