@@ -35,6 +35,8 @@ jobs:
           persist-credentials: false
       # 本番のNginx設定（infrastructure/nginx/nu_app.conf）を、使い捨てのNginxと擬似のバックエンドで実際に動かして確認する
       - run: scripts/nginx-test.sh
+      # TLS証明書の期限確認（閾値・読めない・配信側の確認不能・通知に秘密を含めない）
+      - run: scripts/cert-check-test.sh
       # 本番のCompose（compose.prod.yaml）が、雛形の設定で有効であること
       - run: docker compose --env-file .env.production.example -f infrastructure/compose.prod.yaml config -q
         env:

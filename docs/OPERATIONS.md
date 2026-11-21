@@ -41,8 +41,8 @@
 ## TLS・Nginx（D03）
 
 - Nginxは`nu-digital.jp`と`app.nu-digital.jp`のTLS終端・リバースプロキシ・レート制限・リクエストサイズ制限を担当する。**認証・認可はしない**（Go APIが判断）。
-- 証明書は自動更新する。取得・更新の具体的な手段と版は、P4-01の実装時に一次資料で調べて固定し理由を記録する（今は決めない）。
-- 更新失敗と期限接近を検知する: 期限の残日数を定期確認し、閾値以下や更新失敗でDiscordの運用通知を送る。更新後はNginxを再読み込みし、HTTPS応答の証明書期限を確認する手順を運用文書に書く。
+- 証明書は自動更新する。**採用（暫定 P4-01-1）: Ubuntu 24.04のパッケージの`certbot`（webrootの方式。`/var/www/certbot`）＋Ubuntuが入れるsystemdの`certbot.timer`による自動更新**。更新後は`/etc/letsencrypt/renewal-hooks/deploy/`に置く`certbot-deploy-hook.sh`が`nginx -t`のあと再読み込みする。パッケージの版はUbuntuのセキュリティ更新に従う（`apt-cache policy certbot`で確認し、初回セットアップ時の版を運用記録に残す）。
+- 更新失敗と期限接近を検知する: `infrastructure/nginx/cert-check.sh`（systemd timer `nu-cert-check`。毎日09:00 JST）が、証明書ファイルと**実際に配信されている証明書**の残日数を確認し、14日以下・読めない・配信側が確認できないときにDiscordの運用チャンネルへ通知する（更新したのにNginxが古い証明書を配っている場合も検知）。通知に鍵・URL・個人情報は含まない。
 - DNS未設定の間はACME取得を試験できない。実ドメインでの取得確認は契約・DNS設定後の項目。
 
 ## バックアップ（D04）
@@ -140,3 +140,20 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 - **実際の復旧**（障害時。手動。自動化しない）: 1) 利用者への影響を考えて`web`・`admin`・`api`・`bot`を止める 2) 空のDBを用意し`pg_restore --no-owner -d <db> db.dump`（`docker compose exec -T db pg_restore ...`） 3) `tar -xzf media.tar.gz -C /srv/nu_app/media`（所有者は`65532:65532`） 4) `nuctl media-verify`で整合を確認 5) 起動して`/healthz`・`/readyz`・公開サイトを確認。最大約24時間分の更新を失い得る（D04のリスク）。
 - **自動テスト**（CI `ops / backup-restore`、`scripts/backup-restore-test.sh`）: 成功・世代の保持（失敗で消さない／成功後に古いものだけ消す）・DB停止での失敗と通知（秘密を含まない）・壊れた世代の検出・行とファイルの食い違いの検出。
 - 未実測: 本番サイズでのバックアップ時間・容量（VPS契約後に実測して`MIN_FREE_MB`・容量の見積もりを見直す）。
+
+## 本番の構成と初回セットアップ（P4-01。VPS契約後に実施。**実施前に運用責任者の確認が必要**）
+
+**構成**: ホストにNginx（apt）とDocker。Compose（`infrastructure/compose.prod.yaml`）で db・migrate・api・bot・web・admin を起動。公開ポートは**127.0.0.1だけ**（api 8080・web 8081・admin 3000）で、外へ出すのはNginxの80/443だけ。DB・メディアはコンテナ外の永続領域（DBは名前付きvolume、メディアは`/srv/nu_app/media`）。イメージはCIがビルドして`ghcr.io`へpushしたもの（タグ=コミットSHA）。**VPSではビルドしない**。
+
+**初回セットアップの手順**（以下は手順書。この文書の作成時点では**どれも実行していない**）:
+1. VPSの契約・Ubuntu 24.04 LTSの用意・DNS（`nu-digital.jp`・`app.nu-digital.jp`のAレコード）。実際の事業者・IP・ディスク容量は契約後に確認して上の表に記録する。
+2. OSの更新、運用ユーザー（鍵認証のみ。パスワードログイン・rootのSSHを禁止）、デプロイ専用ユーザー`deploy`（`/srv/nu_app/infrastructure/deploy/deploy.sh`だけをsudoで実行できる）。`ufw`は22・80・443だけ許可。自動セキュリティ更新（`unattended-upgrades`）を有効化。
+3. Docker Engine（公式のapt）をインストール。`/srv/nu_app/`（リポジトリ）・`/srv/nu_app/media`（所有者`65532:65532`・権限750）・`/srv/nu_app/backups`（権限700）を作る。
+4. `/srv/nu_app/.env`（権限600。`.env.production.example`を元に実際の値。**Gitに入れない**）、`/etc/nu_app/backup.env`（権限600。`BACKUP_NOTIFY_WEBHOOK_URL`等）。GHCRからpullする読み取り専用トークンで`docker login ghcr.io`（デプロイ専用ユーザーで）。
+5. Nginx: `apt install nginx certbot`。`infrastructure/nginx/nu_app.conf`を`/etc/nginx/conf.d/`へ。最初は証明書が無いので、80番のサーバーだけで`certbot certonly --webroot -w /var/www/certbot -d nu-digital.jp`と`-d app.nu-digital.jp`を実行してから、443の設定を有効にして`nginx -t && systemctl reload nginx`。`certbot-deploy-hook.sh`を`/etc/letsencrypt/renewal-hooks/deploy/`へ。`systemctl list-timers | grep certbot`で自動更新を確認し、`certbot renew --dry-run`を実行。
+6. `systemd`のタイマー: `nu-backup.timer`（バックアップ）・`nu-cert-check.timer`（証明書の期限確認）。
+7. 初回デプロイは、GitHub Actionsの`deploy`ワークフロー（運用責任者の承認つき）から。手でイメージを起動しない。
+8. 初期Owner作成: `docker compose ... run --rm --no-deps --entrypoint /nuctl api bootstrap-owner --login-id <ID> --display-name <名前>`（表示されるtokenを本人にだけ渡す）。既存記事の取り込みは前述の`import-legacy`（dry-runで確認してから`--apply`）。
+9. 公開前: `docs/TESTING.md`のP4の確認、バックアップの手動実行と`restore-verify.sh`、4GBでの実測（メモリ・CPU・ディスク）、`/healthz`・`/readyz`の監視の設定。
+
+**Nginxの自動テスト**（CI `ops / nginx`、`scripts/nginx-test.sh`）: 使い捨てのNginxと擬似のバックエンドで、HTTP→HTTPS・公開ホストにAPIを出さない（画像の公開配信だけ）・GET/HEADだけ・Cookieを渡さない・X-Forwarded-Forの上書き・12MiB上限・ログインの回数制限・HSTS・キャッシュしない、を確認する。`nginx:1.30.6-alpine`（digest固定）で試験し、ホストのNginxはUbuntuのパッケージ（版は`nginx -v`で確認して記録）。CSP（Content-Security-Policy）は、Nextのインラインスクリプトに依存するため初期は付けない（導入時はnonce方式を別途検討）。
