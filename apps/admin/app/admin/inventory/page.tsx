@@ -58,6 +58,7 @@ function AdminInventory() {
     <main className="page wide">
       <p><Link href="/inventory">← 物品一覧へ</Link></p>
       <h1>物品の管理</h1>
+      <nav className="subnav" aria-label="管理のメニュー"><Link className="btn secondary inline" href="/admin/notifications">通知の設定</Link></nav>
       <p className="lead">物品の登録・編集は管理者（Admin・Owner）だけができます。権限が無い場合は登録時に案内が出ます。</p>
       {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
       <section className="panel" aria-labelledby="new-title">
