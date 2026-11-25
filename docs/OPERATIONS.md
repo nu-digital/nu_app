@@ -6,7 +6,7 @@
 
 | 項目 | 状態 |
 |---|---|
-| VPS事業者 | 未契約。さくらのVPSまたはConoHa VPSの4GBプラン予定。**契約後に確認** |
+| VPS事業者 | **さくらのVPS v5（石狩第1ゾーン）契約済み（2026-11-26確認）**。Ubuntu 24.04.5 LTS amd64・仮想4コア・メモリ約3.9GB・SSD 200GB（空き約184GB）。IPv4は運用記録（Git外）に。無料お試し期間中のため、本契約への移行は運用責任者が判断 |
 | CPUアーキテクチャ・ディスク容量 | **契約後に確認**（未確認のまま値を仮定しない） |
 | OS | Ubuntu 24.04 LTSを第一候補。契約先での提供状況を**確認** |
 | ドメイン | `nu-digital.jp`は取得済み。公式=`nu-digital.jp`、内部アプリ=`app.nu-digital.jp` |
@@ -194,3 +194,13 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 | デプロイ・切り戻し | 前述「デプロイ・切り戻し」。GitHub Actionsの`deploy`（承認つき）。手でイメージを起動しない |
 | 証明書 | 自動更新（`certbot.timer`）。期限確認の通知（`nu-cert-check`）が来たら`certbot renew`・`nginx -t`・再読み込み |
 | 障害の最初の確認 | `docker compose -f /srv/nu_app/infrastructure/compose.prod.yaml ps`・`/healthz`・`/readyz`・`journalctl -u nu-backup`・Nginxのログ。APIが止まるとコンテンツのページは5xxになる（`/healthz/`は応答） |
+
+## 実機セットアップの記録（2026-11-26。さくらのVPS v5）
+
+実施済み（SSH接続はこの作業用の鍵とあなた用の鍵。**認証情報はGit・チャットに残していない**）:
+- ホスト鍵は、さくらのシリアルコンソールで確認した指紋と照合してから信頼した。運用者の公開鍵を`ubuntu`に登録し、**別セッションで鍵認証の接続を確認してから**`/etc/ssh/sshd_config.d/10-nu-hardening.conf`でパスワード認証・root直ログインを無効化（`AllowUsers ubuntu deploy`・`MaxAuthTries 4`）。無効化後、パスワードでの接続が拒否されることも確認。
+- `ufw`: 既定deny、22（回数制限）・80・443を許可。`fail2ban`（sshd）、`unattended-upgrades`を有効化。Dockerが公開するポートは`127.0.0.1`だけ（ufwを迂回されない）。
+- Docker Engine 29.10.1・Compose v5.8.0（Docker公式のapt。署名鍵の指紋を既知の値と照合）。Nginx 1.24.0・certbot 2.9.0（Ubuntuのパッケージ。**Nginxは設定・証明書が整うまで停止・無効**）。
+- `deploy`ユーザー（パスワードなし・SSH鍵のみ）、`/srv/nu_app`（リポジトリ。サーバーからは読み取り専用のdeploy key（Organizationのdeploy key許可が必要）で取得）、`/srv/nu_app/media`（`65532:65532`・750）、`backups`・`/etc/nu_app`（700）。GitHubのホスト鍵は公式の指紋（`SHA256:+DiY3wvv…`）と一致を確認。
+- GitHub Actionsのデプロイ用SSH鍵は、`authorized_keys`で`restrict,command="/srv/nu_app/infrastructure/deploy/ssh-entry.sh"`を付け、**`deploy.sh <40桁SHA>`以外を実行できない**ようにする（`ssh-entry.sh`。`scripts/deploy-test.sh`で検証）。`sudoers`は`deploy ALL=(root) NOPASSWD: /srv/nu_app/infrastructure/deploy/deploy.sh [0-9a-f]*`の1行だけ。
+- 構築中だけ`ubuntu`に一時的な`NOPASSWD:ALL`を付けた（`/etc/sudoers.d/90-nu-setup`）。**作業完了後に削除し、`ubuntu`は通常のsudo（パスワードあり）に戻す**。
