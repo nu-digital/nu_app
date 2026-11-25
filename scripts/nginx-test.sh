@@ -4,7 +4,8 @@
 # 使い方: scripts/nginx-test.sh   （Docker・python3・openssl・curl必須）
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-NGINX_IMAGE="nginx:1.30.6-alpine@sha256:901e593c95dc85f5a729f5765516321366ef4ac401821431d408897e95287d0a"
+# ホスト（Ubuntu 24.04）のNginxは1.24.0。同じ版で試験する（1.30では通るが1.24では動かない書き方を見逃さない）
+NGINX_IMAGE="nginx:1.24.0-alpine@sha256:77e5d4a6ad906c5d3793764085706577fa705b1dc6f244ea0241c4b5e2155385"
 tmp="$(mktemp -d)"
 cid=""; pids=()
 cleanup() { [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1 || true; for p in "${pids[@]:-}"; do [ -n "$p" ] && kill "$p" 2>/dev/null || true; done; rm -rf -- "$tmp"; }
@@ -36,7 +37,7 @@ for h in nu-digital.jp app.nu-digital.jp; do
   mkdir -p "$tmp/le/live/$h"
   openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=$h" -keyout "$tmp/le/live/$h/privkey.pem" -out "$tmp/le/live/$h/fullchain.pem" 2>/dev/null
 done
-sed -e "s#listen 80;#listen $P_HTTP;#; s#listen \[::\]:80;#listen [::]:$P_HTTP;#; s#listen 443 ssl;#listen $P_HTTPS ssl;#; s#listen \[::\]:443 ssl;#listen [::]:$P_HTTPS ssl;#" \
+sed -e "s#listen 80;#listen $P_HTTP;#; s#listen \[::\]:80;#listen [::]:$P_HTTP;#; s#listen 443 ssl http2;#listen $P_HTTPS ssl http2;#; s#listen \[::\]:443 ssl http2;#listen [::]:$P_HTTPS ssl http2;#" \
     -e "s#127.0.0.1:8080#127.0.0.1:$P_API#g; s#127.0.0.1:8081#127.0.0.1:$P_WEB#g; s#127.0.0.1:3000#127.0.0.1:$P_ADMIN#g" \
     -e "s#/etc/letsencrypt#/le#g" "$root/infrastructure/nginx/nu_app.conf" > "$tmp/nu_app.conf"
 cat > "$tmp/nginx.conf" <<CONF
