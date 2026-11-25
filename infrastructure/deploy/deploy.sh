@@ -28,7 +28,9 @@ notify() {
   [ -n "$NOTIFY_URL" ] || return 0
   curl -fsS --max-time 15 -H 'Content-Type: application/json' -d "$(printf '{"content":"%s"}' "$1")" "$NOTIFY_URL" >/dev/null 2>&1 || log "通知を送れませんでした"
 }
-compose() { NU_TAG="$1" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "${@:2}"; }
+# COMPOSE_ARGS（例: "-p nu_trial -f override.yaml"）と SKIP_PULL=1 は、本番ではない試験環境（ローカルでビルドしたイメージ）での予行演習用。本番では設定しない
+# shellcheck disable=SC2086
+compose() { NU_TAG="$1" docker compose ${COMPOSE_ARGS:-} -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "${@:2}"; }
 
 mkdir -p "$STATE_DIR"
 exec 9>"$STATE_DIR/.lock"
@@ -83,7 +85,7 @@ fi
 
 stage="イメージの取得"
 log "イメージを取得: $short"
-compose "$tag" pull --quiet
+[ "${SKIP_PULL:-0}" = 1 ] || compose "$tag" pull --quiet
 
 if [ -n "$current" ]; then
   stage="直前のバックアップ"

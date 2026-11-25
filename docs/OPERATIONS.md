@@ -204,3 +204,22 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 - `deploy`ユーザー（パスワードなし・SSH鍵のみ）、`/srv/nu_app`（リポジトリ。サーバーからは読み取り専用のdeploy key（Organizationのdeploy key許可が必要）で取得）、`/srv/nu_app/media`（`65532:65532`・750）、`backups`・`/etc/nu_app`（700）。GitHubのホスト鍵は公式の指紋（`SHA256:+DiY3wvv…`）と一致を確認。
 - GitHub Actionsのデプロイ用SSH鍵は、`authorized_keys`で`restrict,command="/srv/nu_app/infrastructure/deploy/ssh-entry.sh"`を付け、**`deploy.sh <40桁SHA>`以外を実行できない**ようにする（`ssh-entry.sh`。`scripts/deploy-test.sh`で検証）。`sudoers`は`deploy ALL=(root) NOPASSWD: /srv/nu_app/infrastructure/deploy/deploy.sh [0-9a-f]*`の1行だけ。
 - 構築中だけ`ubuntu`に一時的な`NOPASSWD:ALL`を付けた（`/etc/sudoers.d/90-nu-setup`）。**作業完了後に削除し、`ubuntu`は通常のsudo（パスワードあり）に戻す**。
+
+## 実機での検証の記録（2026-11-26。さくらのVPS v5・4GB。**本番ではない試験環境**）
+
+試験は、本番の永続領域とは別のプロジェクト（`nu_trial`・`/srv/nu_trial`）で行い、終了後にコンテナ・volume・ネットワーク・イメージ・ディレクトリをすべて削除した（本番のデータ・設定には触れていない。DNS・外部公開なし）。イメージはVPS上で試験用にビルドした（本番はCIがビルドしGHCRから取得する）。
+
+| 項目 | 結果 |
+|---|---|
+| ビルド（api・bot・migrate・web・admin） | 全て成功（4コアで数分） |
+| 起動（`compose.prod.yaml`） | db→migrate→api→bot→web→adminが順に起動し全て healthy |
+| アイドル時のメモリ | api 7MiB・web 37MiB・admin 35MiB・bot 4MiB・db 31〜35MiB（合計約120MiB）。ホスト全体の使用は約0.9GB（ページキャッシュ含む） |
+| 公開サイトへ並列400リクエスト（`/blog/`・20並列） | 全て200・約6秒。web最大130MiB（上限384MiB）・api 13MiB・db 39MiB |
+| 約9MBの乱数PNG（1000×3000）のアップロード・再エンコード | 201・約1.5秒。api最大約236MiB（観測。上限1GiB・GOMEMLIMIT 768MiB）。ホストの空きは十分 |
+| 既存記事の取り込み（`import-legacy --apply`、試験DB） | 新規67件・公開サイト全ルート200（トップ0.12秒・一覧0.04秒） |
+| `down`→`up`（`-v`なし） | DB（記事67・画像1）・メディアのファイルが残り、公開サイトも200（永続化OK） |
+| バックアップ→隔離復元検証 | バックアップ約0.6秒・復元検証約2.2秒（スキーマ12・行数・メディア整合OK）。復元検証の一時コンテナは残らない |
+| デプロイの予行演習（`deploy.sh`・ローカルビルドのイメージ） | 初回成功／**壊れた版（APIが起動しない）→更新前バックアップ→失敗を検知→動いていた版へ自動で戻り、公開サイト200** |
+| 安全装置 | `APP_BASE_URL`がhttpで`API_INSECURE_COOKIES`が無いとAPIは起動を拒否する（本番の設定ミスでSecure Cookieなしにならない）。Dockerが公開するポートは127.0.0.1のみ |
+
+未確認: 実ドメインでのTLS取得・Nginxの実機動作（DNS後）、実際のDiscord通知、GHCRからのpull、VPS再起動後の自動起動（`restart: unless-stopped`・docker有効化済みだが再起動は未実施）、本番サイズ（数百〜数千記事・画像数GB）での所要時間・容量。
