@@ -158,7 +158,7 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 
 **ログ**: Nginxのアクセスログ（`/var/log/nginx/nu_app.access.log`）は**クエリ文字列を残さない**（`$uri`）。Cookie・Authorization・本文は記録しない。招待・再設定のtokenはURLのフラグメント（`#token=`）で、そもそもサーバーへ送られない。アプリ（Go・Next）のログにパスワード・token・学生証番号・メール等を出さない（AGENTS.md。テストで確認済みの範囲は`docs/TESTING.md`）。ログのローテーション（logrotate・Dockerの`max-size`）と保持期間は、契約後の容量に合わせて運用責任者が決める。
 
-**Nginxの自動テスト**（CI `ops / nginx`、`scripts/nginx-test.sh`）: 使い捨てのNginxと擬似のバックエンドで、HTTP→HTTPS・公開ホストにAPIを出さない（画像の公開配信だけ）・GET/HEADだけ・Cookieを渡さない・X-Forwarded-Forの上書き・12MiB上限・ログインの回数制限・HSTS・キャッシュしない、を確認する。`nginx:1.30.6-alpine`（digest固定）で試験し、ホストのNginxはUbuntuのパッケージ（版は`nginx -v`で確認して記録）。CSP（Content-Security-Policy）は、Nextのインラインスクリプトに依存するため初期は付けない（導入時はnonce方式を別途検討）。
+**Nginxの自動テスト**（CI `ops / nginx`、`scripts/nginx-test.sh`）: 使い捨てのNginxと擬似のバックエンドで、HTTP→HTTPS・公開ホストにAPIを出さない（画像の公開配信だけ）・GET/HEADだけ・Cookieを渡さない・X-Forwarded-Forの上書き・12MiB上限・ログインの回数制限・HSTS・キャッシュしない、を確認する。`nginx:1.24.0-alpine`（digest固定）で試験する（**ホストのUbuntu 24.04のNginxと同じ1.24.0**。実機で、1.30では通る`http2 on;`が1.24では`unknown directive`になったため）。CSP（Content-Security-Policy）は、Nextのインラインスクリプトに依存するため初期は付けない（導入時はnonce方式を別途検討）。
 
 ## デプロイ・切り戻し（P4-01b）
 
