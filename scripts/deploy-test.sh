@@ -86,4 +86,12 @@ reset; ( exec 9>"$STATE_DIR/.lock"; flock -n 9; deploy "$A"; echo $? > "$tmp/loc
 ! grep -qE "SECRET-TOKEN|webhooks|https://" "$NOTIFY_LOG"; check "通知の本文にWebhookのURL・トークンが含まれない" $?
 ! grep -qE "SECRET-TOKEN" "$tmp/out.log"; check "ログにWebhookのトークンが出ない" $?
 
+# SSH鍵の入口（ssh-entry.sh）: deploy.sh <40桁SHA> 以外は実行できない
+mkdir -p "$tmp/sshbin"; printf '#!/bin/sh\necho "SUDO-CALLED $*"\n' > "$tmp/sshbin/sudo"; chmod +x "$tmp/sshbin/sudo"
+entry() { SSH_ORIGINAL_COMMAND="$1" PATH="$tmp/sshbin:$PATH" "$root/infrastructure/deploy/ssh-entry.sh" 2>&1; }
+out=$(entry "sudo /srv/nu_app/infrastructure/deploy/deploy.sh $A"); [ "$out" = "SUDO-CALLED /srv/nu_app/infrastructure/deploy/deploy.sh $A" ]; check "SSH入口: 許可された形式だけがdeploy.shへ渡る" $?
+for bad in "" "bash" "sudo /srv/nu_app/infrastructure/deploy/deploy.sh $A; id" "sudo /srv/nu_app/infrastructure/deploy/deploy.sh abc" "sudo /srv/nu_app/infrastructure/deploy/deploy.sh $A $A" "sudo /bin/sh" "sudo /srv/nu_app/infrastructure/deploy/deploy.sh ../$A"; do
+  out=$(entry "$bad"); rc=$?; [ $rc = 126 ] && ! echo "$out" | grep -q SUDO-CALLED; check "SSH入口: 拒否される: ${bad:-（空）}" $?
+done
+
 echo; echo "合格 $pass・失敗 $failed"; [ "$failed" = 0 ]
