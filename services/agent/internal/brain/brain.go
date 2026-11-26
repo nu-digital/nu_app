@@ -44,6 +44,8 @@ type Input struct {
 	History    []Turn
 	Text       string
 	Images     [][]byte
+	IsDM       bool  // DMでの会話（ノートはprivateになり、その相手とのDMでだけ使う）
+	MessageID  int64 // 依頼のメッセージ（ノートの元として残す。削除に連動して消える）
 }
 
 type Output struct {
@@ -55,6 +57,7 @@ type Brain struct {
 	LLM    llm.Client
 	Budget *budget.Tracker
 	State  StateStore
+	Memory Memory // nilなら記憶のツールは使えない
 	Now    func() time.Time
 	Log    *slog.Logger
 }
@@ -73,6 +76,15 @@ var seriousRe = regexp.MustCompile(`本気(を)?出して|本気で(考えて|�
 //  3. Sonnetが受ける。重いと判断したら think_hard で Opus に任せ、結果をSonnetがぬるの口調で伝える。「本気出して」は必ずOpus
 //     （Opusの予算・一人あたりのOpusの上限に達していたら、使わずSonnetだけで答える）
 func (b *Brain) Reply(ctx context.Context, in Input) (Output, error) {
+	// 「私のことを忘れて」は、コードの規則で即座に実行する（LLMを通さない・予算や上限に関係なく効く）
+	if b.Memory != nil && forgetMeRe.MatchString(in.Text) {
+		n, err := b.Memory.ForgetPerson(ctx, in.UserID)
+		if err != nil {
+			b.Log.Error("ノートを消せませんでした")
+			return Output{Text: "ごめん、うまく消せなかった。あとでもう一回言って。"}, nil
+		}
+		return Output{Text: fmt.Sprintf("わかった。あなたについてのメモは全部消した（%d件）。", n)}, nil
+	}
 	if !b.Budget.AllowAPI(ctx) {
 		return Output{}, ErrAsleep
 	}
@@ -136,8 +148,7 @@ func (b *Brain) Reply(ctx context.Context, in Input) (Output, error) {
 func (b *Brain) runTool(ctx context.Context, in Input, tu llm.ToolUse, out *Output) llm.Block {
 	res := llm.Block{Type: llm.ToolResult, ToolUseID: tu.ID}
 	if tu.Name != thinkHardName {
-		res.IsError, res.Text = true, "そのツールは使えません"
-		return res
+		return b.runMemoryTool(ctx, in, tu)
 	}
 	var args struct {
 		Task string `json:"task"`
@@ -218,7 +229,11 @@ func (b *Brain) now() time.Time {
 }
 
 func tools() []llm.Tool {
-	return []llm.Tool{{Name: thinkHardName, Description: "リポジトリの読解・長い文章の下書き・複数ステップの調べものなど、重い仕事を、頭のいい自分（Opus）に任せる。雑談では使わない。", Schema: thinkHardSchema}}
+	return []llm.Tool{{Name: searchLogName, Description: "サーバーの過去のメッセージ（ログ）を語で探す。DMは対象外。", Schema: searchLogSchema},
+		{Name: rememberName, Description: "覚えておくことをノートに書く（個人情報は書けない）。", Schema: rememberSchema},
+		{Name: recallName, Description: "ノートから思い出す。", Schema: recallSchema},
+		{Name: forgetName, Description: "いま話している本人についてのノートを1件消す。", Schema: forgetSchema},
+		{Name: thinkHardName, Description: "リポジトリの読解・長い文章の下書き・複数ステップの調べものなど、重い仕事を、頭のいい自分（Opus）に任せる。雑談では使わない。", Schema: thinkHardSchema}}
 }
 
 // userBlocks は、直近の会話と最新の依頼を1つのユーザーメッセージにする。本文はすべて「データ」として <untrusted_message> で囲む。

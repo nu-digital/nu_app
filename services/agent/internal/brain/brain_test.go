@@ -212,7 +212,7 @@ func TestOpusIsSkippedWhenBudgetOrUserLimitIsReached(t *testing.T) {
 		t.Errorf("%+v", tr)
 	}
 	// ツール定義は、予算の段階にかかわらず同じ（キャッシュを壊さない）
-	if len(fake.Calls[0].Tools) != 1 {
+	if len(fake.Calls[0].Tools) != len(tools()) {
 		t.Error("ツール定義が変わった")
 	}
 	// 「本気出して」でも、予算90%以上ならOpusは使わない

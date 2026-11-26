@@ -324,3 +324,10 @@ sudo bash -c 'set -a; . /srv/nu_app/.env; set +a
 10. 異常（応答しない・暴走・想定外の操作）: 16.3の手順で止める。
 
 設定（`agent.settings`。通常は触らない）: `reactions.enabled`（`false`でリアクション全オフ）・`reactions.daily_cap`（既定10）・`budget.limit`相当は既定$60（付与日は1日。変更はP2で設定化）。リアクションは言葉の規則だけで付く（Claude APIは呼ばない）。予算が尽きて寝るときは、その期間に1回だけtimesに固定の文言を書く。
+
+### 16.6 記憶（P2-1）
+- ノートは`agent.notes`。確認: `... psql -c "select id, subject_user_id is not null as about_person, private, left(content,40) from agent.notes order by id desc limit 20"`（本文は個人的な内容を含み得る。画面共有に注意）。
+- 「私のことを忘れて」と言われたら自動で消える。手動で消すとき: `delete from agent.notes where id = …`。特定の人を全部消すなら`delete from agent.notes where subject_user_id = <DiscordのユーザーID>`。
+- Discordでメッセージが消されると、そのメッセージを元にしたノートも消える。
+- DMで作ったノートはprivate（その人とのDMでだけ使う）。ログ検索にDMは含まれない。
+

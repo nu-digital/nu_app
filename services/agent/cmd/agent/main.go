@@ -110,7 +110,7 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 	}
 	// 応答（P1-4a）: メンション・返信・DM・times。ぬるの頭脳は実Claude APIに繋ぐ（上限はbudgetが守る）
 	tracker := budget.New(db, budget.Config{}, nil)
-	br := &brain.Brain{LLM: llm.NewAnthropic(cfg.AnthropicKey), Budget: tracker, State: brainState{db}, Log: log}
+	br := &brain.Brain{LLM: llm.NewAnthropic(cfg.AnthropicKey), Budget: tracker, State: brainState{db}, Memory: db, Log: log}
 	resp := &responder.Responder{Ctl: ctl, Brain: br, Hist: db, Mem: db, Send: gw, Img: discord.NewImageFetcher(),
 		Reacts: db, BotID: gw.BotUserID, TimesChannel: int64(cfg.TimesChannel), Log: log}
 	gw.SetTimesChannel(cfg.TimesChannel)
