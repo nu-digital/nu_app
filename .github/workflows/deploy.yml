@@ -7,6 +7,10 @@ name: deploy
 on:
   push:
     branches: [main]
+    # 文書だけの変更ではデプロイしない（承認の手間とイメージの無駄を避ける）。コード・設定・ワークフローの変更は対象
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
   workflow_dispatch:
     inputs:
       tag:

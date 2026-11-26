@@ -119,6 +119,7 @@
 
 ### 6.3 変数・自動デプロイ
 - リポジトリの変数`DEPLOY_ENABLED`（Settings → Secrets and variables → Actions → Variables）。**`true`にすると、mainへのpushごとに「CI全成功の確認 → GHCRへビルド → 承認待ち → デプロイ」が動く**。止めたいときは削除か`false`にする（実行中のジョブは止まらない。止めるときはActionsの画面でcancel）。
+- **`docs/`と`*.md`だけの変更では、デプロイは動かない**（`paths-ignore`）。コード・設定・ワークフローを変えるPRのマージでは、承認待ちが発生する。
 - 手動の切り戻し: Actions → deploy → Run workflow（入力: 戻したいコミットSHA）。
 
 ### 6.4 GHCR（コンテナイメージ）
