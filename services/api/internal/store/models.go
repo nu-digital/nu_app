@@ -52,6 +52,16 @@ type AgentMessage struct {
 	EditedAt    pgtype.Timestamptz
 }
 
+type AgentNote struct {
+	ID              int64
+	SubjectUserID   pgtype.Int8
+	Content         string
+	Private         bool
+	SourceMessageID pgtype.Int8
+	SourceChannelID pgtype.Int8
+	CreatedAt       pgtype.Timestamptz
+}
+
 type AgentReactionsDaily struct {
 	Day pgtype.Date
 	N   int32

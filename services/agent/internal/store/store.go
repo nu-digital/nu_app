@@ -138,8 +138,20 @@ func (s *Store) DeleteMessages(ctx context.Context, ids ...int64) (int64, error)
 	if len(ids) == 0 {
 		return 0, nil
 	}
-	tag, err := s.pool.Exec(ctx, `DELETE FROM messages WHERE message_id = ANY($1)`, ids)
-	return tag.RowsAffected(), err
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `DELETE FROM messages WHERE message_id = ANY($1)`, ids)
+	if err != nil {
+		return 0, err
+	}
+	// 元のメッセージが消されたら、それを元にしたノートも消す（削除の連動）
+	if _, err := tx.Exec(ctx, `DELETE FROM notes WHERE source_message_id = ANY($1)`, ids); err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), tx.Commit(ctx)
 }
 
 // CountMessages は記録の件数（チャンネルを指定しなければ全体）。

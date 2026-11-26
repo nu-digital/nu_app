@@ -5,6 +5,8 @@ package store_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -261,4 +263,113 @@ func TestTakeReactionRespectsDailyCap(t *testing.T) {
 	if ok, _ := s.TakeReaction(ctx, day.AddDate(0, 0, 2), 0); ok {
 		t.Error("上限0は使えない")
 	}
+}
+
+func TestSearchMessagesNeverReturnsDMsOrBots(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+	mk := func(id int64, kind, content string, bot bool) store.Message {
+		m := msg(id, content)
+		m.Kind, m.IsBot = kind, bot
+		return m
+	}
+	for _, m := range []store.Message{mk(1, "guild", "ハッカソンの日程は50%で決まった", false), mk(2, "dm", "ハッカソンのひみつ", false), mk(3, "guild", "ハッカソンの宣伝", true), mk(4, "guild", "別の話", false)} {
+		if err := s.UpsertMessage(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	hits, err := s.SearchMessages(ctx, "ハッカソン", 10)
+	if err != nil || len(hits) != 1 || hits[0].MessageID != 1 {
+		t.Fatalf("DM・Botを返した: %+v %v", hits, err)
+	}
+	if h, _ := s.SearchMessages(ctx, "50%", 10); len(h) != 1 {
+		t.Error("%は文字として探す")
+	}
+	if h, _ := s.SearchMessages(ctx, "%", 10); len(h) != 1 {
+		t.Errorf("%%だけの検索は全件にならない: %d", len(h))
+	}
+	if h, _ := s.SearchMessages(ctx, "", 10); len(h) != 0 {
+		t.Error("空の検索は何も返さない")
+	}
+}
+
+func TestNotesPrivacyAuthorizationLimitsAndDeletionLink(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+	alice, bob := int64(11), int64(22)
+	pub, _ := s.AddNote(ctx, store.Note{SubjectUserID: &alice, Content: "猫が好き"})
+	priv, _ := s.AddNote(ctx, store.Note{SubjectUserID: &alice, Content: "就活で悩んでいる", Private: true})
+	gen, _ := s.AddNote(ctx, store.Note{Content: "来月ハッカソンがある"})
+	src := int64(900)
+	linked, _ := s.AddNote(ctx, store.Note{Content: "元メッセージ付き", SourceMessageID: &src})
+	ids := func(ns []store.Note) map[int64]bool {
+		m := map[int64]bool{}
+		for _, n := range ns {
+			m[n.ID] = true
+		}
+		return m
+	}
+	// private は、本人とのDMの中だけ
+	got, _ := s.SearchNotes(ctx, "", alice, false, 50)
+	if m := ids(got); m[priv] || !m[pub] || !m[gen] {
+		t.Errorf("DM外でprivateが見えた/公開が見えない: %v", m)
+	}
+	if m := ids(mustNotes(s.SearchNotes(ctx, "", alice, true, 50))); !m[priv] {
+		t.Error("本人とのDMではprivateが見える")
+	}
+	if m := ids(mustNotes(s.SearchNotes(ctx, "", bob, true, 50))); m[priv] {
+		t.Error("別の人とのDMでprivateが見えた")
+	}
+	if m := ids(mustNotes(s.SearchNotes(ctx, "ハッカソン", bob, false, 50))); len(m) != 1 || !m[gen] {
+		t.Errorf("検索: %v", m)
+	}
+	// 他人のノートは消せない
+	if ok, _ := s.ForgetNote(ctx, pub, bob); ok {
+		t.Error("他人のノートを消せた")
+	}
+	if ok, _ := s.ForgetNote(ctx, gen, alice); ok {
+		t.Error("一般のメモを一人で消せた")
+	}
+	if ok, _ := s.ForgetNote(ctx, pub, alice); !ok {
+		t.Error("本人のノートが消せない")
+	}
+	// 元メッセージの削除で、ノートも消える
+	if _, err := s.DeleteMessages(ctx, src); err != nil {
+		t.Fatal(err)
+	}
+	if m := ids(mustNotes(s.SearchNotes(ctx, "", bob, false, 50))); m[linked] {
+		t.Error("元メッセージが消えてもノートが残った")
+	}
+	// 「忘れて」: 本人のノートと親密度が全部消える。他の人は残る
+	_ = s.BumpCloseness(ctx, alice)
+	bobNote, _ := s.AddNote(ctx, store.Note{SubjectUserID: &bob, Content: "ボブのメモ"})
+	n, err := s.ForgetPerson(ctx, alice)
+	if err != nil || n != 1 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	if c, _ := s.GetCloseness(ctx, alice); c != 0 {
+		t.Error("親密度が残った")
+	}
+	if m := ids(mustNotes(s.SearchNotes(ctx, "", bob, true, 50))); !m[bobNote] || m[priv] {
+		t.Errorf("忘れての範囲: %v", m)
+	}
+	// 上限
+	for i := 0; i < store.MaxNotesPerUser; i++ {
+		if _, err := s.AddNote(ctx, store.Note{SubjectUserID: &bob, Content: "x"}); err != nil && i < store.MaxNotesPerUser-1 {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.AddNote(ctx, store.Note{SubjectUserID: &bob, Content: "あふれる"}); !errors.Is(err, store.ErrNoteLimit) {
+		t.Errorf("上限: %v", err)
+	}
+	if _, err := s.AddNote(ctx, store.Note{Content: strings.Repeat("あ", 501)}); err == nil {
+		t.Error("501文字を受け付けた")
+	}
+}
+
+func mustNotes(n []store.Note, err error) []store.Note {
+	if err != nil {
+		panic(err)
+	}
+	return n
 }
