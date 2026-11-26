@@ -10,6 +10,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'nu_agent') THEN
         CREATE ROLE nu_agent NOLOGIN;
     END IF;
+EXCEPTION WHEN duplicate_object OR unique_violation THEN
+    -- 同じクラスターへ複数のDBが同時にmigrationする（試験）とき、別のmigrationが先に作った
+    NULL;
 END
 $$;
 -- +goose StatementEnd
@@ -103,7 +106,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA agent TO nu_agent;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA agent TO nu_agent;
 -- 注意: ALTER DEFAULT PRIVILEGES は使わない（ダンプに「FOR ROLE <所有者>」が出て、別のDBへの復元で所有者のロールが無いと失敗する）。
 -- agentスキーマにテーブルを足すmigrationは、そのテーブルへのGRANT（nu_agent）を自分で書くこと。
-ALTER ROLE nu_agent SET search_path = agent;
+-- search_path は、接続側（services/agent）が agent に固定する（ロールの既定には頼らない。ALTER ROLE ... SET は同時実行で競合する）。
 
 -- +goose Down
 DROP SCHEMA agent CASCADE;

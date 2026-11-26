@@ -48,11 +48,11 @@ func TestAgentRoleIsConfinedToAgentSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ap.Close()
-	// agentスキーマは search_path の既定で、読み書きできる
-	if _, err := ap.Exec(ctx, "INSERT INTO messages (message_id, channel_id, kind, author_id, content, created_at) VALUES (1, 2, 'guild', 3, 'テスト', now())"); err != nil {
+	// agentスキーマは読み書きできる
+	if _, err := ap.Exec(ctx, "INSERT INTO agent.messages (message_id, channel_id, kind, author_id, content, created_at) VALUES (1, 2, 'guild', 3, 'テスト', now())"); err != nil {
 		t.Fatalf("agent.messagesへ書けない: %v", err)
 	}
-	if _, err := ap.Exec(ctx, "DELETE FROM messages WHERE message_id = 1"); err != nil {
+	if _, err := ap.Exec(ctx, "DELETE FROM agent.messages WHERE message_id = 1"); err != nil {
 		t.Fatalf("agent.messagesの削除: %v", err)
 	}
 	// nu_app本体のテーブルは読めない・書けない

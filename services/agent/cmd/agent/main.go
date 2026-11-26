@@ -10,10 +10,15 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/nu-digital/nu_app/services/agent/internal/config"
+	"github.com/nu-digital/nu_app/services/agent/internal/control"
+	"github.com/nu-digital/nu_app/services/agent/internal/discord"
 	"github.com/nu-digital/nu_app/services/agent/internal/health"
+	"github.com/nu-digital/nu_app/services/agent/internal/store"
 )
 
 func main() {
@@ -46,10 +51,88 @@ func run(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 		// 値は出さない。足りない設定の名前だけ
 		log.Info("無効モードで起動します（Discordに接続せず、Claude APIも呼びません）", "missing", m)
 		st.SetMode("disabled")
-	} else {
-		// P1-2以降: Discordへの接続・応答をここへ追加する
-		log.Info("設定は揃っています（P1-1ではまだDiscordに接続しません）", "config", cfg.String())
-		st.SetMode("ready")
+		return st.Serve(ctx, cfg.HealthAddr)
 	}
+	log.Info("設定が揃っています。有効モードで起動します", "config", cfg.String())
+	st.SetMode("starting")
+	go func() {
+		if err := runEnabled(ctx, log, cfg, st); err != nil && ctx.Err() == nil {
+			log.Error("ぬるが停止しました", "error", err.Error())
+			st.SetHealthy(false)
+		}
+	}()
 	return st.Serve(ctx, cfg.HealthAddr)
+}
+
+// runEnabled はDBに接続し、Discordに接続して、記録・過去ログの取り込み・/nulコマンドを動かす（P1-2。応答・発言はP1-3以降）。
+func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *health.Status) error {
+	// DBに接続できない（nu_agentのパスワード未設定など）間は、再試行する（落ちて再起動を繰り返さない）
+	var db *store.Store
+	for {
+		var err error
+		if db, err = store.Open(ctx, cfg.DatabaseURL()); err == nil {
+			break
+		}
+		log.Error("DBに接続できません。30秒後に再試行します", "error", err.Error())
+		st.SetHealthy(false)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(30 * time.Second):
+		}
+	}
+	defer db.Close()
+	ctl, err := control.New(ctx, db)
+	if err != nil {
+		log.Error("停止状態を読めないため、停止状態で始めます")
+	}
+	rec := discord.NewRecorder(db, log)
+	cmd := &discord.Commander{Ctl: ctl, AdminRole: strconv.FormatUint(cfg.AdminRole, 10)}
+	cmd.Status = func(ctx context.Context) (string, error) {
+		n, err := db.CountMessages(ctx, nil)
+		if err != nil {
+			return "", err
+		}
+		ch, done, imp, err := db.ImportSummary(ctx)
+		if err != nil {
+			return "", err
+		}
+		return discord.FormatStatus(ctl.Mode(), n, ch, done, imp), nil
+	}
+	gw, err := discord.NewGateway(cfg.DiscordToken, cfg.GuildID, rec, cmd, log)
+	if err != nil {
+		return err
+	}
+	if err := gw.Open(); err != nil {
+		return err
+	}
+	defer gw.Close()
+	st.SetMode("running")
+	st.SetHealthy(true)
+
+	// 切断が3分以上続いたら異常にする（コンテナのヘルスチェックに出る）
+	go func() {
+		t := time.NewTicker(30 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				st.SetHealthy(gw.Down() < 3*time.Minute)
+			}
+		}
+	}()
+	// 過去ログの取り込み。ゆっくり（1ページごとに1秒待つ）。完了済みは飛ばすので、6時間ごとに新しいスレッドを拾う
+	im := &discord.Importer{Hist: gw.History(), St: db, Log: log, PageSize: 100, PageDelay: time.Second}
+	for {
+		if err := im.Run(ctx, int64(cfg.GuildID)); err != nil && ctx.Err() == nil {
+			log.Warn("過去ログの取り込みを中断しました（次回に続きから）")
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(6 * time.Hour):
+		}
+	}
 }
