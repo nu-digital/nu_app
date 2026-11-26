@@ -5,6 +5,7 @@ package schedule
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"math/rand/v2"
 	"time"
@@ -22,6 +23,7 @@ type Poster interface {
 
 type Speaker interface {
 	Spontaneous(ctx context.Context, in brain.SpontInput) (string, error)
+	Report(ctx context.Context, in brain.ReportInput) (string, error)
 }
 
 type Settings interface {
@@ -33,6 +35,7 @@ type Memory interface {
 	GetState(ctx context.Context) (store.State, error)
 	SaveState(ctx context.Context, st store.State) error
 	RecentMessages(ctx context.Context, channelID int64, threadID *int64, beforeID int64, limit int) ([]store.Message, error)
+	SummariesBetween(ctx context.Context, from, to time.Time, limit int) ([]store.Summary, error)
 }
 
 type Scheduler struct {
@@ -56,6 +59,8 @@ const (
 	keyDrift = "mood.drift_day"
 	keySpont = "spont.state"
 	keyStop  = "budget.stop_announced"
+	keyWeek  = "report.weekly"
+	keyMonth = "report.monthly"
 )
 
 // 趣味の候補（P1。P3で「調べたこと」に置き換える）。数日ごとに入れ替える。
@@ -73,6 +78,7 @@ func (s *Scheduler) Tick(ctx context.Context) {
 	now := s.now()
 	s.dailyMood(ctx, now)
 	s.announceStop(ctx, now)
+	s.maybeReports(ctx, now)
 	s.maybeSpeak(ctx, now)
 }
 
@@ -242,5 +248,98 @@ func (s *Scheduler) Run(ctx context.Context) {
 		case <-t.C:
 			s.Tick(ctx)
 		}
+	}
+}
+
+// ---- 週報・月報 ----
+
+type reportState struct {
+	Key   string    `json:"key"`   // 期間の識別（週報は金曜の日付、月報は YYYY-MM）
+	Done  bool      `json:"done"`  // 投稿した（または材料が無くて見送った）
+	Tries int       `json:"tries"` // 失敗の回数（上限あり）
+	Last  time.Time `json:"last"`  // 最後に試した時刻
+}
+
+const (
+	maxReportTries = 3
+	reportRetry    = 30 * time.Minute
+	maxMaterial    = 14000 // 材料の文字数の上限
+)
+
+// maybeReports は、金曜21:00（JST）以降の週報、毎月1日12:00以降の月報を、その期間に1回だけtimesへ書く。
+func (s *Scheduler) maybeReports(ctx context.Context, now time.Time) {
+	if !s.Ctl.MayPostSpontaneously() {
+		return
+	}
+	n := now.In(jst)
+	day0 := time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.UTC) // 日付だけ（JSTのカレンダー日）
+	if n.Weekday() == time.Friday && n.Hour() >= 21 {
+		from, to := day0.AddDate(0, 0, -7), day0
+		title := "週報 " + from.Format("1/2") + "〜" + to.AddDate(0, 0, -1).Format("1/2")
+		s.report(ctx, now, keyWeek, day0.Format("2006-01-02"), "weekly", title, from, to, "")
+	}
+	if n.Day() == 1 && n.Hour() >= 12 {
+		to := day0
+		from := to.AddDate(0, -1, 0)
+		title := "月報 " + from.Format("2006年1月")
+		facts := ""
+		if spent, start, err := s.Budget.PreviousPeriod(ctx); err == nil {
+			facts = fmt.Sprintf("ぬるの予算（%s〜の期間）: 使った %s / 上限 %s（残り %s）。\n", start.In(jst).Format("1/2"), usd(spent), usd(s.Budget.Limit()), usd(s.Budget.Limit()-spent))
+		}
+		s.report(ctx, now, keyMonth, to.Format("2006-01"), "monthly", title, from, to, facts)
+	}
+}
+
+func usd(micro int64) string { return fmt.Sprintf("$%.2f", float64(micro)/1e6) }
+
+func (s *Scheduler) report(ctx context.Context, now time.Time, setKey, period, kind, title string, from, to time.Time, facts string) {
+	var st reportState
+	if raw, ok, err := s.Set.GetSetting(ctx, setKey); err != nil {
+		return
+	} else if ok {
+		_ = json.Unmarshal(raw, &st)
+	}
+	if st.Key == period && (st.Done || st.Tries >= maxReportTries || now.Sub(st.Last) < reportRetry) {
+		return
+	}
+	if st.Key != period {
+		st = reportState{Key: period}
+	}
+	save := func() { _ = s.Set.SetSetting(ctx, setKey, st) }
+	sums, err := s.Mem.SummariesBetween(ctx, from, to, 40)
+	if err != nil {
+		return
+	}
+	if len(sums) == 0 { // 材料が無い（要約がまだ・静かな期間）。書かずに見送る
+		st.Done, st.Last = true, now
+		save()
+		return
+	}
+	var material []brain.Turn
+	var total, msgs int
+	for _, x := range sums {
+		msgs += x.MsgCount
+		t := x.Content
+		if total+len([]rune(t)) > maxMaterial {
+			continue
+		}
+		total += len([]rune(t))
+		material = append(material, brain.Turn{AuthorName: fmt.Sprintf("<#%d> %s", x.ChannelID, x.Day.Format("1/2")), Text: t})
+	}
+	facts += fmt.Sprintf("対象期間: %s〜%s。要約のあるチャンネル×日: %d、発言数の合計: %d。", from.Format("1/2"), to.AddDate(0, 0, -1).Format("1/2"), len(sums), msgs)
+	st.Tries++
+	st.Last = now
+	save() // 先に数える（生成が失敗しても、続けて何度も呼ばない）
+	text, err := s.Brain.Report(ctx, brain.ReportInput{Kind: kind, Title: title, Facts: facts, Material: material, ChannelID: s.TimesCh})
+	if err != nil || text == "" {
+		return
+	}
+	if !s.Ctl.MayPostSpontaneously() { // 生成中に止められたら書かない（次の試行で）
+		return
+	}
+	st.Done = true
+	save()
+	if err := s.Post.PostTimes(ctx, text); err != nil {
+		s.Log.Error("報告をtimesへ投稿できません")
 	}
 }

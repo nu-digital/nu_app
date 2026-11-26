@@ -337,3 +337,7 @@ sudo bash -c 'set -a; . /srv/nu_app/.env; set +a
 - 要約を作り直したいとき: `delete from agent.summaries where day = '2026-11-20'`（次の15分で候補に戻る）。範囲を変えるとき: `delete from agent.settings where key = 'summary.since'`（再見積もり）。
 - バッチが止まったように見えるとき: `settings.summary.pending`のidをConsoleのBatchesで確認。48時間たっても終わらないものは自動で破棄して次へ進む。
 
+### 16.8 週報・月報（P2-3）
+- 週報: 毎週金曜21:00(JST)以降に、前の7日間（金〜木）の日次要約から。月報: 毎月1日12:00以降に、先月の要約と前の予算期間の使用額から。どちらもtimesに1回だけ。`/nul quiet`・`/nul stop`・予算停止中は書かない。
+- 材料の日次要約が無い期間は書かずに見送る（要約の取り込みが終わるまで、初期の週報は出ないことがある）。再生成したいとき: `delete from agent.settings where key in ('report.weekly','report.monthly')`（金曜21時以降・月初12時以降なら、次の1分で書き直す）。
+

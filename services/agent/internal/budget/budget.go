@@ -196,6 +196,24 @@ func (t *Tracker) Remaining(ctx context.Context) int64 {
 	return st.Limit*70/100 - st.Spent
 }
 
+// PreviousPeriod は、ひとつ前の予算期間の使用額と、期間の始まり（月報用）。
+func (t *Tracker) PreviousPeriod(ctx context.Context) (spent int64, start time.Time, err error) {
+	cur, _ := t.Period(t.now())
+	prev := cur.AddDate(0, -1, 0)
+	a, err := t.l.SpentMicroSince(ctx, prev)
+	if err != nil {
+		return 0, prev, err
+	}
+	b, err := t.l.SpentMicroSince(ctx, cur)
+	if err != nil {
+		return 0, prev, err
+	}
+	return a - b, prev, nil
+}
+
+// Limit は月の上限（マイクロドル）。
+func (t *Tracker) Limit() int64 { return t.cfg.LimitMicro }
+
 // AllowUser は、一人あたりの1日の上限（連打対策）。kind は "reply" か "opus"。数えてから判定する（上限を超えた回は拒否）。
 func (t *Tracker) AllowUser(ctx context.Context, userID int64, kind string) (bool, error) {
 	limit := t.cfg.ReplyPerUserDay
