@@ -14,10 +14,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nu-digital/nu_app/services/agent/internal/brain"
+	"github.com/nu-digital/nu_app/services/agent/internal/budget"
 	"github.com/nu-digital/nu_app/services/agent/internal/config"
 	"github.com/nu-digital/nu_app/services/agent/internal/control"
 	"github.com/nu-digital/nu_app/services/agent/internal/discord"
 	"github.com/nu-digital/nu_app/services/agent/internal/health"
+	"github.com/nu-digital/nu_app/services/agent/internal/llm"
+	"github.com/nu-digital/nu_app/services/agent/internal/responder"
 	"github.com/nu-digital/nu_app/services/agent/internal/store"
 )
 
@@ -103,6 +107,12 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 	if err != nil {
 		return err
 	}
+	// 応答（P1-4a）: メンション・返信・DM・times。ぬるの頭脳は実Claude APIに繋ぐ（上限はbudgetが守る）
+	tracker := budget.New(db, budget.Config{}, nil)
+	br := &brain.Brain{LLM: llm.NewAnthropic(cfg.AnthropicKey), Budget: tracker, State: brainState{db}, Log: log}
+	resp := &responder.Responder{Ctl: ctl, Brain: br, Hist: db, Mem: db, Send: gw, Img: discord.NewImageFetcher(),
+		BotID: gw.BotUserID, TimesChannel: int64(cfg.TimesChannel), Log: log}
+	gw.OnIncoming = resp.Handle
 	if err := gw.Open(); err != nil {
 		return err
 	}
@@ -135,4 +145,16 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 		case <-time.After(6 * time.Hour):
 		}
 	}
+}
+
+// brainState は store.State を brain.State に変える。
+type brainState struct{ db *store.Store }
+
+func (b brainState) GetState(ctx context.Context) (brain.State, error) {
+	st, err := b.db.GetState(ctx)
+	return brain.State{Mood: st.Mood, Energy: st.Energy, Hobby: st.Hobby}, err
+}
+
+func (b brainState) GetCloseness(ctx context.Context, userID int64) (int, error) {
+	return b.db.GetCloseness(ctx, userID)
 }

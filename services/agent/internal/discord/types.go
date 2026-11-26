@@ -28,6 +28,8 @@ type Attachment struct {
 	Filename    string
 	ContentType string
 	Size        int
+	// URL は取得用（署名つきで期限切れになる。保存しない）
+	URL string
 }
 
 // Channel は取り込み対象の候補。
@@ -44,4 +46,12 @@ type History interface {
 	Channels(ctx context.Context, guildID int64) ([]Channel, error)
 	// MessagesBefore は beforeID（0なら最新）より古いメッセージを新しい順に最大limit件返す。
 	MessagesBefore(ctx context.Context, ch Channel, beforeID int64, limit int) ([]Msg, error)
+}
+
+// Incoming は受信したメッセージと、その文脈（応答の判断に使う）。
+type Incoming struct {
+	Msg           Msg
+	MentionsBot   bool // ぬるへのメンション
+	RepliesToBot  bool // ぬるのメッセージへの返信
+	IsBotAuthored bool // Botの発言（ぬる自身を含む）
 }
