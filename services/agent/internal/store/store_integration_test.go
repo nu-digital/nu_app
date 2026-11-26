@@ -131,3 +131,51 @@ func TestProgressResumes(t *testing.T) {
 		t.Errorf("%d %d %d %v", ch, done, imp, err)
 	}
 }
+
+func TestUsageAndDailyCounters(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+	now := time.Now()
+	ch, us := int64(5), int64(9)
+	for _, c := range []int64{1500, 2500} {
+		if err := s.RecordUsage(ctx, store.UsageRecord{Model: "claude-sonnet-5-5", Purpose: "chat", Input: 10, Output: 5, CostMicroUSD: c, ChannelID: &ch, UserID: &us}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	n, err := s.SpentMicroSince(ctx, now.Add(-time.Hour))
+	if err != nil || n != 4000 {
+		t.Errorf("使用額: %d %v", n, err)
+	}
+	if n, _ := s.SpentMicroSince(ctx, now.Add(time.Hour)); n != 0 {
+		t.Errorf("未来: %d", n)
+	}
+	if err := s.RecordUsage(ctx, store.UsageRecord{Model: "m", Purpose: "p", CostMicroUSD: -1}); err == nil {
+		t.Error("負の金額を受け付けた")
+	}
+	// 1日の回数は原子的に増え、日が変われば別に数える。種別（reply/opus）は別
+	for want := 1; want <= 3; want++ {
+		if got, err := s.IncDaily(ctx, now, 7, "reply"); err != nil || got != want {
+			t.Errorf("%d回目: %d %v", want, got, err)
+		}
+	}
+	if got, _ := s.IncDaily(ctx, now, 7, "opus"); got != 1 {
+		t.Errorf("opus: %d", got)
+	}
+	if got, _ := s.IncDaily(ctx, now.AddDate(0, 0, 1), 7, "reply"); got != 1 {
+		t.Errorf("翌日: %d", got)
+	}
+	if _, err := s.IncDaily(ctx, now, 7, "bad"); err == nil {
+		t.Error("不正な種別を受け付けた")
+	}
+	// 並行して増やしても数え落とさない
+	done := make(chan struct{})
+	for i := 0; i < 10; i++ {
+		go func() { _, _ = s.IncDaily(ctx, now, 99, "reply"); done <- struct{}{} }()
+	}
+	for i := 0; i < 10; i++ {
+		<-done
+	}
+	if got, _ := s.IncDaily(ctx, now, 99, "reply"); got != 11 {
+		t.Errorf("並行: %d", got)
+	}
+}

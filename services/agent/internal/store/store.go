@@ -184,3 +184,39 @@ func (s *Store) ImportSummary(ctx context.Context) (channels, done int, imported
 	err = s.pool.QueryRow(ctx, `SELECT count(*), count(*) FILTER (WHERE done), coalesce(sum(imported),0) FROM import_progress`).Scan(&channels, &done, &imported)
 	return
 }
+
+// ---- API使用量（予算） ----
+
+type UsageRecord struct {
+	Model        string
+	Purpose      string
+	Input        int64
+	Output       int64
+	CacheRead    int64
+	CacheWrite   int64
+	CostMicroUSD int64
+	ChannelID    *int64
+	UserID       *int64
+}
+
+// RecordUsage はAPI呼び出し1回の使用量を記録する（本文は入れない）。
+func (s *Store) RecordUsage(ctx context.Context, u UsageRecord) error {
+	_, err := s.pool.Exec(ctx, `INSERT INTO api_usage (model, purpose, input_tokens, output_tokens, cache_read, cache_write, cost_micro_usd, channel_id, user_id)
+	  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, u.Model, u.Purpose, u.Input, u.Output, u.CacheRead, u.CacheWrite, u.CostMicroUSD, u.ChannelID, u.UserID)
+	return err
+}
+
+// SpentMicroSince は from 以降の使用額（マイクロドル）。
+func (s *Store) SpentMicroSince(ctx context.Context, from time.Time) (int64, error) {
+	var n int64
+	err := s.pool.QueryRow(ctx, `SELECT coalesce(sum(cost_micro_usd), 0) FROM api_usage WHERE ts >= $1`, from).Scan(&n)
+	return n, err
+}
+
+// IncDaily は一人あたりの1日の回数を1増やし、増やした後の回数を返す（原子的）。kind は reply|opus。
+func (s *Store) IncDaily(ctx context.Context, day time.Time, userID int64, kind string) (int, error) {
+	var n int
+	err := s.pool.QueryRow(ctx, `INSERT INTO daily_calls (day, discord_user_id, kind, n) VALUES ($1::date, $2, $3, 1)
+	  ON CONFLICT (day, discord_user_id, kind) DO UPDATE SET n = daily_calls.n + 1 RETURNING n`, day, userID, kind).Scan(&n)
+	return n, err
+}
