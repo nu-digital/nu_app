@@ -20,6 +20,9 @@ HOST_LABEL="${HOST_LABEL:-nu_app}"
 NOTIFY_URL="${BACKUP_NOTIFY_WEBHOOK_URL:-}"
 DEPLOYED_TAG="${DEPLOYED_TAG:-}"
 
+# compose.prod.yamlはNU_TAG（動いている版）が必須。systemdのタイマーから呼ばれるときは未設定なので、デプロイが記録した値を使う
+if [ -z "${NU_TAG:-}" ]; then NU_TAG="$(cat "${STATE_DIR:-/srv/nu_app/state}/current_tag" 2>/dev/null || echo unknown)"; fi
+export NU_TAG
 compose() { docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" --env-file "$COMPOSE_ENV_FILE" "$@"; }
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >&2; }
 
