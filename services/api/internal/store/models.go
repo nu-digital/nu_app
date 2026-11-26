@@ -88,6 +88,14 @@ type AgentState struct {
 	UpdatedAt pgtype.Timestamptz
 }
 
+type AgentSummary struct {
+	ChannelID int64
+	Day       pgtype.Date
+	Content   string
+	MsgCount  int32
+	CreatedAt pgtype.Timestamptz
+}
+
 type AuditLog struct {
 	ID          pgtype.UUID
 	ActorUserID pgtype.UUID

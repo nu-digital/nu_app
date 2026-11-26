@@ -143,15 +143,38 @@ func (s *Store) DeleteMessages(ctx context.Context, ids ...int64) (int64, error)
 		return 0, err
 	}
 	defer tx.Rollback(ctx)
-	tag, err := tx.Exec(ctx, `DELETE FROM messages WHERE message_id = ANY($1)`, ids)
+	rows, err := tx.Query(ctx, `DELETE FROM messages WHERE message_id = ANY($1) RETURNING channel_id, (created_at AT TIME ZONE 'Asia/Tokyo')::date`, ids)
 	if err != nil {
 		return 0, err
 	}
+	type key struct {
+		ch  int64
+		day time.Time
+	}
+	var keys []key
+	for rows.Next() {
+		var k key
+		if err := rows.Scan(&k.ch, &k.day); err != nil {
+			return 0, err
+		}
+		keys = append(keys, k)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	// 消されたメッセージを含む日の要約も消す（残った内容で作り直される）
+	for _, k := range keys {
+		if _, err := tx.Exec(ctx, `DELETE FROM summaries WHERE channel_id = $1 AND day = $2`, k.ch, k.day); err != nil {
+			return 0, err
+		}
+	}
+	n := int64(len(keys))
 	// 元のメッセージが消されたら、それを元にしたノートも消す（削除の連動）
 	if _, err := tx.Exec(ctx, `DELETE FROM notes WHERE source_message_id = ANY($1)`, ids); err != nil {
 		return 0, err
 	}
-	return tag.RowsAffected(), tx.Commit(ctx)
+	return n, tx.Commit(ctx)
 }
 
 // CountMessages は記録の件数（チャンネルを指定しなければ全体）。

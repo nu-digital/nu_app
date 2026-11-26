@@ -230,6 +230,7 @@ func (b *Brain) now() time.Time {
 
 func tools() []llm.Tool {
 	return []llm.Tool{{Name: searchLogName, Description: "サーバーの過去のメッセージ（ログ）を語で探す。DMは対象外。", Schema: searchLogSchema},
+		{Name: digestName, Description: "チャンネルごとの日次要約を読む（最近の動き・昔の出来事）。DMは含まれない。", Schema: digestSchema},
 		{Name: rememberName, Description: "覚えておくことをノートに書く（個人情報は書けない）。", Schema: rememberSchema},
 		{Name: recallName, Description: "ノートから思い出す。", Schema: recallSchema},
 		{Name: forgetName, Description: "いま話している本人についてのノートを1件消す。", Schema: forgetSchema},

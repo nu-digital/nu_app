@@ -331,3 +331,9 @@ sudo bash -c 'set -a; . /srv/nu_app/.env; set +a
 - Discordでメッセージが消されると、そのメッセージを元にしたノートも消える。
 - DMで作ったノートはprivate（その人とのDMでだけ使う）。ログ検索にDMは含まれない。
 
+### 16.7 日次要約（P2-2）
+- 有効化すると、15分ごとにBatch API（Haiku・半額）へ要約を依頼する。初回は過去ログ全体を見積もり、**$3を超える見込みなら直近1年から**。進み具合: `... psql -c "select count(*), min(day), max(day) from agent.summaries"`。進行中のバッチ: `select value from agent.settings where key = 'summary.pending'`。
+- 予算が70%を超えると、新しいバッチは送らない（進行中のものは完了を待って保存する）。Consoleの使用量では用途がBatchとして出る。
+- 要約を作り直したいとき: `delete from agent.summaries where day = '2026-11-20'`（次の15分で候補に戻る）。範囲を変えるとき: `delete from agent.settings where key = 'summary.since'`（再見積もり）。
+- バッチが止まったように見えるとき: `settings.summary.pending`のidをConsoleのBatchesで確認。48時間たっても終わらないものは自動で破棄して次へ進む。
+

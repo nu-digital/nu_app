@@ -373,3 +373,75 @@ func mustNotes(n []store.Note, err error) []store.Note {
 	}
 	return n
 }
+
+func TestSummariesCandidatesSaveAndDeletionLink(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+	jst := time.FixedZone("JST", 9*3600)
+	d1 := time.Date(2026, 11, 20, 23, 30, 0, 0, jst) // JSTの20日（UTCでも20日）
+	d2 := time.Date(2026, 11, 21, 0, 30, 0, 0, jst)  // JSTの21日（UTCでは20日15:30）
+	var id int64
+	add := func(ch int64, at time.Time, kind string, bot bool) int64 {
+		id++
+		m := store.Message{ID: id, ChannelID: ch, Kind: kind, AuthorID: 7, AuthorName: "太郎", Content: "発言", CreatedAt: at, IsBot: bot}
+		if err := s.UpsertMessage(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	var firstOfDay1 int64
+	for i := 0; i < 5; i++ {
+		x := add(1, d1.Add(time.Duration(i)*time.Minute), "guild", false)
+		if i == 0 {
+			firstOfDay1 = x
+		}
+	}
+	for i := 0; i < 5; i++ {
+		add(1, d2.Add(time.Duration(i)*time.Minute), "guild", false) // 翌日（JST）
+	}
+	for i := 0; i < 9; i++ {
+		add(2, d1, "dm", false)   // DMは対象外
+		add(3, d1, "guild", true) // Botは対象外
+	}
+	before := time.Date(2026, 11, 22, 0, 0, 0, 0, time.UTC)
+	gs, err := s.SummaryCandidates(ctx, before, nil, 5, 100)
+	if err != nil || len(gs) != 2 {
+		t.Fatalf("JSTで日付が分かれ、DM・Botは除く: %+v %v", gs, err)
+	}
+	if !gs[0].Day.Equal(time.Date(2026, 11, 21, 0, 0, 0, 0, time.UTC)) || gs[0].Count != 5 {
+		t.Errorf("新しい日から: %+v", gs)
+	}
+	if gs2, _ := s.SummaryCandidates(ctx, time.Date(2026, 11, 21, 0, 0, 0, 0, time.UTC), nil, 5, 100); len(gs2) != 1 {
+		t.Error("before（含まない）")
+	}
+	since := time.Date(2026, 11, 21, 0, 0, 0, 0, time.UTC)
+	if gs3, _ := s.SummaryCandidates(ctx, before, &since, 5, 100); len(gs3) != 1 {
+		t.Error("since")
+	}
+	if gs4, _ := s.SummaryCandidates(ctx, before, nil, 6, 100); len(gs4) != 0 {
+		t.Error("最小件数")
+	}
+	msgs, _ := s.DayMessages(ctx, 1, gs[1].Day, 100)
+	if len(msgs) != 5 {
+		t.Errorf("その日の発言: %d", len(msgs))
+	}
+	if err := s.SaveSummary(ctx, store.Summary{ChannelID: 1, Day: gs[1].Day, Content: "- ハッカソンの話", MsgCount: 5}); err != nil {
+		t.Fatal(err)
+	}
+	if gs5, _ := s.SummaryCandidates(ctx, before, nil, 5, 100); len(gs5) != 1 {
+		t.Error("要約済みは候補から外れる")
+	}
+	if got, _ := s.SearchSummaries(ctx, "ハッカソン", 5); len(got) != 1 {
+		t.Error("要約の検索")
+	}
+	if got, _ := s.SearchSummaries(ctx, "", 5); len(got) != 1 {
+		t.Error("空なら最近のもの")
+	}
+	// メッセージが消されたら、その日の要約も消えて、また候補になる
+	if _, err := s.DeleteMessages(ctx, firstOfDay1); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.SearchSummaries(ctx, "", 5); len(got) != 0 {
+		t.Error("消されたメッセージの日の要約が残った")
+	}
+}
