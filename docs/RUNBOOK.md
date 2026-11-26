@@ -160,7 +160,7 @@ sudo env POSTGRES_IMAGE='postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc44
 隔離した一時コンテナ・一時ディレクトリに復元して、チェックサム・スキーマ・行数・メディアのファイル数・DBの行とファイルの整合（`nuctl media-verify`）を確認する。本番には触れない。`OK:`と出れば成功。
 
 ### 9.4 実際の復旧（障害時・手動）
-1. 影響を考え、`web`・`admin`・`api`・`bot`を止める（`compose stop web admin api bot`）。2. 復旧する世代を決める（`ls /srv/nu_app/backups`）。3. DB: 空のDBを用意し`pg_restore --no-owner --clean --if-exists -d <db> db.dump`（`compose exec -T db pg_restore ...`）。4. メディア: `tar -xzf media.tar.gz -C /srv/nu_app/media`（所有者を`65532:65532`に）。5. `nuctl media-verify`で整合確認。6. 起動して`/healthz`・`/readyz`・サイトを確認。7. 事後: 失った期間の更新を関係者に伝える。**VPSごと失った場合**: 新しいVPSを§2・§5・§6の手順で構築し、(VPS外にバックアップが無いため)復旧できない。この場合に備えるなら、運用責任者がVPS外のバックアップ（別の場所へ`backups/`を定期コピー）を追加で決める（現在は未対応）。
+1. 影響を考え、`web`・`admin`・`api`・`bot`を止める（`compose stop web admin api bot`）。2. 復旧する世代を決める（`ls /srv/nu_app/backups`）。3. DB: 空のDBを用意し、**先にロールを作る**（`infrastructure/backup/roles.sql`を`psql`で実行。ダンプにはロールが含まれず、無いと`pg_restore`のGRANTが失敗する）→ `pg_restore --no-owner --clean --if-exists -d <db> db.dump`（`compose exec -T db pg_restore ...`）。復旧後、`nu_agent`のパスワードは§16.2で再設定する。4. メディア: `tar -xzf media.tar.gz -C /srv/nu_app/media`（所有者を`65532:65532`に）。5. `nuctl media-verify`で整合確認。6. 起動して`/healthz`・`/readyz`・サイトを確認。7. 事後: 失った期間の更新を関係者に伝える。**VPSごと失った場合**: 新しいVPSを§2・§5・§6の手順で構築し、(VPS外にバックアップが無いため)復旧できない。この場合に備えるなら、運用責任者がVPS外のバックアップ（別の場所へ`backups/`を定期コピー）を追加で決める（現在は未対応）。
 
 ## 10. 定期・随時の更新作業
 

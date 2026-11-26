@@ -101,8 +101,8 @@ CREATE TABLE agent.reactions_daily (
 GRANT USAGE ON SCHEMA agent TO nu_agent;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA agent TO nu_agent;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA agent TO nu_agent;
-ALTER DEFAULT PRIVILEGES IN SCHEMA agent GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO nu_agent;
-ALTER DEFAULT PRIVILEGES IN SCHEMA agent GRANT USAGE, SELECT ON SEQUENCES TO nu_agent;
+-- 注意: ALTER DEFAULT PRIVILEGES は使わない（ダンプに「FOR ROLE <所有者>」が出て、別のDBへの復元で所有者のロールが無いと失敗する）。
+-- agentスキーマにテーブルを足すmigrationは、そのテーブルへのGRANT（nu_agent）を自分で書くこと。
 ALTER ROLE nu_agent SET search_path = agent;
 
 -- +goose Down
