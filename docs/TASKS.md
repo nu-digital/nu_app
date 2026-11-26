@@ -97,6 +97,28 @@
 - [x] 移行前後の公式サイト表示・リンク・画像を検証。（compose smokeで、実際の移行結果と実際のAPIから描画したサイトを、移設前基準と毎回比較 #105）
 - [x] 管理者向け運用手順: ユーザー発行、Owner引継ぎ、DB復元、デプロイ復旧。（OPERATIONS.mdの「管理者向け運用手順」）
 
+## ぬる: AIメンバー（Discord。別系統。仕様 [nul-agent.md](design/nul-agent.md)・決定 [D15](DECISIONS.md)）
+
+nu_appの本体（P0〜P4）とは別の系統。段階はぬるのP1〜P5（仕様§14）。**本番へのデプロイ・Claude APIキー・Discordのtokenの配置は、運用責任者の確認とVPSのsecretへの配置が必要**。テスト・CIでは実際のClaude API・Discordを呼ばない（偽のクライアント）。
+
+### ぬる P1: ぬる誕生
+- [ ] `services/agent`（Go・discordgo・anthropic-sdk-go）の骨組み・Dockerfile・Compose（内部ネットワークのみ・メモリ256MB）・デプロイ・切り戻し。secret（`NUL_DISCORD_TOKEN`・`ANTHROPIC_API_KEY`）の置き方をRUNBOOKへ。
+- [ ] `agent`スキーマのmigration（ぬるの状態・予算の記録・メッセージ記録・取り込みの進捗・設定）。
+- [ ] Discordの受信（Guilds・GuildMessages・MessageContent・GuildMembers・DM・リアクション）とメッセージ記録（編集・削除の反映）。過去ログの取り込み（ゆっくり・再開可能・メッセージ数の見積もり）。
+- [ ] 応答: メンション・DMへの返信、timesでの自由発言（自発はtimesだけ。コードで制限）、リアクション（1日の上限・Adminがオフ）。
+- [ ] キャラ設定（固定・プロンプトキャッシュ）と気分（機嫌・テンション・ハマり・親密度。会話途中のシステムメッセージ）。
+- [ ] モデルの切り替え（Sonnet→`think_hard`→Opus。「本気出して」は必ずOpus）、refusalのフォールバック、forced tool_choiceを使わない。
+- [ ] 画像の読み取り（縮小してから送る）。
+- [ ] 予算管理（呼び出しごとの記録・70%/90%/100%の段階・一人あたりの1日の上限・クレジット切れで静かに寝る）。
+- [ ] 緊急停止（`/nul stop`・`quiet`・`resume`。Adminロール）。
+- [ ] 安全: Discord操作は許可リスト、メッセージ中の指示に従わない、ログにメッセージ本文・秘密を出さない。偽のDiscord・偽のClaudeでの自動テスト。
+
+### ぬる P2〜P5
+- [ ] P2 記憶: ログ検索・日次要約（Haiku・Batch）・ノート・関係・「忘れて」・週報/月報・削除の連動。
+- [ ] P3 調べもの: Web検索・GitHub読み取り・研究日誌・気まぐれ投稿のネタ。
+- [ ] P4 nu_app連携: NUL-1（サービストークン・紐づけ・本人の権限・確認の強制）→読み取り→確認付き書き込み→写真の保存・通知の受信。
+- [ ] P5 遊び: リマインダー・思い出アルバム（容量の上限を、VPSのdf・バックアップ容量から決める）・nu_appのイベントへの反応。
+
 ## 完成判定の共通DoD
 
 - [ ] 定義されたAPI・DB migrations・権限テストが実装されている。

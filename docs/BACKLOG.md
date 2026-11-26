@@ -27,6 +27,11 @@
 | P3-04 | 再実行可能な記事/画像移行、公開サイトAPI接続、全URL/表示比較（設計: `docs/design/p3-web.md`・Opusレビュー反映済み。段階: P3-04-0 基準の固定 #91 完了→a 移行CLI #95（a-2 投稿者の管理API #97・a-3 確認画面 #99）→b 公式サイトの動的配信 #101/#105→c 基準との比較の常時実行（compose smoke）#105。完了。**残り: 本番へのimport-legacy実行（契約後・確認の上で）**） | P3-03 |
 | P4-01 | Actions経由のUbuntuデプロイ、Nginx/TLS自動更新と失敗検知/secret/healthcheck/失敗通知/切り戻し（a: 本番Compose・Nginx・TLS確認 #113 完了、b: デプロイ・切り戻し（既定で無効） #115 完了。**残り（VPS契約後）: セットアップ・実ドメインのTLS・secret・承認者の設定・`DEPLOY_ENABLED`・初回デプロイ**） | P1基盤、VPS契約後の実情報 |
 | P4-02 | DB+画像のVPS内バックアップ(毎日03:00 JST・7世代)/復元検証、4GB実測、運用手順、公開前総合検証（バックアップ・復元検証・自動テスト・手順 #111 完了。**残り（VPS契約後）: 4GB実測・実環境での復元検証・公開前総合検証**） | 対象Phase完成 |
+| NUL-P1 | **ぬる誕生**（仕様[nul-agent.md](design/nul-agent.md) §14。計画: [nul-agent-p1.md](design/nul-agent-p1.md)）: `services/agent`（Go・discordgo・anthropic-sdk-go）の新設、timesでの自由発言、メンション・DMへの応答、キャラと気分、Sonnet/Opusの切り替え、画像の読み取り、予算管理、緊急停止、ログの記録（過去ログの取り込みを含む）。Compose・デプロイ・切り戻しに乗せる。`agent`スキーマ（migration） | D15、運用責任者の計画確認、Claude APIキー（デプロイ直前に運用責任者が発行） |
+| NUL-P2 | **記憶**: ログ検索（pg_bigm/pg_trgm）、日次要約（Haiku・Batch API）、ノート（remember/recall/forget）、関係、「忘れて」、週報・月報、削除の連動（D08・Discordの削除） | NUL-P1 |
+| NUL-P3 | **調べもの**: Web検索、GitHubの読み取り（GitHub App・ポーリング）、研究日誌、気まぐれ投稿のネタ | NUL-P2 |
+| NUL-P4 | **nu_appとの連携**: Bot用認証（DECISIONS NUL-1: サービストークン・アカウント紐づけ・本人の権限での代理実行・確認の強制）、読み取り→確認付きの書き込み、写真の保存、nu_appの通知の受信 | NUL-P1、NUL-1の設計の確認 |
+| NUL-P5 | **遊び**: リマインダー、思い出アルバム（容量の上限を決めてから）、nu_appのイベントへの反応 | NUL-P4、アルバム容量（VPSのdf・バックアップ容量） |
 
 P4は最後まで放置せず各Phaseで逐次実装する。本番公開は運用準備と公開対象機能の受け入れが揃ってから。大きすぎるIssueはさらに分割し、機能途中でもmainを壊さない単位にする。
 
