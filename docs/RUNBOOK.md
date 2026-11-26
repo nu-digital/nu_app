@@ -160,7 +160,7 @@ sudo env POSTGRES_IMAGE='postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc44
 隔離した一時コンテナ・一時ディレクトリに復元して、チェックサム・スキーマ・行数・メディアのファイル数・DBの行とファイルの整合（`nuctl media-verify`）を確認する。本番には触れない。`OK:`と出れば成功。
 
 ### 9.4 実際の復旧（障害時・手動）
-1. 影響を考え、`web`・`admin`・`api`・`bot`を止める（`compose stop web admin api bot`）。2. 復旧する世代を決める（`ls /srv/nu_app/backups`）。3. DB: 空のDBを用意し`pg_restore --no-owner --clean --if-exists -d <db> db.dump`（`compose exec -T db pg_restore ...`）。4. メディア: `tar -xzf media.tar.gz -C /srv/nu_app/media`（所有者を`65532:65532`に）。5. `nuctl media-verify`で整合確認。6. 起動して`/healthz`・`/readyz`・サイトを確認。7. 事後: 失った期間の更新を関係者に伝える。**VPSごと失った場合**: 新しいVPSを§2・§5・§6の手順で構築し、(VPS外にバックアップが無いため)復旧できない。この場合に備えるなら、運用責任者がVPS外のバックアップ（別の場所へ`backups/`を定期コピー）を追加で決める（現在は未対応）。
+1. 影響を考え、`web`・`admin`・`api`・`bot`を止める（`compose stop web admin api bot`）。2. 復旧する世代を決める（`ls /srv/nu_app/backups`）。3. DB: 空のDBを用意し、**先にロールを作る**（`infrastructure/backup/roles.sql`を`psql`で実行。ダンプにはロールが含まれず、無いと`pg_restore`のGRANTが失敗する）→ `pg_restore --no-owner --clean --if-exists -d <db> db.dump`（`compose exec -T db pg_restore ...`）。復旧後、`nu_agent`のパスワードは§16.2で再設定する。4. メディア: `tar -xzf media.tar.gz -C /srv/nu_app/media`（所有者を`65532:65532`に）。5. `nuctl media-verify`で整合確認。6. 起動して`/healthz`・`/readyz`・サイトを確認。7. 事後: 失った期間の更新を関係者に伝える。**VPSごと失った場合**: 新しいVPSを§2・§5・§6の手順で構築し、(VPS外にバックアップが無いため)復旧できない。この場合に備えるなら、運用責任者がVPS外のバックアップ（別の場所へ`backups/`を定期コピー）を追加で決める（現在は未対応）。
 
 ## 10. 定期・随時の更新作業
 
@@ -278,3 +278,34 @@ sudo env POSTGRES_IMAGE='postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc44
 | （未実施） | 投稿者名の公開許可の確認と記録、Discord Botのtoken設定、VPS外バックアップの検討、無料お試し期間の終了前の本契約への移行 |
 
 **一時設定**: なし（構築中に付けた`ubuntu`のNOPASSWD:ALLは2026-11-26に解除済み。確認: `sudo -l`でパスワードを求められる）。
+
+## 16. ぬる（AIメンバー。Discord）の運用
+
+仕様: [nul-agent.md](design/nul-agent.md)・決定: [DECISIONS D15](DECISIONS.md)・計画: [nul-agent-p1.md](design/nul-agent-p1.md)。`services/agent`（コンテナ`nu_app-agent-1`）。**設定（秘密・ID）が揃うまでは「無効モード」**（Discordに接続せず、Claude APIも呼ばない。healthzだけ応答）。secretを置く前にデプロイしても、他のサービスには影響しない。
+
+### 16.1 必要な設定（`/srv/nu_app/.env`。root・600。**運用責任者が自分で書く。チャット・Gitに出さない**）
+| キー | 内容 | 秘密 |
+|---|---|---|
+| `NUL_DISCORD_TOKEN` | Discord Developer Portalで発行したBotのtoken（Reset Tokenで一度だけ表示。パスワードマネージャーに保存） | **秘密** |
+| `NUL_ANTHROPIC_API_KEY` | Claude APIキー（ワークスペース限定・有効期限は長め。Consoleで使用上限$60・支払い方法は登録しない・auto-reloadを使わない） | **秘密** |
+| `NUL_DB_PASSWORD` | DBロール`nu_agent`のパスワード（英数字のみ・32文字以上のランダム値。下の手順で同じ値をDBにも設定） | **秘密** |
+| `NUL_GUILD_ID`・`NUL_TIMES_CHANNEL_ID`・`NUL_ADMIN_ROLE_ID` | DiscordのサーバーID・ぬるのtimesのチャンネルID・`/nul`を使えるAdminロールのID（Discordの開発者モードでIDをコピー） | 秘密ではない |
+
+### 16.2 DBロール`nu_agent`の有効化（初回の1回。パスワードを画面・履歴に出さない）
+migration（00013）は、`agent`スキーマと専用ロール`nu_agent`（**NOLOGIN**。`agent`スキーマだけを使え、nu_app本体のテーブルは読めない）を作る。パスワードを設定してログインを許可する:
+```
+sudo bash -c 'set -a; . /srv/nu_app/.env; set +a
+  T=$(cat /srv/nu_app/state/current_tag)
+  printf "ALTER ROLE nu_agent LOGIN PASSWORD :'"'"'pw'"'"';\n" | env NU_TAG=$T docker compose -p nu_app -f /srv/nu_app/infrastructure/compose.prod.yaml --env-file /srv/nu_app/.env exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -v pw="$NUL_DB_PASSWORD"'
+```
+（`NUL_DB_PASSWORD`を`.env`へ先に書いてから実行。パスワードを変えるときも同じ手順。）設定後、`docker compose ... up -d agent`で再起動すると、設定が揃っていれば有効モードになる。
+
+### 16.3 止め方（緊急時）
+1. Discordで`/nul stop`（Adminロール。全停止）／`/nul quiet`（timesだけ黙る）／`/nul resume`。
+2. 効かない・Discordに入れないとき: `sudo docker stop nu_app-agent-1`（他のサービスに影響しない。再開は`sudo env NU_TAG=$(sudo cat /srv/nu_app/state/current_tag) docker compose -p nu_app -f /srv/nu_app/infrastructure/compose.prod.yaml --env-file /srv/nu_app/.env up -d agent`）。ずっと止めるなら`.env`から`NUL_DISCORD_TOKEN`を消して`up -d agent`（無効モードになる）。
+3. **tokenの漏えいの疑い**: すぐにDiscord Developer PortalでReset Token → `.env`を更新 → 再起動。APIキーはConsoleで失効 → 作り直し → `.env`を更新。
+
+### 16.4 運用上の注意
+- 費用: ぬるの実行時のClaude API（Teamプラン付属のAPIクレジット$60/月）だけ。**Consoleに支払い方法を登録しない・auto-reloadを使わない**（クレジットが尽きたら止まるだけにする）。上限はコードで守る（70%/90%/100%の段階。計画書§6）。APIキーの有効期限（ぬるが14日前から催促）。
+- ログ: アプリのログにメッセージ本文を出さない。DB（`agent.messages`）にはメッセージを保存する（バックアップに含まれる）。`agent`スキーマの増え方（`agent.messages`の件数・サイズ）は月次確認に含める: `docker compose ... exec db psql ... -c "select pg_size_pretty(sum(pg_total_relation_size(c.oid))) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='agent'"`。
+- 無効モードの確認: `sudo docker logs nu_app-agent-1 | head`に「無効モードで起動します」と、足りない設定の**名前**（値は出ない）が出る。

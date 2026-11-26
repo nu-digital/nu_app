@@ -8,6 +8,76 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AgentApiUsage struct {
+	ID           int64
+	Ts           pgtype.Timestamptz
+	Model        string
+	Purpose      string
+	InputTokens  int32
+	OutputTokens int32
+	CacheRead    int32
+	CacheWrite   int32
+	CostMicroUsd int64
+	ChannelID    pgtype.Int8
+	UserID       pgtype.Int8
+}
+
+type AgentDailyCall struct {
+	Day           pgtype.Date
+	DiscordUserID int64
+	Kind          string
+	N             int32
+}
+
+type AgentImportProgress struct {
+	ChannelID       int64
+	OldestMessageID pgtype.Int8
+	Done            bool
+	Counted         pgtype.Int8
+	Imported        int64
+	UpdatedAt       pgtype.Timestamptz
+}
+
+type AgentMessage struct {
+	MessageID   int64
+	ChannelID   int64
+	ThreadID    pgtype.Int8
+	Kind        string
+	AuthorID    int64
+	AuthorName  string
+	IsBot       bool
+	Content     string
+	Attachments []byte
+	CreatedAt   pgtype.Timestamptz
+	EditedAt    pgtype.Timestamptz
+}
+
+type AgentReactionsDaily struct {
+	Day pgtype.Date
+	N   int32
+}
+
+type AgentRelationship struct {
+	DiscordUserID int64
+	Closeness     int32
+	Nickname      string
+	LastSeen      pgtype.Timestamptz
+}
+
+type AgentSetting struct {
+	Key       string
+	Value     []byte
+	UpdatedAt pgtype.Timestamptz
+}
+
+type AgentState struct {
+	ID        bool
+	Mood      int16
+	Energy    int16
+	Hobby     string
+	UpdatedAt pgtype.Timestamptz
+}
+
 type AuditLog struct {
 	ID          pgtype.UUID
 	ActorUserID pgtype.UUID

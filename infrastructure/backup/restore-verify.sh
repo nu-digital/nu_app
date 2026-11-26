@@ -38,6 +38,8 @@ for _ in $(seq 1 90); do
 done
 docker exec "$pg" pg_isready -U restore -d restore >/dev/null 2>&1 || fail "一時のPostgreSQLが起動しません"
 
+log "ロールを用意（ダンプにはロールが含まれない）"
+docker exec -i "$pg" psql -U restore -d restore -v ON_ERROR_STOP=1 < "$(dirname "$0")/roles.sql" >/dev/null || fail "ロールを作れませんでした"
 log "DBを復元"
 docker exec -i "$pg" pg_restore -U restore -d restore --no-owner --exit-on-error < "$gen/db.dump" || fail "pg_restoreに失敗しました"
 q() { docker exec "$pg" psql -U restore -d restore -Atc "$1"; }

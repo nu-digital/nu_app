@@ -70,6 +70,26 @@ services:
       migrate: { condition: service_completed_successfully }
     mem_limit: ${BOT_MEM_LIMIT:-128m}
 
+  # AIメンバー「ぬる」（Discord）。docs/design/nul-agent.md。秘密（NUL_DISCORD_TOKEN・ANTHROPIC_API_KEY・NUL_DB_PASSWORD）と
+  # ID類（NUL_GUILD_ID・NUL_TIMES_CHANNEL_ID・NUL_ADMIN_ROLE_ID）が.envに揃うまでは「無効モード」（Discordに接続せずAPIも呼ばない）。
+  agent:
+    image: ${NU_REGISTRY:-ghcr.io/nu-digital}/nu_app-agent:${NU_TAG:?}
+    <<: *hardened
+    read_only: true
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    environment:
+      NUL_DISCORD_TOKEN: ${NUL_DISCORD_TOKEN:-}
+      ANTHROPIC_API_KEY: ${NUL_ANTHROPIC_API_KEY:-}
+      NUL_DB_HOST: db:5432
+      NUL_DB_NAME: ${POSTGRES_DB:?}
+      NUL_DB_USER: nu_agent
+      NUL_DB_PASSWORD: ${NUL_DB_PASSWORD:-}
+      NUL_GUILD_ID: ${NUL_GUILD_ID:-}
+      NUL_TIMES_CHANNEL_ID: ${NUL_TIMES_CHANNEL_ID:-}
+      NUL_ADMIN_ROLE_ID: ${NUL_ADMIN_ROLE_ID:-}
+    mem_limit: ${AGENT_MEM_LIMIT:-256m}
+
   web:
     image: ${NU_REGISTRY:-ghcr.io/nu-digital}/nu_app-web:${NU_TAG:?}
     <<: *hardened

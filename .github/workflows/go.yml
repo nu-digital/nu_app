@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [services/api, services/bot]
+        module: [services/api, services/bot, services/agent]
     defaults:
       run:
         working-directory: ${{ matrix.module }}
@@ -50,6 +50,7 @@ jobs:
           persist-credentials: false
       - run: docker build -t nu_app-api:ci services/api
       - run: docker build -t nu_app-bot:ci services/bot
+      - run: docker build -t nu_app-agent:ci services/agent
       - run: docker build -t nu_app-migrate:ci db
 
   sqlc:
