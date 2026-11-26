@@ -22,6 +22,8 @@ type Gateway struct {
 	log       *slog.Logger
 	connected atomic.Bool
 	lastUp    atomic.Int64 // 最後に接続していた時刻（unix秒）
+	// OnIncoming は、記録したメッセージを応答担当へ渡す（Open の前に設定する。nilなら応答しない）。
+	OnIncoming func(ctx context.Context, in Incoming)
 }
 
 // NewGateway は接続の準備をする（まだ接続しない）。token は秘密（ログに出さない）。
@@ -52,6 +54,14 @@ func (g *Gateway) Open() error {
 		return errors.New("Discordに接続できません（tokenとIntentsの設定を確認してください）")
 	}
 	return nil
+}
+
+// BotUserID はぬる自身のユーザーID（接続後）。
+func (g *Gateway) BotUserID() int64 {
+	if g.s.State != nil && g.s.State.User != nil {
+		return atoi(g.s.State.User.ID)
+	}
+	return 0
 }
 
 func (g *Gateway) Close() { _ = g.s.Close() }
@@ -93,9 +103,33 @@ func (g *Gateway) onReady(s *discordgo.Session, r *discordgo.Ready) {
 // ---- メッセージの記録 ----
 
 func (g *Gateway) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if msg, ok := g.convert(m.Message); ok {
-		g.rec.OnCreate(context.Background(), msg)
+	msg, ok := g.convert(m.Message)
+	if !ok {
+		return
 	}
+	g.rec.OnCreate(context.Background(), msg)
+	if g.OnIncoming == nil {
+		return
+	}
+	me := ""
+	if s.State != nil && s.State.User != nil {
+		me = s.State.User.ID
+	}
+	in := Incoming{Msg: msg, IsBotAuthored: m.Author.Bot}
+	for _, u := range m.Mentions {
+		if u.ID == me {
+			in.MentionsBot = true
+		}
+	}
+	if m.ReferencedMessage != nil && m.ReferencedMessage.Author != nil && m.ReferencedMessage.Author.ID == me {
+		in.RepliesToBot = true
+	}
+	// 応答は時間がかかる。受信のgoroutineを塞がない（失敗・停止はresponder側で扱う）
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		defer cancel()
+		g.OnIncoming(ctx, in)
+	}()
 }
 
 func (g *Gateway) onMessageUpdate(s *discordgo.Session, m *discordgo.MessageUpdate) {
@@ -162,7 +196,7 @@ func ConvertMessage(m *discordgo.Message, parent, thread string) Msg {
 		out.EditedAt = &e
 	}
 	for _, a := range m.Attachments {
-		out.Attachments = append(out.Attachments, Attachment{ID: a.ID, Filename: a.Filename, ContentType: a.ContentType, Size: a.Size})
+		out.Attachments = append(out.Attachments, Attachment{ID: a.ID, Filename: a.Filename, ContentType: a.ContentType, Size: a.Size, URL: a.URL})
 	}
 	return out
 }

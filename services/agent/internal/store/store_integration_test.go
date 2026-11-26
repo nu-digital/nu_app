@@ -208,3 +208,37 @@ func TestStateAndCloseness(t *testing.T) {
 		t.Errorf("親密度: %d", n)
 	}
 }
+
+func TestRecentMessagesScopesToTheConversation(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+	th := int64(500)
+	put := func(id, ch int64, thread *int64, kind, content string) {
+		m := store.Message{ID: id, ChannelID: ch, ThreadID: thread, Kind: kind, AuthorID: 1, AuthorName: "a", Content: content, CreatedAt: time.Now()}
+		if err := s.UpsertMessage(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := int64(1); i <= 5; i++ {
+		put(i, 10, nil, "guild", "チャンネル10")
+	}
+	put(6, 10, &th, "guild", "スレッド500")
+	put(7, 20, nil, "guild", "別のチャンネル")
+	put(8, 30, nil, "dm", "DMの内容")
+	got, err := s.RecentMessages(ctx, 10, nil, 0, 3)
+	if err != nil || len(got) != 3 || got[0].ID != 3 || got[2].ID != 5 {
+		t.Fatalf("チャンネル（スレッドを除く）の直近3件・古い順: %+v %v", got, err)
+	}
+	if got, _ := s.RecentMessages(ctx, 10, nil, 4, 10); len(got) != 3 || got[2].ID != 3 {
+		t.Errorf("beforeID: %+v", got)
+	}
+	if got, _ := s.RecentMessages(ctx, 10, &th, 0, 10); len(got) != 1 || got[0].Content != "スレッド500" {
+		t.Errorf("スレッド: %+v", got)
+	}
+	if got, _ := s.RecentMessages(ctx, 30, nil, 0, 10); len(got) != 1 || got[0].Kind != "dm" {
+		t.Errorf("DM: %+v", got)
+	}
+	if got, _ := s.RecentMessages(ctx, 99, nil, 0, 10); len(got) != 0 {
+		t.Errorf("該当なし: %+v", got)
+	}
+}

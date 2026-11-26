@@ -257,3 +257,28 @@ func (s *Store) BumpCloseness(ctx context.Context, userID int64) error {
 	  ON CONFLICT (discord_user_id) DO UPDATE SET closeness = relationships.closeness + 1, last_seen = now()`, userID)
 	return err
 }
+
+// RecentMessages は、そのやりとりの直近のメッセージを古い順に返す（beforeIDより古いもの。0なら最新から）。
+// threadID があればそのスレッド、なければチャンネル（スレッドを除く）。DMは channelID がDMチャンネルなので、そのDMの中だけ（他の場所のメッセージは混ざらない）。
+func (s *Store) RecentMessages(ctx context.Context, channelID int64, threadID *int64, beforeID int64, limit int) ([]Message, error) {
+	q := `SELECT message_id, channel_id, thread_id, kind, author_id, author_name, is_bot, content, created_at FROM messages
+	      WHERE channel_id = $1 AND ((thread_id IS NULL AND $2::bigint IS NULL) OR thread_id = $2) AND ($3 = 0 OR message_id < $3)
+	      ORDER BY message_id DESC LIMIT $4`
+	rows, err := s.pool.Query(ctx, q, channelID, threadID, beforeID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.ChannelID, &m.ThreadID, &m.Kind, &m.AuthorID, &m.AuthorName, &m.IsBot, &m.Content, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 { // 古い順にする
+		out[i], out[j] = out[j], out[i]
+	}
+	return out, rows.Err()
+}
