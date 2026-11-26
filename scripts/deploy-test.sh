@@ -86,6 +86,11 @@ reset; ( exec 9>"$STATE_DIR/.lock"; flock -n 9; deploy "$A"; echo $? > "$tmp/loc
 ! grep -qE "SECRET-TOKEN|webhooks|https://" "$NOTIFY_LOG"; check "通知の本文にWebhookのURL・トークンが含まれない" $?
 ! grep -qE "SECRET-TOKEN" "$tmp/out.log"; check "ログにWebhookのトークンが出ない" $?
 
+# 運用設定ファイル（NU_ENV_FILE）の通知先が使われる
+reset; printf 'DEPLOY_NOTIFY_WEBHOOK_URL=https://discord.example/api/webhooks/FROM-ENV-FILE\n' > "$tmp/ops.env"
+( unset DEPLOY_NOTIFY_WEBHOOK_URL; export NU_ENV_FILE="$tmp/ops.env"; deploy "$C" ); grep -q "デプロイに成功しました" "$NOTIFY_LOG"; check "運用設定ファイルの通知先でも通知できる" $?
+grep -q "FROM-ENV-FILE" "$NOTIFY_LOG"; check "通知は運用設定ファイルのURLへ送られる" $?
+
 # SSH鍵の入口（ssh-entry.sh）: deploy.sh <40桁SHA> 以外は実行できない
 mkdir -p "$tmp/sshbin"; printf '#!/bin/sh\necho "SUDO-CALLED $*"\n' > "$tmp/sshbin/sudo"; chmod +x "$tmp/sshbin/sudo"
 entry() { SSH_ORIGINAL_COMMAND="$1" PATH="$tmp/sshbin:$PATH" "$root/infrastructure/deploy/ssh-entry.sh" 2>&1; }

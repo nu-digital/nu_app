@@ -4,7 +4,7 @@
 
 作成済み: [準備PR #1](https://github.com/nu-digital/nu_app/pull/1)、[P0-01 / Issue #2](https://github.com/nu-digital/nu_app/issues/2)。P0-01は完了（PR #5。調査結果は[legacy-baseline](legacy-baseline/README.md)）。P0-02〜P0-04は完了（PR #10・#14・#16・#18・#20と P0-04。[P0完了報告](handoffs/P0-complete.md)）。P1は進行中: P1-01（#26・#30・#28）はmainにマージ済み。P1-02（認証・招待・再設定・セッション・CSRF・レート制限・停止）は積み重ねDraft PR（#32 → #34 → #36 → #38 → #40 → #42）でレビュー待ち。P1-03（#44 Editor/Adminロール、#46 Owner二段階移譲、#48 緊急復旧CLI）も積み重ねDraft PRで実装済み。P1-04（内部アプリUI）は#50で実装済み（Draft PR）。P1の実装は一通り完了で、運用責任者のレビューと実機確認待ち。P2-01（プロフィール）は積み重ねDraft PR（#54 API → #56 メンバー一覧・個人情報 → #58 画面）で実装済み。次はP2-02（物品登録・貸出・返却）。実装ブランチ例は `chore/2-legacy-baseline`。
 
-**進捗サマリー（2026-11-22。実PR・CIで照合: マージ済みPR #1〜#115、開いているPRはDependabot #3・#4のみ）:** P0〜P3完了（P3-04 移行CLI #95・投稿者の管理 #97/#99・WebP #103・公式サイトの動的配信と基準比較 #105・アバター/物品写真 #107・公開版の本人情報の確認 #109）。P4は、VPS未契約でも作れる範囲を完了（バックアップ・復元検証 #111、本番Compose・Nginx・TLS確認 #113、デプロイ・切り戻し（既定で無効） #115）。**残りは契約・設定・実機検証が必要な項目**: VPS・DNS・secret・`production`環境の承認者・`DEPLOY_ENABLED`、4GBでの実測、実ドメインでのTLS取得、初回デプロイ、実環境での復元検証、本番への`import-legacy --apply`、投稿者名の公開許可の確認、Discordの実送信確認。
+**進捗サマリー（2026-11-22。実PR・CIで照合: マージ済みPR #1〜#115、開いているPRはDependabot #3・#4のみ）:** P0〜P3完了（P3-04 移行CLI #95・投稿者の管理 #97/#99・WebP #103・公式サイトの動的配信と基準比較 #105・アバター/物品写真 #107・公開版の本人情報の確認 #109）。P4は、VPS未契約でも作れる範囲を完了（バックアップ・復元検証 #111、本番Compose・Nginx・TLS確認 #113、デプロイ・切り戻し（既定で無効） #115）。**VPS構築・実機検証・DNS・TLS・GitHub/Discord設定は完了（2026-11-26。[RUNBOOK](RUNBOOK.md)）。残りは運用責任者の確認が必要な項目**: 自動デプロイの有効化（`DEPLOY_ENABLED`）・初回デプロイ・本番への`import-legacy --apply`・投稿者名の公開許可の確認・`NOPASSWD:ALL`の解除。（以下は構築前の記述） VPS・DNS・secret・`production`環境の承認者・`DEPLOY_ENABLED`、4GBでの実測、実ドメインでのTLS取得、初回デプロイ、実環境での復元検証、本番への`import-legacy --apply`、投稿者名の公開許可の確認、Discordの実送信確認。
 
 | ID | 作業と完了条件 | 依存 |
 |---|---|---|

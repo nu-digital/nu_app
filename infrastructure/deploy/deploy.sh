@@ -9,6 +9,10 @@
 #   - 成功通知はヘルスチェックの成功後だけ。通知にsecret・個人情報・tokenは含めない
 set -Eeuo pipefail
 
+# 運用設定（通知のWebhook・バックアップの設定。Git外・権限600）。SSH経由のsudo実行ではsystemdのEnvironmentFileが効かないため、ここで読み込む
+NU_ENV_FILE="${NU_ENV_FILE:-/etc/nu_app/backup.env}"
+if [ -r "$NU_ENV_FILE" ]; then set -a; . "$NU_ENV_FILE"; set +a; fi
+
 APP_DIR="${APP_DIR:-/srv/nu_app}"
 COMPOSE_FILE="${COMPOSE_FILE:-$APP_DIR/infrastructure/compose.prod.yaml}"
 ENV_FILE="${ENV_FILE:-$APP_DIR/.env}"
