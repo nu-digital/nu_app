@@ -248,3 +248,22 @@ func (s *Store) SearchSummaries(ctx context.Context, query string, limit int) ([
 	}
 	return out, rows.Err()
 }
+
+// SummariesBetween は、from（含む）〜to（含まない）の日の要約を、発言が多かった順に返す（週報・月報の材料）。
+func (s *Store) SummariesBetween(ctx context.Context, from, to time.Time, limit int) ([]Summary, error) {
+	rows, err := s.pool.Query(ctx, `SELECT channel_id, day, content, msg_count FROM summaries
+	  WHERE day >= $1::date AND day < $2::date ORDER BY msg_count DESC, day, channel_id LIMIT $3`, from, to, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Summary
+	for rows.Next() {
+		var x Summary
+		if err := rows.Scan(&x.ChannelID, &x.Day, &x.Content, &x.MsgCount); err != nil {
+			return nil, err
+		}
+		out = append(out, x)
+	}
+	return out, rows.Err()
+}

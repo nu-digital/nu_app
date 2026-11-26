@@ -437,6 +437,12 @@ func TestSummariesCandidatesSaveAndDeletionLink(t *testing.T) {
 	if got, _ := s.SearchSummaries(ctx, "", 5); len(got) != 1 {
 		t.Error("空なら最近のもの")
 	}
+	if got, _ := s.SummariesBetween(ctx, since.AddDate(0, 0, -1), since.AddDate(0, 0, 1), 10); len(got) != 1 {
+		t.Errorf("期間（to含まず）: %d", len(got))
+	}
+	if got, _ := s.SummariesBetween(ctx, since, since.AddDate(0, 0, 5), 10); len(got) != 0 {
+		t.Errorf("範囲外: %d", len(got))
+	}
 	// メッセージが消されたら、その日の要約も消えて、また候補になる
 	if _, err := s.DeleteMessages(ctx, firstOfDay1); err != nil {
 		t.Fatal(err)
