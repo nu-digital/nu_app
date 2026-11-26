@@ -4,7 +4,7 @@
 
 - 設計の方針・確定事項（D01〜D14）は [OPERATIONS](OPERATIONS.md)・[DECISIONS](DECISIONS.md)。この文書は「**今どう構成されていて、どう操作するか**」を書く。食い違いを見つけたら、実際の環境を確認してこの文書を直す。
 - **パスワード・秘密鍵・トークン・WebhookのURL・証明書の秘密鍵は、この文書にも、Git・チャット・Issue・ログにも書かない。** 場所と更新手順だけを書く。
-- 最終更新: 2026-11-26（初回デプロイ前）。**初回デプロイ・自動デプロイの有効化・本番データの移行は、この時点では未実施**（実施したら §15 に日付を記録する）。
+- 最終更新: 2026-11-26（本番稼働中。初回デプロイ・自動デプロイの有効化・初期Owner作成・既存記事の取り込みは実施済み。§15に記録）。
 - 「（要記入）」は、運用責任者が把握して書き込む項目（契約者名など。コードからは分からない）。
 
 ---
@@ -91,13 +91,13 @@
 | 鍵（コメント） | 用途 | 公開鍵の置き場所 | 秘密鍵の場所 | できること |
 |---|---|---|---|---|
 | `nu_app-vps-admin` | **管理者（運用担当）の個人の鍵**。サーバー管理 | VPSの`/home/ubuntu/.ssh/authorized_keys` | 運用担当のPC（パスフレーズ付きを推奨） | `ubuntu`でログイン・sudo |
-| `claude-nu_app-ops` | AI開発エージェント（Claude Code）の作業用。構築・検証のため | 同上 | 開発環境のWSL `~/.ssh/nu_app_vps` | 同上（**`ubuntu`と同じ権限**） |
+| `claude-nu_app-ops`（**2026-11-26に削除済み**） | AI開発エージェントの作業用（構築・検証のため。削除済み） | （削除済み） | （削除済み） | AIにサーバー権限を与えたいときは、期間を決めて追加し、終わったら必ず削除する |
 | `nu_app-actions-deploy` | GitHub Actionsのデプロイ専用 | VPSの`/home/deploy/.ssh/authorized_keys`（`restrict,command="/srv/nu_app/infrastructure/deploy/ssh-entry.sh"`付き） | GitHubの環境`production`のsecret `DEPLOY_SSH_KEY`（と、作成した開発環境の`~/.ssh/nu_app_actions`） | **`deploy.sh <40桁のコミットSHA>`だけ**（入口が他のコマンドを拒否。端末・ポート転送なし） |
 | `nu_app-vps-repo-readonly` | VPSがGitHubからリポジトリを読む（deploy key） | GitHub: リポジトリ → Settings → Deploy keys（**読み取り専用**） | VPSの`/etc/nu_app/repo_deploy_key`（root・600） | リポジトリの読み取りのみ |
 
 **運用ルール**
 - 管理者が増える・交代するときは、**新しい人の公開鍵を`authorized_keys`に追加 → 新しい人が実際に入れることを確認 → 去る人の鍵を削除**の順（逆にしない）。`ssh-keygen -lf ~/.ssh/authorized_keys`で一覧と指紋を確認できる。
-- **`claude-nu_app-ops`は、AIエージェントに作業させる期間だけ**置く。作業が終わったら`authorized_keys`から削除する（運用責任者の判断）。
+- **AIエージェントの鍵は、作業させる期間だけ**置く（今回の構築では2026-11-26に追加・同日削除）。作業が終わったら`authorized_keys`から削除する（運用責任者の判断）。
 - 鍵を作り直す（漏えいの疑い・担当交代）: (a) 新しい鍵を作る → (b) サーバーに追加して接続を確認 → (c) 古い鍵を削除。Actionsの鍵は、(a)新しい鍵ペアを作る → (b)VPSの`/home/deploy/.ssh/authorized_keys`の鍵を差し替え（`restrict,command=...`のプレフィックスを必ず付ける） → (c)GitHubのsecret `DEPLOY_SSH_KEY`を更新 → (d)古い鍵を削除。repoのdeploy keyは、(a)`sudo ssh-keygen -t ed25519 -N "" -f /etc/nu_app/repo_deploy_key`で作り直し → (b)GitHubのDeploy keysを入れ替え。
 - サーバーの**ホスト鍵**の指紋（接続時の確認用。公開してよい）: `SHA256:SVvijkywaLzF6U1+F42yixOUJ4Wsemb9ELA1EGsRcxw`（ED25519）。さくらのシリアルコンソールで`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`で照合できる。OSを再インストールすると変わる（GitHubの`DEPLOY_KNOWN_HOSTS`も更新する）。
 - **締め出されたら**: さくらの管理画面の**シリアルコンソール**から（ネットワーク経由でないので、SSHの設定に関係なく入れる。`ubuntu`のパスワードが必要＝§12の引き継ぎ対象）。
@@ -252,7 +252,7 @@ sudo env POSTGRES_IMAGE='postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc44
 
 未確認: VPS再起動後の自動起動、GHCRからの実際のpull、本番サイズ（数百〜数千記事・画像数GB）での所要時間・容量、`nu-backup.timer`の実行（初回デプロイ後に有効化）、実際のデプロイ（未実施）。
 
-## 14. 初回公開の手順（チェックリスト。**各項目の実行前に運用責任者の確認を取る**）
+## 14. 初回公開の手順（チェックリスト。2026-11-26に1〜6・10まで実施済み。今後サーバーを作り直すときの手順として残す。**各項目の実行前に運用責任者の確認を取る**）
 
 1. [ ] 本RUNBOOKの「（要記入）」を埋めた。`production`環境の承認者・secret（4つ）・GHCRトークン・Webhookを確認した。
 2. [ ] リポジトリ変数`DEPLOY_ENABLED=true`にする（**自動デプロイの有効化。確認が必要**）。mainに何かマージ（または空コミット）→ `verify`・`build`が通る → `deploy`の承認待ちになる。
@@ -272,6 +272,9 @@ sudo env POSTGRES_IMAGE='postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc44
 | 2026-11-26 | VPS構築（SSH強化・ufw・fail2ban・自動更新・Docker・ディレクトリ・deployユーザー・deploy key）、試験環境での実機検証（§13）、DNS（Cloudflare）・さくらのパケットフィルター設定、TLS証明書取得・Nginx起動、GitHub環境`production`・Secrets・GHCRログイン・Discord Webhook設定（運用責任者）。実施: 運用責任者とClaude Code（AI開発エージェント。SSHは作業用の鍵） |
 | 2026-11-26 | `DEPLOY_ENABLED=true`に設定（運用責任者の許可）。初回デプロイを開始（PR #127。結果は下に追記） |
 | 2026-11-26 | **初回デプロイ成功**（承認者が承認）。バックアップタイマーを有効化。再起動後の自動起動を確認。2回目のデプロイ（PR #129）と、手動の切り戻し・再前進を実機で確認 |
-| （未実施） | 初期Owner作成、既存記事の取り込み、`NOPASSWD:ALL`の解除、作業用SSH鍵の整理 |
+| 2026-11-26 | **初期Ownerを作成**（ログインID `yura231997`・表示名 `yurarara`。招待tokenはサーバーのroot専用ファイルに一時保存し、本人が受け取った後に`shred`で削除。Ownerがパスワードを設定しログイン確認済み） |
+| 2026-11-26 | **既存記事の取り込み（`import-legacy`）**: 運用責任者の確認のもと、取り込み直前に手動バックアップ→dry-run（新規67件）→`--apply`（新規67件）→再実行（新規0・スキップ67＝冪等）。投稿者（移行元）3件はすべて公開許可「未確認」（公開サイトでは「nu_digital」表示）。本番の`/`・`/blog/`・`/project/`等の全72ルート・記事67・画像532が基準と一致（`web-verify`）、指紋の比較は意図した差を除き一致（`/`のヒーロースライダーの表示中スライドが、実ネットワークの遅延で稀にずれて失敗する＝既知のフレーク。再実行で一致）。 |
+| 2026-11-26 | **一時設定の解除・鍵の整理**: `ubuntu`の`NOPASSWD:ALL`（`/etc/sudoers.d/90-nu-setup`）を削除（`sudo`はパスワード必須。`/etc/sudoers.d/20-nu-deploy`の`deploy`用の1行は残す）。AI開発エージェントの作業用SSH鍵`claude-nu_app-ops`を`ubuntu`の`authorized_keys`から削除し、エージェントの環境の鍵ファイル（作業用・Actionsデプロイ用の秘密鍵のコピー）も削除（Actionsの鍵はGitHubのsecretにのみ存在）。以後、サーバーの管理者は`nu_app-vps-admin`鍵の運用担当のみ。 |
+| （未実施） | 投稿者名の公開許可の確認と記録、Discord Botのtoken設定、VPS外バックアップの検討、無料お試し期間の終了前の本契約への移行 |
 
-**一時設定（作業完了後に解除する）**: `/etc/sudoers.d/90-nu-setup`（`ubuntu`のNOPASSWD:ALL。構築作業のため一時的に設定）。**解除すると、`ubuntu`のsudoはパスワードが必要になる**（`sudo`のパスワード＝`ubuntu`のパスワード。無い場合は、さくらのシリアルコンソールで設定してから解除する）。解除済みになったらこの行に日付を書く。
+**一時設定**: なし（構築中に付けた`ubuntu`のNOPASSWD:ALLは2026-11-26に解除済み。確認: `sudo -l`でパスワードを求められる）。
