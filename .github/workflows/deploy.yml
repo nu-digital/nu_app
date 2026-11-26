@@ -84,6 +84,7 @@ jobs:
           }
           build api services/api
           build bot services/bot
+          build agent services/agent
           build migrate db
           build web apps/web --build-arg API_INTERNAL_URL=http://api:8080
           build admin apps/admin --build-arg API_INTERNAL_URL=http://api:8080
