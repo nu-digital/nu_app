@@ -267,6 +267,7 @@ sudo env POSTGRES_IMAGE='postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc44
 | 日付 | 内容 |
 |---|---|
 | 2026-11-26 | VPS構築（SSH強化・ufw・fail2ban・自動更新・Docker・ディレクトリ・deployユーザー・deploy key）、試験環境での実機検証（§13）、DNS（Cloudflare）・さくらのパケットフィルター設定、TLS証明書取得・Nginx起動、GitHub環境`production`・Secrets・GHCRログイン・Discord Webhook設定（運用責任者）。実施: 運用責任者とClaude Code（AI開発エージェント。SSHは作業用の鍵） |
-| （未実施） | `DEPLOY_ENABLED=true`、初回デプロイ、バックアップタイマーの有効化、初期Owner作成、既存記事の取り込み |
+| 2026-11-26 | `DEPLOY_ENABLED=true`に設定（運用責任者の許可）。初回デプロイを開始（PR #127。結果は下に追記） |
+| （未実施） | バックアップタイマーの有効化、初期Owner作成、既存記事の取り込み |
 
 **一時設定（作業完了後に解除する）**: `/etc/sudoers.d/90-nu-setup`（`ubuntu`のNOPASSWD:ALL。構築作業のため一時的に設定）。**解除すると、`ubuntu`のsudoはパスワードが必要になる**（`sudo`のパスワード＝`ubuntu`のパスワード。無い場合は、さくらのシリアルコンソールで設定してから解除する）。解除済みになったらこの行に日付を書く。
