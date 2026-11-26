@@ -14,3 +14,7 @@ for _ in $(seq 1 60); do docker exec "$name" pg_isready -U postgres >/dev/null 2
 "$root/scripts/go-docker.sh" --network "$net" services/api \
   env TEST_DATABASE_URL="postgres://postgres:itest-only-not-secret@$name:5432/postgres?sslmode=disable" \
   go test -tags integration,nodynamic -race -count=1 ./... "$@"
+# ぬる（services/agent）も同じ使い捨てDBで（agentスキーマの実際のmigrationに対して）
+"$root/scripts/go-docker.sh" --network "$net" services/agent \
+  env TEST_DATABASE_URL="postgres://postgres:itest-only-not-secret@$name:5432/postgres?sslmode=disable" \
+  go test -tags integration -race -count=1 ./... "$@"
