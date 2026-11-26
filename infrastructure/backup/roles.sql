@@ -7,4 +7,3 @@ BEGIN
     END IF;
 END
 $$;
-ALTER ROLE nu_agent SET search_path = agent;
