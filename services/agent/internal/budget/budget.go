@@ -174,6 +174,28 @@ func (t *Tracker) Record(ctx context.Context, model, purpose string, u llm.Usage
 	return cost, err
 }
 
+// RecordBatch はBatch APIの使用量を記録する（半額。切り上げ）。
+func (t *Tracker) RecordBatch(ctx context.Context, model, purpose string, u llm.Usage) (int64, error) {
+	cost := (Cost(model, u) + 1) / 2
+	err := t.l.RecordUsage(ctx, store.UsageRecord{Model: model, Purpose: purpose, Input: u.InputTokens, Output: u.OutputTokens,
+		CacheRead: u.CacheReadTokens, CacheWrite: u.CacheWriteTokens, CostMicroUSD: cost})
+	return cost, err
+}
+
+// EstimateBatch はBatch APIの見積もり（半額。切り上げ）。入力・出力のトークン数から。
+func EstimateBatch(model string, inTokens, outTokens int64) int64 {
+	return (Cost(model, llm.Usage{InputTokens: inTokens, OutputTokens: outTokens}) + 1) / 2
+}
+
+// Remaining は、予算の70%（節約の段階に入る前）までの残り。0以下なら、バッチなどの任意の仕事はしない。
+func (t *Tracker) Remaining(ctx context.Context) int64 {
+	st := t.State(ctx)
+	if st.Tier != Normal {
+		return 0
+	}
+	return st.Limit*70/100 - st.Spent
+}
+
 // AllowUser は、一人あたりの1日の上限（連打対策）。kind は "reply" か "opus"。数えてから判定する（上限を超えた回は拒否）。
 func (t *Tracker) AllowUser(ctx context.Context, userID int64, kind string) (bool, error) {
 	limit := t.cfg.ReplyPerUserDay

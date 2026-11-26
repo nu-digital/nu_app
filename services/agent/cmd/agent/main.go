@@ -24,6 +24,7 @@ import (
 	"github.com/nu-digital/nu_app/services/agent/internal/responder"
 	"github.com/nu-digital/nu_app/services/agent/internal/schedule"
 	"github.com/nu-digital/nu_app/services/agent/internal/store"
+	"github.com/nu-digital/nu_app/services/agent/internal/summarize"
 )
 
 func main() {
@@ -110,7 +111,8 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 	}
 	// 応答（P1-4a）: メンション・返信・DM・times。ぬるの頭脳は実Claude APIに繋ぐ（上限はbudgetが守る）
 	tracker := budget.New(db, budget.Config{}, nil)
-	br := &brain.Brain{LLM: llm.NewAnthropic(cfg.AnthropicKey), Budget: tracker, State: brainState{db}, Memory: db, Log: log}
+	claude := llm.NewAnthropic(cfg.AnthropicKey)
+	br := &brain.Brain{LLM: claude, Budget: tracker, State: brainState{db}, Memory: db, Log: log}
 	resp := &responder.Responder{Ctl: ctl, Brain: br, Hist: db, Mem: db, Send: gw, Img: discord.NewImageFetcher(),
 		Reacts: db, BotID: gw.BotUserID, TimesChannel: int64(cfg.TimesChannel), Log: log}
 	gw.SetTimesChannel(cfg.TimesChannel)
@@ -123,6 +125,19 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 	st.SetMode("running")
 	st.SetHealthy(true)
 
+	sum := &summarize.Job{Store: db, LLM: claude, Budget: tracker, Log: log}
+	go func() { // 日次要約（Batch API）。15分ごとに、進行中のバッチの確認か新しいバッチの送信
+		t := time.NewTicker(15 * time.Minute)
+		defer t.Stop()
+		for {
+			sum.Tick(ctx)
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+			}
+		}
+	}()
 	go sch.Run(ctx) // 毎日の気分・気まぐれ投稿・予算停止のお知らせ
 
 	// 切断が3分以上続いたら異常にする（コンテナのヘルスチェックに出る）

@@ -153,3 +153,98 @@ func (s *Store) ForgetPerson(ctx context.Context, userID int64) (int64, error) {
 	}
 	return tag.RowsAffected(), tx.Commit(ctx)
 }
+
+// ---- 日次要約 ----
+
+// Group は要約の候補（チャンネル×日（JST））。
+type Group struct {
+	ChannelID int64
+	Day       time.Time
+	Count     int
+	Chars     int
+}
+
+// SummaryCandidates は、まだ要約が無い（チャンネル×日）を、新しい日から返す。
+// サーバーのチャンネルの人間の発言（DM・Bot除く）が minMsgs 件以上あり、日が before（JSTの日付。含まない）より前のもの。since があればその日以降だけ。
+func (s *Store) SummaryCandidates(ctx context.Context, before time.Time, since *time.Time, minMsgs, limit int) ([]Group, error) {
+	rows, err := s.pool.Query(ctx, `SELECT m.channel_id, d.day, count(*), sum(char_length(m.content))
+	  FROM messages m, LATERAL (SELECT (m.created_at AT TIME ZONE 'Asia/Tokyo')::date AS day) d
+	  WHERE m.kind = 'guild' AND NOT m.is_bot AND d.day < $1::date AND ($2::date IS NULL OR d.day >= $2::date)
+	    AND NOT EXISTS (SELECT 1 FROM summaries s WHERE s.channel_id = m.channel_id AND s.day = d.day)
+	  GROUP BY m.channel_id, d.day HAVING count(*) >= $3
+	  ORDER BY d.day DESC, m.channel_id LIMIT $4`, before, since, minMsgs, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Group
+	for rows.Next() {
+		var g Group
+		if err := rows.Scan(&g.ChannelID, &g.Day, &g.Count, &g.Chars); err != nil {
+			return nil, err
+		}
+		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
+// DayMessages は、そのチャンネルのその日（JST）の人間の発言を古い順に返す（サーバーのチャンネルのみ）。
+func (s *Store) DayMessages(ctx context.Context, channelID int64, day time.Time, limit int) ([]Message, error) {
+	rows, err := s.pool.Query(ctx, `SELECT message_id, author_name, content, created_at FROM messages
+	  WHERE kind = 'guild' AND NOT is_bot AND channel_id = $1 AND (created_at AT TIME ZONE 'Asia/Tokyo')::date = $2::date
+	  ORDER BY message_id LIMIT $3`, channelID, day, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Message
+	for rows.Next() {
+		m := Message{ChannelID: channelID, Kind: "guild"}
+		if err := rows.Scan(&m.ID, &m.AuthorName, &m.Content, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+type Summary struct {
+	ChannelID int64
+	Day       time.Time
+	Content   string
+	MsgCount  int
+}
+
+// SaveSummary は要約を保存する（その日のメッセージがバッチの処理中に消えていた場合に備え、既にあれば上書きしない）。
+func (s *Store) SaveSummary(ctx context.Context, sm Summary) error {
+	c := strings.TrimSpace(sm.Content)
+	if r := []rune(c); len(r) == 0 || len(r) > 3000 {
+		return errors.New("要約は1〜3000文字")
+	}
+	_, err := s.pool.Exec(ctx, `INSERT INTO summaries (channel_id, day, content, msg_count) VALUES ($1, $2::date, $3, $4) ON CONFLICT DO NOTHING`,
+		sm.ChannelID, sm.Day, c, sm.MsgCount)
+	return err
+}
+
+// SearchSummaries は要約を探す（新しい日から）。query が空なら最近のもの。
+func (s *Store) SearchSummaries(ctx context.Context, query string, limit int) ([]Summary, error) {
+	query = strings.TrimSpace(query)
+	if len([]rune(query)) > MaxQueryRunes {
+		return nil, nil
+	}
+	rows, err := s.pool.Query(ctx, `SELECT channel_id, day, content, msg_count FROM summaries
+	  WHERE $1 = '' OR content ILIKE $2 ORDER BY day DESC, channel_id LIMIT $3`, query, likePattern(query), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Summary
+	for rows.Next() {
+		var x Summary
+		if err := rows.Scan(&x.ChannelID, &x.Day, &x.Content, &x.MsgCount); err != nil {
+			return nil, err
+		}
+		out = append(out, x)
+	}
+	return out, rows.Err()
+}
