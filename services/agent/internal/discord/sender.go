@@ -36,6 +36,18 @@ func (g *Gateway) Reply(ctx context.Context, channelID, replyToID int64, text st
 	return err
 }
 
+// PostTimes は、設定したtimesチャンネルにだけ投稿する（送信先は引数で変えられない）。誰にもメンションを飛ばさない。
+func (g *Gateway) PostTimes(ctx context.Context, text string) error {
+	text = clip(text)
+	if g.timesID == "" || strings.TrimSpace(text) == "" {
+		return errors.New("no target")
+	}
+	_, err := g.s.ChannelMessageSendComplex(g.timesID, &discordgo.MessageSend{
+		Content: text, AllowedMentions: &discordgo.MessageAllowedMentions{},
+	}, discordgo.WithContext(ctx))
+	return err
+}
+
 // React は絵文字リアクションを付ける。
 func (g *Gateway) React(ctx context.Context, channelID, messageID int64, emoji string) error {
 	return g.s.MessageReactionAdd(strconv.FormatInt(channelID, 10), strconv.FormatInt(messageID, 10), emoji, discordgo.WithContext(ctx))

@@ -22,6 +22,7 @@ import (
 	"github.com/nu-digital/nu_app/services/agent/internal/health"
 	"github.com/nu-digital/nu_app/services/agent/internal/llm"
 	"github.com/nu-digital/nu_app/services/agent/internal/responder"
+	"github.com/nu-digital/nu_app/services/agent/internal/schedule"
 	"github.com/nu-digital/nu_app/services/agent/internal/store"
 )
 
@@ -111,7 +112,9 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 	tracker := budget.New(db, budget.Config{}, nil)
 	br := &brain.Brain{LLM: llm.NewAnthropic(cfg.AnthropicKey), Budget: tracker, State: brainState{db}, Log: log}
 	resp := &responder.Responder{Ctl: ctl, Brain: br, Hist: db, Mem: db, Send: gw, Img: discord.NewImageFetcher(),
-		BotID: gw.BotUserID, TimesChannel: int64(cfg.TimesChannel), Log: log}
+		Reacts: db, BotID: gw.BotUserID, TimesChannel: int64(cfg.TimesChannel), Log: log}
+	gw.SetTimesChannel(cfg.TimesChannel)
+	sch := &schedule.Scheduler{Ctl: ctl, Budget: tracker, Brain: br, Post: gw, Mem: db, Set: db, TimesCh: int64(cfg.TimesChannel), BotID: gw.BotUserID, Log: log}
 	gw.OnIncoming = resp.Handle
 	if err := gw.Open(); err != nil {
 		return err
@@ -119,6 +122,8 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 	defer gw.Close()
 	st.SetMode("running")
 	st.SetHealthy(true)
+
+	go sch.Run(ctx) // 毎日の気分・気まぐれ投稿・予算停止のお知らせ
 
 	// 切断が3分以上続いたら異常にする（コンテナのヘルスチェックに出る）
 	go func() {

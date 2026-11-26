@@ -17,6 +17,7 @@ import (
 type Gateway struct {
 	s         *discordgo.Session
 	guildID   string
+	timesID   string // 自発投稿の送信先（設定した1チャンネルだけ）
 	rec       *Recorder
 	cmd       *Commander
 	log       *slog.Logger
@@ -47,6 +48,9 @@ func NewGateway(token string, guildID uint64, rec *Recorder, cmd *Commander, log
 	s.AddHandler(g.onInteraction)
 	return g, nil
 }
+
+// SetTimesChannel は自発投稿の送信先を固定する（Openの前に1回）。
+func (g *Gateway) SetTimesChannel(id uint64) { g.timesID = strconv.FormatUint(id, 10) }
 
 // Open はDiscordへ接続する。
 func (g *Gateway) Open() error {

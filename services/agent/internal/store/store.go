@@ -282,3 +282,14 @@ func (s *Store) RecentMessages(ctx context.Context, channelID int64, threadID *i
 	}
 	return out, rows.Err()
 }
+
+// TakeReaction は、その日のリアクションの枠を1つ使う（上限 cap まで。原子的）。使えたら true。
+func (s *Store) TakeReaction(ctx context.Context, day time.Time, cap int) (bool, error) {
+	var n int
+	err := s.pool.QueryRow(ctx, `INSERT INTO reactions_daily (day, n) SELECT $1::date, 1 WHERE $2 > 0
+	  ON CONFLICT (day) DO UPDATE SET n = reactions_daily.n + 1 WHERE reactions_daily.n < $2 RETURNING n`, day, cap).Scan(&n)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
+}
