@@ -1,16 +1,16 @@
 # Ubuntu VPS運用の実装前契約
 
-区分: **ユーザー確定**／**技術上の採用方針**／**契約後に確認する実情報**を分けて読むこと。この文書は本番デプロイ・VPS契約・DNS設定の実行許可ではない。
+区分: **ユーザー確定**／**技術上の採用方針**／**契約後に確認する実情報**を分けて読むこと。この文書は設計の方針と契約。実際の環境の記録と運用手順は[RUNBOOK](RUNBOOK.md)。この文書は本番デプロイの実行許可ではない。
 
 ## 確定事項と未確認の実情報（D07）
 
 | 項目 | 状態 |
 |---|---|
 | VPS事業者 | **さくらのVPS v5（石狩第1ゾーン）契約済み（2026-11-26確認）**。Ubuntu 24.04.5 LTS amd64・仮想4コア・メモリ約3.9GB・SSD 200GB（空き約184GB）。IPv4は運用記録（Git外）に。無料お試し期間中のため、本契約への移行は運用責任者が判断 |
-| CPUアーキテクチャ・ディスク容量 | **契約後に確認**（未確認のまま値を仮定しない） |
-| OS | Ubuntu 24.04 LTSを第一候補。契約先での提供状況を**確認** |
-| ドメイン | `nu-digital.jp`は取得済み。公式=`nu-digital.jp`、内部アプリ=`app.nu-digital.jp` |
-| DNS設定・本番接続 | **未完了。完了済みとして扱わない**。SSH接続・DNS変更は行わない |
+| CPUアーキテクチャ・ディスク容量 | **確認済み**: amd64・仮想4コア・メモリ約3.9GB・SSD 200GB（[RUNBOOK](RUNBOOK.md)） |
+| OS | **Ubuntu 24.04.5 LTS（確認済み）** |
+| ドメイン・DNS | `nu-digital.jp`（公式）・`app.nu-digital.jp`（内部アプリ）。**CloudflareのDNS（DNS only）で`133.125.46.174`を設定済み（2026-11-26）**。詳細は[RUNBOOK](RUNBOOK.md) |
+| 本番への接続 | SSH（鍵認証のみ）・TLS・Nginxは構築済み。**初回デプロイ・自動デプロイの有効化・本番データの移行は、運用責任者の確認を経て実施する**（[RUNBOOK](RUNBOOK.md) §14） |
 | 構築方式 | 事業者固有機能に依存せずDocker Compose |
 | リバースプロキシ | Nginx正式採用（D03） |
 
@@ -134,31 +134,13 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 
 ### バックアップの運用手順（P4-02）
 
-- **配置**（VPS契約後）: リポジトリを`/srv/nu_app/`に置く（デプロイで更新）。`/etc/nu_app/backup.env`（権限600・root。Git外）に設定を書く: `BACKUP_ROOT=/srv/nu_app/backups`、`MEDIA_DIR=/srv/nu_app/media`、`COMPOSE_FILE`・`COMPOSE_ENV_FILE`・`COMPOSE_PROJECT`、`RETENTION=7`、`BACKUP_NOTIFY_WEBHOOK_URL`（Discordの運用チャンネルのWebhook。**秘密**）。`infrastructure/backup/systemd/nu-backup.{service,timer}`を`/etc/systemd/system/`へ置き、`systemctl enable --now nu-backup.timer`。毎日03:00(JST)に実行され、失敗は`journalctl -u nu-backup`とDiscordの通知に出る。
-- **手動実行**: `sudo systemctl start nu-backup.service`。同時実行はロック（`flock`）で防ぐ。空き容量が足りないときは（直前の世代の2倍または`MIN_FREE_MB`のうち大きい方）、**世代を黙って減らさず**失敗して通知する。
-- **復元検証**（公開前・方式の変更時・四半期に1回を推奨）: `POSTGRES_IMAGE=<本番のDBと同じイメージ> NUCTL_IMAGE=<本番のAPIイメージ> infrastructure/backup/restore-verify.sh [世代]`。**隔離した一時環境**（使い捨てのPostgreSQL・内部ネットワーク・一時ディレクトリ）に復元し、チェックサム・スキーマのバージョン・行数（users/contents/media_assets）・メディアのファイル数・`nuctl media-verify`による**行とファイルの参照整合**を確認する。本番のDB・メディアには触れない。
-- **実際の復旧**（障害時。手動。自動化しない）: 1) 利用者への影響を考えて`web`・`admin`・`api`・`bot`を止める 2) 空のDBを用意し`pg_restore --no-owner -d <db> db.dump`（`docker compose exec -T db pg_restore ...`） 3) `tar -xzf media.tar.gz -C /srv/nu_app/media`（所有者は`65532:65532`） 4) `nuctl media-verify`で整合を確認 5) 起動して`/healthz`・`/readyz`・公開サイトを確認。最大約24時間分の更新を失い得る（D04のリスク）。
-- **自動テスト**（CI `ops / backup-restore`、`scripts/backup-restore-test.sh`）: 成功・世代の保持（失敗で消さない／成功後に古いものだけ消す）・DB停止での失敗と通知（秘密を含まない）・壊れた世代の検出・行とファイルの食い違いの検出。
-- 未実測: 本番サイズでのバックアップ時間・容量（VPS契約後に実測して`MIN_FREE_MB`・容量の見積もりを見直す）。
+配置・有効化・手動実行・復元検証・実際の復旧の手順は[RUNBOOK](RUNBOOK.md)の§9。ここには仕様のみを残す: `BACKUP_ROOT`・`MEDIA_DIR`・`COMPOSE_*`・`RETENTION=7`・`BACKUP_NOTIFY_WEBHOOK_URL`は`/etc/nu_app/backup.env`（root・600）。空き容量が足りないときは（直前の世代の2倍または`MIN_FREE_MB`のうち大きい方）、**世代を黙って減らさず**失敗して通知する。同時実行は`flock`で防ぐ。**自動テスト**（CI `ops / backup-restore`、`scripts/backup-restore-test.sh`）: 成功・世代の保持・DB停止での失敗と通知・壊れた世代の検出・行とファイルの食い違いの検出。
 
-## 本番の構成と初回セットアップ（P4-01。VPS契約後に実施。**実施前に運用責任者の確認が必要**）
+## 本番の構成と初回セットアップ（P4-01）
 
-**構成**: ホストにNginx（apt）とDocker。Compose（`infrastructure/compose.prod.yaml`）で db・migrate・api・bot・web・admin を起動。公開ポートは**127.0.0.1だけ**（api 8080・web 8081・admin 3000）で、外へ出すのはNginxの80/443だけ。DB・メディアはコンテナ外の永続領域（DBは名前付きvolume、メディアは`/srv/nu_app/media`）。イメージはCIがビルドして`ghcr.io`へpushしたもの（タグ=コミットSHA）。**VPSではビルドしない**。
+実際の構成・サーバーの設定・手順は、**[RUNBOOK](RUNBOOK.md)**（運用・引き継ぎ手引き）に記録している（実機で構築済み。2026-11-26）。この文書は設計の方針・契約を書く。構成の要点: ホストにNginx（apt）とDocker、Composeで db・migrate・api・bot・web・admin、公開ポートは127.0.0.1のみ、DB・メディアはコンテナ外の永続領域、イメージはCIがビルドしGHCRへ（VPSではビルドしない）。
 
-**初回セットアップの手順**（以下は手順書。この文書の作成時点では**どれも実行していない**）:
-1. VPSの契約・Ubuntu 24.04 LTSの用意・DNS（`nu-digital.jp`・`app.nu-digital.jp`のAレコード）。実際の事業者・IP・ディスク容量は契約後に確認して上の表に記録する。
-2. OSの更新、運用ユーザー（鍵認証のみ。パスワードログイン・rootのSSHを禁止）、デプロイ専用ユーザー`deploy`（`/srv/nu_app/infrastructure/deploy/deploy.sh`だけをsudoで実行できる）。`ufw`は22・80・443だけ許可。自動セキュリティ更新（`unattended-upgrades`）を有効化。
-3. Docker Engine（公式のapt）をインストール。`/srv/nu_app/`（リポジトリ）・`/srv/nu_app/media`（所有者`65532:65532`・権限750）・`/srv/nu_app/backups`（権限700）を作る。
-4. `/srv/nu_app/.env`（権限600。`.env.production.example`を元に実際の値。**Gitに入れない**）、`/etc/nu_app/backup.env`（権限600。`BACKUP_NOTIFY_WEBHOOK_URL`等）。GHCRからpullする読み取り専用トークンで`docker login ghcr.io`（デプロイ専用ユーザーで）。
-5. Nginx: `apt install nginx certbot`。`infrastructure/nginx/nu_app.conf`を`/etc/nginx/conf.d/`へ。最初は証明書が無いので、80番のサーバーだけで`certbot certonly --webroot -w /var/www/certbot -d nu-digital.jp`と`-d app.nu-digital.jp`を実行してから、443の設定を有効にして`nginx -t && systemctl reload nginx`。`certbot-deploy-hook.sh`を`/etc/letsencrypt/renewal-hooks/deploy/`へ。`systemctl list-timers | grep certbot`で自動更新を確認し、`certbot renew --dry-run`を実行。
-6. `systemd`のタイマー: `nu-backup.timer`（バックアップ）・`nu-cert-check.timer`（証明書の期限確認）。
-7. 初回デプロイは、GitHub Actionsの`deploy`ワークフロー（運用責任者の承認つき）から。手でイメージを起動しない。
-8. 初期Owner作成: `docker compose ... run --rm --no-deps --entrypoint /nuctl api bootstrap-owner --login-id <ID> --display-name <名前>`（表示されるtokenを本人にだけ渡す）。既存記事の取り込みは前述の`import-legacy`（dry-runで確認してから`--apply`）。
-9. 公開前: `docs/TESTING.md`のP4の確認、バックアップの手動実行と`restore-verify.sh`、4GBでの実測（メモリ・CPU・ディスク）、`/healthz`・`/readyz`の監視の設定。
-
-**ログ**: Nginxのアクセスログ（`/var/log/nginx/nu_app.access.log`）は**クエリ文字列を残さない**（`$uri`）。Cookie・Authorization・本文は記録しない。招待・再設定のtokenはURLのフラグメント（`#token=`）で、そもそもサーバーへ送られない。アプリ（Go・Next）のログにパスワード・token・学生証番号・メール等を出さない（AGENTS.md。テストで確認済みの範囲は`docs/TESTING.md`）。ログのローテーション（logrotate・Dockerの`max-size`）と保持期間は、契約後の容量に合わせて運用責任者が決める。
-
-**Nginxの自動テスト**（CI `ops / nginx`、`scripts/nginx-test.sh`）: 使い捨てのNginxと擬似のバックエンドで、HTTP→HTTPS・公開ホストにAPIを出さない（画像の公開配信だけ）・GET/HEADだけ・Cookieを渡さない・X-Forwarded-Forの上書き・12MiB上限・ログインの回数制限・HSTS・キャッシュしない、を確認する。`nginx:1.24.0-alpine`（digest固定）で試験する（**ホストのUbuntu 24.04のNginxと同じ1.24.0**。実機で、1.30では通る`http2 on;`が1.24では`unknown directive`になったため）。CSP（Content-Security-Policy）は、Nextのインラインスクリプトに依存するため初期は付けない（導入時はnonce方式を別途検討）。
+**Nginxの自動テスト**（CI `ops / nginx`、`scripts/nginx-test.sh`）: 使い捨てのNginxと擬似のバックエンドで、HTTP→HTTPS・公開ホストにAPIを出さない（画像の公開配信だけ）・GET/HEADだけ・Cookieを渡さない・X-Forwarded-Forの上書き・12MiB上限・ログインの回数制限・HSTS・キャッシュしない・アクセスログにクエリを残さない、を確認する。`nginx:1.24.0-alpine`（digest固定）で試験する（**ホストのUbuntu 24.04のNginxと同じ1.24.0**。実機で、1.30では通る`http2 on;`が1.24では`unknown directive`になったため）。**ログ**: Nginxのアクセスログ（`/var/log/nginx/nu_app.access.log`）は**クエリ文字列を残さない**（`$uri`）。Cookie・Authorization・本文は記録しない。招待・再設定のtokenはURLのフラグメント（`#token=`）でサーバーへ送られない。ログのローテーションと保持期間は、容量に合わせて運用責任者が決める。CSPは、Nextのインラインスクリプトに依存するため初期は付けない（導入時はnonce方式を別途検討）。
 
 ## デプロイ・切り戻し（P4-01b）
 
@@ -194,32 +176,3 @@ docker compose run --rm --no-deps --entrypoint /nuctl api recover-owner \
 | デプロイ・切り戻し | 前述「デプロイ・切り戻し」。GitHub Actionsの`deploy`（承認つき）。手でイメージを起動しない |
 | 証明書 | 自動更新（`certbot.timer`）。期限確認の通知（`nu-cert-check`）が来たら`certbot renew`・`nginx -t`・再読み込み |
 | 障害の最初の確認 | `docker compose -f /srv/nu_app/infrastructure/compose.prod.yaml ps`・`/healthz`・`/readyz`・`journalctl -u nu-backup`・Nginxのログ。APIが止まるとコンテンツのページは5xxになる（`/healthz/`は応答） |
-
-## 実機セットアップの記録（2026-11-26。さくらのVPS v5）
-
-実施済み（SSH接続はこの作業用の鍵とあなた用の鍵。**認証情報はGit・チャットに残していない**）:
-- ホスト鍵は、さくらのシリアルコンソールで確認した指紋と照合してから信頼した。運用者の公開鍵を`ubuntu`に登録し、**別セッションで鍵認証の接続を確認してから**`/etc/ssh/sshd_config.d/10-nu-hardening.conf`でパスワード認証・root直ログインを無効化（`AllowUsers ubuntu deploy`・`MaxAuthTries 4`）。無効化後、パスワードでの接続が拒否されることも確認。
-- `ufw`: 既定deny、22（回数制限）・80・443を許可。`fail2ban`（sshd）、`unattended-upgrades`を有効化。Dockerが公開するポートは`127.0.0.1`だけ（ufwを迂回されない）。
-- Docker Engine 29.10.1・Compose v5.8.0（Docker公式のapt。署名鍵の指紋を既知の値と照合）。Nginx 1.24.0・certbot 2.9.0（Ubuntuのパッケージ。**Nginxは設定・証明書が整うまで停止・無効**）。
-- `deploy`ユーザー（パスワードなし・SSH鍵のみ）、`/srv/nu_app`（リポジトリ。サーバーからは読み取り専用のdeploy key（Organizationのdeploy key許可が必要）で取得）、`/srv/nu_app/media`（`65532:65532`・750）、`backups`・`/etc/nu_app`（700）。GitHubのホスト鍵は公式の指紋（`SHA256:+DiY3wvv…`）と一致を確認。
-- GitHub Actionsのデプロイ用SSH鍵は、`authorized_keys`で`restrict,command="/srv/nu_app/infrastructure/deploy/ssh-entry.sh"`を付け、**`deploy.sh <40桁SHA>`以外を実行できない**ようにする（`ssh-entry.sh`。`scripts/deploy-test.sh`で検証）。`sudoers`は`deploy ALL=(root) NOPASSWD: /srv/nu_app/infrastructure/deploy/deploy.sh [0-9a-f]*`の1行だけ。
-- 構築中だけ`ubuntu`に一時的な`NOPASSWD:ALL`を付けた（`/etc/sudoers.d/90-nu-setup`）。**作業完了後に削除し、`ubuntu`は通常のsudo（パスワードあり）に戻す**。
-
-## 実機での検証の記録（2026-11-26。さくらのVPS v5・4GB。**本番ではない試験環境**）
-
-試験は、本番の永続領域とは別のプロジェクト（`nu_trial`・`/srv/nu_trial`）で行い、終了後にコンテナ・volume・ネットワーク・イメージ・ディレクトリをすべて削除した（本番のデータ・設定には触れていない。DNS・外部公開なし）。イメージはVPS上で試験用にビルドした（本番はCIがビルドしGHCRから取得する）。
-
-| 項目 | 結果 |
-|---|---|
-| ビルド（api・bot・migrate・web・admin） | 全て成功（4コアで数分） |
-| 起動（`compose.prod.yaml`） | db→migrate→api→bot→web→adminが順に起動し全て healthy |
-| アイドル時のメモリ | api 7MiB・web 37MiB・admin 35MiB・bot 4MiB・db 31〜35MiB（合計約120MiB）。ホスト全体の使用は約0.9GB（ページキャッシュ含む） |
-| 公開サイトへ並列400リクエスト（`/blog/`・20並列） | 全て200・約6秒。web最大130MiB（上限384MiB）・api 13MiB・db 39MiB |
-| 約9MBの乱数PNG（1000×3000）のアップロード・再エンコード | 201・約1.5秒。api最大約236MiB（観測。上限1GiB・GOMEMLIMIT 768MiB）。ホストの空きは十分 |
-| 既存記事の取り込み（`import-legacy --apply`、試験DB） | 新規67件・公開サイト全ルート200（トップ0.12秒・一覧0.04秒） |
-| `down`→`up`（`-v`なし） | DB（記事67・画像1）・メディアのファイルが残り、公開サイトも200（永続化OK） |
-| バックアップ→隔離復元検証 | バックアップ約0.6秒・復元検証約2.2秒（スキーマ12・行数・メディア整合OK）。復元検証の一時コンテナは残らない |
-| デプロイの予行演習（`deploy.sh`・ローカルビルドのイメージ） | 初回成功／**壊れた版（APIが起動しない）→更新前バックアップ→失敗を検知→動いていた版へ自動で戻り、公開サイト200** |
-| 安全装置 | `APP_BASE_URL`がhttpで`API_INSECURE_COOKIES`が無いとAPIは起動を拒否する（本番の設定ミスでSecure Cookieなしにならない）。Dockerが公開するポートは127.0.0.1のみ |
-
-未確認: 実ドメインでのTLS取得・Nginxの実機動作（DNS後）、実際のDiscord通知、GHCRからのpull、VPS再起動後の自動起動（`restart: unless-stopped`・docker有効化済みだが再起動は未実施）、本番サイズ（数百〜数千記事・画像数GB）での所要時間・容量。
