@@ -220,3 +220,40 @@ func (s *Store) IncDaily(ctx context.Context, day time.Time, userID int64, kind 
 	  ON CONFLICT (day, discord_user_id, kind) DO UPDATE SET n = daily_calls.n + 1 RETURNING n`, day, userID, kind).Scan(&n)
 	return n, err
 }
+
+// ---- ぬるの状態・親密度 ----
+
+type State struct {
+	Mood   int
+	Energy int
+	Hobby  string
+}
+
+// GetState は気分などの状態（1行）。
+func (s *Store) GetState(ctx context.Context) (State, error) {
+	var st State
+	err := s.pool.QueryRow(ctx, `SELECT mood, energy, hobby FROM state WHERE id`).Scan(&st.Mood, &st.Energy, &st.Hobby)
+	return st, err
+}
+
+func (s *Store) SaveState(ctx context.Context, st State) error {
+	_, err := s.pool.Exec(ctx, `UPDATE state SET mood = $1, energy = $2, hobby = $3, updated_at = now() WHERE id`, st.Mood, st.Energy, st.Hobby)
+	return err
+}
+
+// GetCloseness は人ごとの親密度（話した回数。無ければ0）。
+func (s *Store) GetCloseness(ctx context.Context, userID int64) (int, error) {
+	var n int
+	err := s.pool.QueryRow(ctx, `SELECT closeness FROM relationships WHERE discord_user_id = $1`, userID).Scan(&n)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, nil
+	}
+	return n, err
+}
+
+// BumpCloseness は話したことを1回数える（最後に話した時刻も更新）。
+func (s *Store) BumpCloseness(ctx context.Context, userID int64) error {
+	_, err := s.pool.Exec(ctx, `INSERT INTO relationships (discord_user_id, closeness) VALUES ($1, 1)
+	  ON CONFLICT (discord_user_id) DO UPDATE SET closeness = relationships.closeness + 1, last_seen = now()`, userID)
+	return err
+}
