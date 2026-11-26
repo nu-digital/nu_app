@@ -179,3 +179,32 @@ func TestUsageAndDailyCounters(t *testing.T) {
 		t.Errorf("並行: %d", got)
 	}
 }
+
+func TestStateAndCloseness(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+	st, err := s.GetState(ctx)
+	if err != nil || st.Mood != 0 || st.Hobby != "" {
+		t.Fatalf("初期: %+v %v", st, err)
+	}
+	if err := s.SaveState(ctx, store.State{Mood: -2, Energy: 1, Hobby: "ネットの歴史"}); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := s.GetState(ctx); st.Mood != -2 || st.Energy != 1 || st.Hobby != "ネットの歴史" {
+		t.Errorf("%+v", st)
+	}
+	if err := s.SaveState(ctx, store.State{Mood: 3}); err == nil {
+		t.Error("範囲外の機嫌を受け付けた")
+	}
+	if n, err := s.GetCloseness(ctx, 7); n != 0 || err != nil {
+		t.Errorf("初期の親密度: %d %v", n, err)
+	}
+	for i := 0; i < 3; i++ {
+		if err := s.BumpCloseness(ctx, 7); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n, _ := s.GetCloseness(ctx, 7); n != 3 {
+		t.Errorf("親密度: %d", n)
+	}
+}
