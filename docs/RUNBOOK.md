@@ -119,6 +119,7 @@
 
 ### 6.3 変数・自動デプロイ
 - リポジトリの変数`DEPLOY_ENABLED`（Settings → Secrets and variables → Actions → Variables）。**`true`にすると、mainへのpushごとに「CI全成功の確認 → GHCRへビルド → 承認待ち → デプロイ」が動く**。止めたいときは削除か`false`にする（実行中のジョブは止まらない。止めるときはActionsの画面でcancel）。
+- **`docs/`と`*.md`だけの変更では、デプロイは動かない**（`paths-ignore`）。コード・設定・ワークフローを変えるPRのマージでは、承認待ちが発生する。
 - 手動の切り戻し: Actions → deploy → Run workflow（入力: 戻したいコミットSHA）。
 
 ### 6.4 GHCR（コンテナイメージ）
@@ -247,7 +248,7 @@ sudo env POSTGRES_IMAGE='postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc44
 | TLS・Nginx（本番） | 証明書取得（両ホスト）・自動更新の予行（dry-run）成功。HTTP→HTTPS 301・HSTS等のヘッダー・公開ホストの`/api/`が404・HTTP/2を実機で確認。**Nginx 1.24では`http2 on;`が使えない**ことを実機で発見し修正（CIのNginxも1.24.0に変更） |
 | 通知 | Discord Webhookの接続テスト 204（2026-11-26） |
 
-**初回の本番デプロイ後の検証（2026-11-26）**: PR #127のマージ→`verify`→`build`（GHCRへpush）→承認→`deploy`が成功（コミット`20692e523c2f`）。GHCRからのpull成功。公式サイト（`/`・`/blog/`・`/project/`・`/terms/`）・管理アプリ（`/`・`/login`・`/healthz`）がHTTPS・HTTP/2・証明書検証OKで200、`http://`は301、公開ホストの`/api/v1/auth/me`は404、管理ホストでは未認証の401（JSON）。外部から`5432`・`8080`・`8081`・`3000`・`53`は閉じている（開いているのは22・80・443のみ）。メモリ（デプロイ直後）: web 46MiB・admin 37MiB・api 6MiB・bot 1MiB・db 33MiB、ホスト使用約0.9GB、ディスク5.3GB/197GB。**バックアップ（systemd経由）→隔離復元検証OK**（スキーマ12）、`nu-backup.timer`有効（毎日03:00 JST）。**VPS再起動後**、5つのコンテナ・Nginx・Docker・fail2ban・ufw・全タイマーが自動で復帰し、サイトは200（約1分）。未検証: 本番での失敗時の自動切り戻し（試験環境では確認済み。次のデプロイで手動の切り戻しも試す）。
+**初回の本番デプロイ後の検証（2026-11-26）**: PR #127のマージ→`verify`→`build`（GHCRへpush）→承認→`deploy`が成功（コミット`20692e523c2f`）。GHCRからのpull成功。公式サイト（`/`・`/blog/`・`/project/`・`/terms/`）・管理アプリ（`/`・`/login`・`/healthz`）がHTTPS・HTTP/2・証明書検証OKで200、`http://`は301、公開ホストの`/api/v1/auth/me`は404、管理ホストでは未認証の401（JSON）。外部から`5432`・`8080`・`8081`・`3000`・`53`は閉じている（開いているのは22・80・443のみ）。メモリ（デプロイ直後）: web 46MiB・admin 37MiB・api 6MiB・bot 1MiB・db 33MiB、ホスト使用約0.9GB、ディスク5.3GB/197GB。**バックアップ（systemd経由）→隔離復元検証OK**（スキーマ12）、`nu-backup.timer`有効（毎日03:00 JST）。**VPS再起動後**、5つのコンテナ・Nginx・Docker・fail2ban・ufw・全タイマーが自動で復帰し、サイトは200（約1分）。**2回目のデプロイと手動の切り戻し（2026-11-26）**: PR #129のデプロイ（更新前バックアップを自動で取得→更新→ヘルスチェック成功）、続けて`deploy`ワークフローの手動実行（`workflow_dispatch`・入力＝1回目のSHA・承認）で**1回目の版へ切り戻し成功**（`current_tag`/`previous_tag`が入れ替わり、全コンテナが旧イメージで起動・サイト200）、さらに最新版へ戻して成功。1回の切り戻しは承認から約1分。未検証: 本番での**失敗時の自動切り戻し**（壊れたイメージをGHCRへ置かない方針のため、試験環境でのみ確認済み）。
 
 未確認: VPS再起動後の自動起動、GHCRからの実際のpull、本番サイズ（数百〜数千記事・画像数GB）での所要時間・容量、`nu-backup.timer`の実行（初回デプロイ後に有効化）、実際のデプロイ（未実施）。
 
@@ -270,7 +271,7 @@ sudo env POSTGRES_IMAGE='postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc44
 |---|---|
 | 2026-11-26 | VPS構築（SSH強化・ufw・fail2ban・自動更新・Docker・ディレクトリ・deployユーザー・deploy key）、試験環境での実機検証（§13）、DNS（Cloudflare）・さくらのパケットフィルター設定、TLS証明書取得・Nginx起動、GitHub環境`production`・Secrets・GHCRログイン・Discord Webhook設定（運用責任者）。実施: 運用責任者とClaude Code（AI開発エージェント。SSHは作業用の鍵） |
 | 2026-11-26 | `DEPLOY_ENABLED=true`に設定（運用責任者の許可）。初回デプロイを開始（PR #127。結果は下に追記） |
-| 2026-11-26 | **初回デプロイ成功**（承認者が承認）。バックアップタイマーを有効化。再起動後の自動起動を確認 |
+| 2026-11-26 | **初回デプロイ成功**（承認者が承認）。バックアップタイマーを有効化。再起動後の自動起動を確認。2回目のデプロイ（PR #129）と、手動の切り戻し・再前進を実機で確認 |
 | （未実施） | 初期Owner作成、既存記事の取り込み、`NOPASSWD:ALL`の解除、作業用SSH鍵の整理 |
 
 **一時設定（作業完了後に解除する）**: `/etc/sudoers.d/90-nu-setup`（`ubuntu`のNOPASSWD:ALL。構築作業のため一時的に設定）。**解除すると、`ubuntu`のsudoはパスワードが必要になる**（`sudo`のパスワード＝`ubuntu`のパスワード。無い場合は、さくらのシリアルコンソールで設定してから解除する）。解除済みになったらこの行に日付を書く。
