@@ -5,8 +5,10 @@ package responder
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"math/rand/v2"
 	"regexp"
 	"strconv"
 	"strings"
@@ -47,6 +49,12 @@ type Memory interface {
 	BumpCloseness(ctx context.Context, userID int64) error
 }
 
+// Reactions はリアクションの枠と設定（store.Store と設定が満たす）。
+type Reactions interface {
+	TakeReaction(ctx context.Context, day time.Time, cap int) (bool, error)
+	GetSetting(ctx context.Context, key string) (json.RawMessage, bool, error)
+}
+
 // Images は添付画像の取得（縮小済みのJPEGを返す）。
 type Images interface {
 	Fetch(ctx context.Context, a discord.Attachment) ([]byte, error)
@@ -59,6 +67,8 @@ type Responder struct {
 	Mem          Memory
 	Send         Sender
 	Img          Images
+	Reacts       Reactions // nilならリアクションしない
+	Rng          *rand.Rand
 	BotID        func() int64 // ぬる自身のユーザーID（接続後に分かる）
 	TimesChannel int64
 	Log          *slog.Logger
@@ -111,13 +121,14 @@ func (r *Responder) Decide(in discord.Incoming) bool {
 // Handle はメッセージを受けて、応えるべきなら応える。エラーは外へ出さずログに（本文を出さない）。
 func (r *Responder) Handle(ctx context.Context, in discord.Incoming) {
 	if !r.Decide(in) {
+		r.maybeReact(ctx, in)
 		return
 	}
 	m := in.Msg
 	if !r.cooldownOK(m.ChannelID) {
 		return // 連投には応えない（静かに）
 	}
-	_ = r.Send.Typing(ctx, m.ChannelID)
+	_ = r.Send.Typing(ctx, target(m))
 	hist := r.history(ctx, m)
 	var imgs [][]byte
 	for _, a := range m.Attachments {
@@ -132,31 +143,31 @@ func (r *Responder) Handle(ctx context.Context, in discord.Incoming) {
 	}
 	text := stripMention(m.Content, r.botID())
 	if text == "" && len(imgs) == 0 {
-		_ = r.Send.React(ctx, m.ChannelID, m.ID, emojiSeen) // 呼ばれただけ（本文も画像も無い）
+		_ = r.Send.React(ctx, target(m), m.ID, emojiSeen) // 呼ばれただけ（本文も画像も無い）
 		return
 	}
 	out, err := r.Brain.Reply(ctx, brain.Input{UserID: m.AuthorID, ChannelID: m.ChannelID, AuthorName: m.AuthorName, Where: r.where(m),
 		History: hist, Text: text, Images: imgs})
 	switch {
 	case errors.Is(err, brain.ErrAsleep):
-		_ = r.Send.React(ctx, m.ChannelID, m.ID, emojiAsleep)
+		_ = r.Send.React(ctx, target(m), m.ID, emojiAsleep)
 		return
 	case errors.Is(err, brain.ErrUserLimit):
-		_ = r.Send.React(ctx, m.ChannelID, m.ID, emojiLimit)
+		_ = r.Send.React(ctx, target(m), m.ID, emojiLimit)
 		return
 	case errors.Is(err, brain.ErrBusy):
-		_ = r.Send.React(ctx, m.ChannelID, m.ID, emojiBusy)
+		_ = r.Send.React(ctx, target(m), m.ID, emojiBusy)
 		return
 	case err != nil:
 		r.Log.Error("応答を作れませんでした", "reason", errKind(err))
-		_ = r.Send.React(ctx, m.ChannelID, m.ID, emojiNoSpeak)
+		_ = r.Send.React(ctx, target(m), m.ID, emojiNoSpeak)
 		return
 	}
 	// 生成中に停止された場合は送らない
 	if !r.Ctl.MayRespond() {
 		return
 	}
-	if err := r.Send.Reply(ctx, m.ChannelID, m.ID, out.Text); err != nil {
+	if err := r.Send.Reply(ctx, target(m), m.ID, out.Text); err != nil {
 		r.Log.Error("返信を送れませんでした")
 		return
 	}
@@ -266,4 +277,75 @@ func errKind(err error) string {
 		return "canceled"
 	}
 	return "error"
+}
+
+// リアクション: 呼ばれていない発言に、たまに絵文字だけ付ける。APIは呼ばない（言葉の規則だけ）。
+// 条件: 通常モード（静か・停止では付けない）・設定でオン・1日の上限・Bot以外・自分以外・確率。
+const (
+	keyReactOn  = "reactions.enabled"   // false でオフ（Admin）。無ければオン
+	keyReactCap = "reactions.daily_cap" // 1日の上限。無ければ10
+	reactProb   = 0.08
+)
+
+var reactRules = []struct {
+	re    *regexp.Regexp
+	emoji string
+}{
+	{regexp.MustCompile(`ありがとう|感謝|助かった`), "🙏"},
+	{regexp.MustCompile(`お疲れ|おつかれ|がんばった|頑張った`), "👏"},
+	{regexp.MustCompile(`笑|www|草|ウケる`), "😂"},
+	{regexp.MustCompile(`完成|できた|リリース|公開した|合格`), "🎉"},
+	{regexp.MustCompile(`眠い|ねむい|徹夜|寝れない`), "😴"},
+}
+
+func (r *Responder) maybeReact(ctx context.Context, in discord.Incoming) {
+	m := in.Msg
+	if r.Reacts == nil || m.AuthorID == r.botID() || m.IsBot || in.IsBotAuthored || m.GuildID == 0 || !r.Ctl.MayPostSpontaneously() {
+		return
+	}
+	emoji := ""
+	for _, rule := range reactRules {
+		if rule.re.MatchString(m.Content) {
+			emoji = rule.emoji
+			break
+		}
+	}
+	if emoji == "" {
+		return
+	}
+	rng := r.Rng
+	if rng == nil {
+		rng = rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 7))
+	}
+	if rng.Float64() >= reactProb {
+		return
+	}
+	if raw, ok, err := r.Reacts.GetSetting(ctx, keyReactOn); err != nil || (ok && string(raw) == "false") {
+		return
+	}
+	cap := 10
+	if raw, ok, err := r.Reacts.GetSetting(ctx, keyReactCap); err == nil && ok {
+		var n int
+		if json.Unmarshal(raw, &n) == nil && n >= 0 {
+			cap = n
+		}
+	}
+	now := time.Now()
+	if r.Now != nil {
+		now = r.Now()
+	}
+	if ok, err := r.Reacts.TakeReaction(ctx, now.In(time.FixedZone("JST", 9*3600)), cap); err != nil || !ok {
+		return
+	}
+	if err := r.Send.React(ctx, target(m), m.ID, emoji); err != nil {
+		r.Log.Error("リアクションを付けられません")
+	}
+}
+
+// target は送信先のチャンネル。スレッドの中のメッセージには、そのスレッド（Msg.ChannelID は親）へ送る。
+func target(m discord.Msg) int64 {
+	if m.ThreadID != nil {
+		return *m.ThreadID
+	}
+	return m.ChannelID
 }

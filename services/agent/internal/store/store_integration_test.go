@@ -242,3 +242,23 @@ func TestRecentMessagesScopesToTheConversation(t *testing.T) {
 		t.Errorf("該当なし: %+v", got)
 	}
 }
+
+func TestTakeReactionRespectsDailyCap(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newStore(t)
+	day := time.Date(2026, 11, 27, 3, 0, 0, 0, time.UTC)
+	for i := 0; i < 2; i++ {
+		if ok, err := s.TakeReaction(ctx, day, 2); err != nil || !ok {
+			t.Fatalf("%d: ok=%v err=%v", i, ok, err)
+		}
+	}
+	if ok, err := s.TakeReaction(ctx, day, 2); err != nil || ok {
+		t.Errorf("上限を超えて使えた: ok=%v err=%v", ok, err)
+	}
+	if ok, _ := s.TakeReaction(ctx, day.AddDate(0, 0, 1), 2); !ok {
+		t.Error("翌日は使える")
+	}
+	if ok, _ := s.TakeReaction(ctx, day.AddDate(0, 0, 2), 0); ok {
+		t.Error("上限0は使えない")
+	}
+}

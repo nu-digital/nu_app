@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"strings"
 	"sync"
 	"testing"
@@ -279,4 +280,93 @@ func TestStripMention(t *testing.T) {
 	if got := stripMention("<@900> hi <@901>", 900); got != "hi <@901>" {
 		t.Errorf("%q", got)
 	}
+}
+
+type fakeReacts struct {
+	settings map[string]json.RawMessage
+	used     int
+	cap      int
+}
+
+func (f *fakeReacts) GetSetting(_ context.Context, k string) (json.RawMessage, bool, error) {
+	v, ok := f.settings[k]
+	return v, ok, nil
+}
+func (f *fakeReacts) TakeReaction(_ context.Context, _ time.Time, cap int) (bool, error) {
+	f.cap = cap
+	if f.used >= cap {
+		return false, nil
+	}
+	f.used++
+	return true, nil
+}
+
+func reactRig(t *testing.T) (*rig, *fakeReacts) {
+	x := newRig(t)
+	fr := &fakeReacts{settings: map[string]json.RawMessage{}}
+	x.r.Reacts = fr
+	x.r.Rng = rand.New(rand.NewPCG(1, 1))
+	return x, fr
+}
+
+func TestReactionsAreRareRuleBasedAndCapped(t *testing.T) {
+	x, fr := reactRig(t)
+	for i := 0; i < 400; i++ {
+		x.r.Handle(context.Background(), discord.Incoming{Msg: msg(otherCh, 1, "助かった、ありがとう")})
+	}
+	if len(x.b.calls) != 0 {
+		t.Error("リアクションでClaudeを呼ばない")
+	}
+	if len(x.s.reactions) == 0 || len(x.s.reactions) > 10 || fr.used != len(x.s.reactions) {
+		t.Errorf("既定の上限10・確率つき: %d", len(x.s.reactions))
+	}
+	if x.s.reactions[0] != "🙏" {
+		t.Errorf("%v", x.s.reactions[0])
+	}
+}
+
+func TestReactionsOffByAdminSettingOrQuietOrNoKeyword(t *testing.T) {
+	run := func(mod func(*rig, *fakeReacts), content string) int {
+		x, fr := reactRig(t)
+		mod(x, fr)
+		for i := 0; i < 400; i++ {
+			x.r.Handle(context.Background(), discord.Incoming{Msg: msg(otherCh, 1, content)})
+		}
+		return len(x.s.reactions)
+	}
+	if run(func(_ *rig, f *fakeReacts) { f.settings[keyReactOn] = json.RawMessage("false") }, "ありがとう") != 0 {
+		t.Error("オフ設定でも付けた")
+	}
+	if run(func(x *rig, _ *fakeReacts) { _ = x.c.Set(context.Background(), control.Quiet) }, "ありがとう") != 0 {
+		t.Error("静かモードで付けた")
+	}
+	if run(func(*rig, *fakeReacts) {}, "ふつうの発言") != 0 {
+		t.Error("該当なしで付けた")
+	}
+	if run(func(_ *rig, f *fakeReacts) { f.settings[keyReactCap] = json.RawMessage("0") }, "ありがとう") != 0 {
+		t.Error("上限0で付けた")
+	}
+}
+
+func TestRepliesInThreadsGoToTheThread(t *testing.T) {
+	x := newRig(t)
+	th := int64(555)
+	var gotCh int64
+	x.r.Send = chanRecorder{fakeSender: x.s, ch: &gotCh}
+	m := msg(otherCh, 1, "<@900> やあ")
+	m.ThreadID = &th
+	x.r.Handle(context.Background(), discord.Incoming{Msg: m, MentionsBot: true})
+	if gotCh != th {
+		t.Errorf("スレッドへ送る: %d", gotCh)
+	}
+}
+
+type chanRecorder struct {
+	*fakeSender
+	ch *int64
+}
+
+func (c chanRecorder) Reply(ctx context.Context, ch, id int64, t string) error {
+	*c.ch = ch
+	return c.fakeSender.Reply(ctx, ch, id, t)
 }

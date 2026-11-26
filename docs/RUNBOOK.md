@@ -309,3 +309,18 @@ sudo bash -c 'set -a; . /srv/nu_app/.env; set +a
 - 費用: ぬるの実行時のClaude API（Teamプラン付属のAPIクレジット$60/月）だけ。**Consoleに支払い方法を登録しない・auto-reloadを使わない**（クレジットが尽きたら止まるだけにする）。上限はコードで守る（70%/90%/100%の段階。計画書§6）。APIキーの有効期限（ぬるが14日前から催促）。
 - ログ: アプリのログにメッセージ本文を出さない。DB（`agent.messages`）にはメッセージを保存する（バックアップに含まれる）。`agent`スキーマの増え方（`agent.messages`の件数・サイズ）は月次確認に含める: `docker compose ... exec db psql ... -c "select pg_size_pretty(sum(pg_total_relation_size(c.oid))) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='agent'"`。
 - 無効モードの確認: `sudo docker logs nu_app-agent-1 | head`に「無効モードで起動します」と、足りない設定の**名前**（値は出ない）が出る。
+
+### 16.5 実機での確認手順（初回の有効化のあと。上から順に。1つでも期待と違えば`/nul stop`して報告）
+前提: 16.1・16.2の設定が済み、`up -d agent`した。`docker logs nu_app-agent-1`に「Discordに接続しました」が出る（本文・tokenは出ない）。
+1. **/nul status**（Adminロール）: 状態が`running`、取り込み済みのチャンネル数・件数が増えていく（過去ログは1ページごとに1秒待つのでゆっくり）。Adminでない人が実行すると断られる。
+2. **メンション**: Admin以外のテスト用チャンネルで`@ぬる こんにちは`。返信が付く（誰にも通知は飛ばない）。メンションなしの発言には**応えない**。
+3. **times**: ぬるのtimesで普通に話しかけると応える。スレッド内はメンションが要る。
+4. **DM**: ぬるにDMすると応える。ほかの場所で話した内容をDMで出さない。
+5. **画像**: 画像つきでメンション → 内容に触れる。
+6. **本気出して**: `@ぬる 本気出して〇〇`（Opus。1日3回まで）。`/nul status`でなくConsole（Usage）で、sonnetとopusの使用が増えたことを確認。
+7. **停止**: `/nul quiet` → timesへの自発投稿・リアクションが止まる（呼べば応える）。`/nul stop` → メンションにも応えない（リアクションも付かない）。`/nul resume`で戻る。
+8. **自発投稿**: runningのとき、1日に最大3回（深夜が多め。1.5時間以上あける）、timesに独り言。Consoleの使用量で`spontaneous`相当の増加が1日数円以内。
+9. **予算**: Consoleの使用上限が$60で、支払い方法が未登録・auto-reloadが無効であることを再確認。
+10. 異常（応答しない・暴走・想定外の操作）: 16.3の手順で止める。
+
+設定（`agent.settings`。通常は触らない）: `reactions.enabled`（`false`でリアクション全オフ）・`reactions.daily_cap`（既定10）・`budget.limit`相当は既定$60（付与日は1日。変更はP2で設定化）。リアクションは言葉の規則だけで付く（Claude APIは呼ばない）。予算が尽きて寝るときは、その期間に1回だけtimesに固定の文言を書く。
