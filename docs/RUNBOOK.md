@@ -351,3 +351,8 @@ sudo bash -c 'set -a; . /srv/nu_app/.env; set +a
 - 変な内容が混じったとき: `delete from agent.diary where id = …`。ハマりを変えるとき: `update agent.state set hobby = '…'`。
 - 調べもの日誌の費用の目安: 1日あたり検索最大3回（$0.03）＋トークン（数セント）。月$2〜3。止めたいときはConsoleで組織のWeb検索を無効にする（発掘日誌は動く）。
 
+### 16.11 新メンバーへの反応・APIキー期限の催促（P3-3）
+- 新しいメンバーが入ると、timesに固定の文言で一言（APIは呼ばない）。1時間に5件まで。止めたいときは`/nul quiet`。
+- **APIキーの期限を設定する**（キーを発行したら必ず）: `... psql -c "insert into agent.settings (key, value) values ('apikey.expires', '\"2027-02-25\"') on conflict (key) do update set value = excluded.value"`（日付はConsoleで確認した期限）。14日前から毎日夜、timesで催促する。更新したら新しい日付に書き換える。
+- 必要な権限: Bot側でGuild Members Intent（特権）が有効であること（P0で設定済みの前提。無効だと参加イベントが来ない）。
+

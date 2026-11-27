@@ -399,3 +399,81 @@ func TestDiaryRespectsQuietAndBudget(t *testing.T) {
 		t.Error("90%超で日誌を書いた")
 	}
 }
+
+func TestGreetNewMemberFixedTextSanitizedAndRateLimited(t *testing.T) {
+	x := newRig(t)
+	x.s.Greet(context.Background(), "太郎@everyone\n`<@123>`")
+	if len(x.p.posts) != 1 || strings.ContainsAny(x.p.posts[0], "@`<>") || !strings.Contains(x.p.posts[0], "太郎everyone") {
+		t.Fatalf("%v", x.p.posts)
+	}
+	if x.sp.calls != 0 || len(x.sp.reports) != 0 {
+		t.Error("一言でAPIを呼ばない")
+	}
+	for i := 0; i < 10; i++ {
+		x.s.Greet(context.Background(), "花子")
+	}
+	if len(x.p.posts) != maxJoinsPerHour {
+		t.Errorf("1時間に%d件まで: %d", maxJoinsPerHour, len(x.p.posts))
+	}
+	x.now = x.now.Add(2 * time.Hour)
+	x.s.Greet(context.Background(), "次郎")
+	if len(x.p.posts) != maxJoinsPerHour+1 {
+		t.Error("1時間たてば再び書ける")
+	}
+	x.s.Greet(context.Background(), "")
+	x.s.Greet(context.Background(), "@@``")
+	if len(x.p.posts) != maxJoinsPerHour+1 {
+		t.Error("空の名前で書いた")
+	}
+	q := newRig(t)
+	_ = q.s.Ctl.Set(context.Background(), control.Quiet)
+	q.s.Greet(context.Background(), "太郎")
+	if len(q.p.posts) != 0 {
+		t.Error("静かモードで書いた")
+	}
+	if n := sanitizeName(strings.Repeat("あ", 100)); len([]rune(n)) != maxNameRunes {
+		t.Errorf("長い名前: %d", len([]rune(n)))
+	}
+}
+
+func TestAPIKeyNagStartsFourteenDaysBeforeOncePerDayAtNight(t *testing.T) {
+	x := newRig(t)
+	_ = x.m.SetSetting(context.Background(), keyKeyExp, "2026-12-10")
+	at := func(day, hour int) time.Time { return time.Date(2026, 11, day, hour-9, 0, 0, 0, time.UTC) } // JST
+	nag := func(tm time.Time) int {
+		before := len(x.p.posts)
+		x.s.nagKey(context.Background(), tm)
+		return len(x.p.posts) - before
+	}
+	if nag(at(25, 22)) != 0 { // 残り15日
+		t.Error("14日より前に催促した")
+	}
+	if nag(at(26, 12)) != 0 {
+		t.Error("昼に催促した")
+	}
+	if nag(at(26, 22)) != 1 || !strings.Contains(x.p.posts[len(x.p.posts)-1], "あと14日") {
+		t.Errorf("14日前: %v", x.p.posts)
+	}
+	if nag(at(26, 23)) != 0 {
+		t.Error("同じ日に2回")
+	}
+	if nag(at(27, 22)) != 1 {
+		t.Error("翌日はまた催促")
+	}
+	y := newRig(t)
+	_ = y.m.SetSetting(context.Background(), keyKeyExp, "2026-11-20")
+	y.s.nagKey(context.Background(), at(27, 22))
+	if len(y.p.posts) != 1 || !strings.Contains(y.p.posts[0], "切れてる") {
+		t.Errorf("期限後: %v", y.p.posts)
+	}
+	z := newRig(t) // 設定なし・不正な値・静かモード
+	z.s.nagKey(context.Background(), at(27, 22))
+	_ = z.m.SetSetting(context.Background(), keyKeyExp, "bad")
+	z.s.nagKey(context.Background(), at(27, 22))
+	_ = z.m.SetSetting(context.Background(), keyKeyExp, "2026-11-28")
+	_ = z.s.Ctl.Set(context.Background(), control.Quiet)
+	z.s.nagKey(context.Background(), at(27, 22))
+	if len(z.p.posts) != 0 {
+		t.Errorf("%v", z.p.posts)
+	}
+}
