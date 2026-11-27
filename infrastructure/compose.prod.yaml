@@ -88,6 +88,8 @@ services:
       NUL_GUILD_ID: ${NUL_GUILD_ID:-}
       NUL_TIMES_CHANNEL_ID: ${NUL_TIMES_CHANNEL_ID:-}
       NUL_ADMIN_ROLE_ID: ${NUL_ADMIN_ROLE_ID:-}
+      # Goのメモリ上限（コンテナの上限256mより少し低く。画像の縮小で一時的に増えても、OOM killの前にGCが働く）
+      GOMEMLIMIT: ${AGENT_GOMEMLIMIT:-200MiB}
     mem_limit: ${AGENT_MEM_LIMIT:-256m}
 
   web:
