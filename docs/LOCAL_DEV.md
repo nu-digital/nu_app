@@ -1,4 +1,4 @@
-# ローカル開発の起動手順（P0）
+# ローカル開発の起動手順
 
 前提: WSL2/LinuxのUbuntu、Docker Engine（`docker compose`）、Node.js（[.node-version](../.node-version)）、Git。初回の準備は[WSL_SETUP](WSL_SETUP.md)。固定版は[TOOLCHAIN](TOOLCHAIN.md)。ホストにGoは不要。
 
@@ -13,10 +13,11 @@ npm run dev:up                # db → migrate → api → bot / web / admin を
 | サービス | URL（127.0.0.1のみ） | 内容 |
 |---|---|---|
 | web | http://127.0.0.1:8081/ | 公式サイト（動的配信。コンテンツは公開API（api）から描画時に取得）。URLは本番想定と同じ。APIが落ちている間は、コンテンツのページは5xxになる（`/healthz/`は応答する）。移行前の記事は、運用者が`nuctl import-legacy`で取り込むまで表示されない |
-| admin | http://127.0.0.1:3000/ | 内部アプリの骨組み（`/healthz`のみ。画面はP1以降） |
+| admin | http://127.0.0.1:3000/ | 内部ポータル（ログイン・メンバー・物品・記事/作品・管理画面。初期Ownerの作成は§4） |
 | api | http://127.0.0.1:8080/healthz ・ `/readyz` | `readyz`はDB接続を含む |
 | db | `127.0.0.1:15432`（PostgreSQL） | ローカル専用。ポートは`.env`の`DB_PORT` |
-| bot | – | 起動のみ（Discord通知の送信はAPI内のworker。`DISCORD_BOT_TOKEN`を.envに設定したときだけ有効。docs/OPERATIONS.md） |
+| bot | – | 骨組みのみ（Discord通知の送信はAPI内のworker。`DISCORD_BOT_TOKEN`を.envに設定したときだけ有効。docs/OPERATIONS.md） |
+| **agent（ぬる）** | – | **ローカルのComposeには含めない**。実際のDiscord・Claude APIに、開発・CIから接続しない方針（[CLAUDE_TEAM](CLAUDE_TEAM.md)）。検証は`scripts/go-docker.sh services/agent go test ./...`（偽のClaude・偽のDiscord）と`scripts/test-integration.sh`（実PostgreSQL）。有効モードの実機確認は本番で[NUL_LAUNCH](NUL_LAUNCH.md)だけ |
 
 `.env`が無い、または`POSTGRES_*`が空のときComposeは起動を拒否する。`.env`は`.gitignore`済みでGitに入れない。
 
@@ -50,16 +51,29 @@ docker compose --env-file .env -f infrastructure/compose.yaml run --rm --no-deps
   bootstrap-owner --login-id owner.example --display-name "ローカル用オーナー"
 ```
 
-招待tokenが**一度だけ**表示される（DBにはSHA-256のみ。ログ・監査に残らない）。パスワード設定とログインはP1-02で提供する。やり直すには`npm run dev:reset`（開発用DBの初期化）。**本番では実行しない**（本番は未構築。実行は運用責任者の手順で別途決める）。
+招待tokenが**一度だけ**表示される（DBにはSHA-256のみ。ログ・監査に残らない）。パスワードは、表示されたtokenで`/invite`の画面から設定してログインする。やり直すには`npm run dev:reset`（開発用DBの初期化）。**本番では実行しない**（本番の初期Ownerは作成済み。再実行は拒否される。緊急時の復旧は[RUNBOOK §11](RUNBOOK.md)）。
 
 ## 5. つまずいたら
 
 - ポート競合: `.env`の`*_PORT`を変更。
 - DBパスワードに記号を使うとDSNが壊れる。英数字と`- _ . ~`だけにする。
 - 一部サービスだけ作り直す: `docker compose --env-file .env -f infrastructure/compose.yaml up --build -d <service>`。
-- migrationは`migrate`サービスが起動時に`up`を実行する（再実行は安全）。スキーマはP1以降。
+- migrationは`migrate`サービスが起動時に`up`を実行する（再実行は安全）。スキーマは`db/migrations`（00001〜）。
 
 ## 画像（メディア）
 
 - composeのAPIは`MEDIA_DIR=/data/media`（名前付きボリューム`media-data`）に、再エンコード後の画像を保存する。ローカルでAPIを直接起動する場合は`MEDIA_DIR`に絶対パスを指定する（未設定ならアップロード・配信は503）。ボリュームを消すと画像も消える（`docker compose down -v`に注意）。
 - 運用コマンド: `docker compose run --rm --no-deps --entrypoint /nuctl api media-verify`（`media-gc`・`media-redact`も同様。docs/OPERATIONS.md）。
+
+## ローカルでPlaywright（Chromium）が動かないとき（WSLに共有ライブラリが無い）
+
+`npm run web:site-check`・`compose:smoke`・`web:e2e`は、ホストのChromiumが共有ライブラリ（libnspr4・libnss3・libasound）を要する。sudoできない環境では、パッケージを展開して`LD_LIBRARY_PATH`で渡せる:
+
+```sh
+mkdir -p /tmp/chromelibs/debs && cd /tmp/chromelibs/debs && apt-get download libnspr4 libnss3 libasound2t64
+for d in *.deb; do dpkg -x $d /tmp/chromelibs/root; done
+export LD_LIBRARY_PATH=/tmp/chromelibs/root/usr/lib/x86_64-linux-gnu    # 以降、このシェルでnpm run ... を実行
+```
+
+`/tmp`は消えることがあるので、必要なら作り直す。`pkill -f <パターン>`は、そのコマンド自身を殺すことがあるので使わず、`fuser -k <port>/tcp`で止める。
+

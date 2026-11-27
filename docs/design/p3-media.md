@@ -1,5 +1,7 @@
 # P3-02 設計メモ: メディア（画像）
 
+> **状態（2026-11-28）: 実装済み。これは設計の経緯と理由の記録（履歴）**で、実装の正本はコードと[docs/README.md](../README.md)の各正本文書（[ARCHITECTURE](../ARCHITECTURE.md)・[DATABASE](../DATABASE.md)・[API](../API.md)・[AUTHZ](../AUTHZ.md)）。以下の「暫定」「提案」「未実装」などの表現は、書かれた当時のもの。
+
 - 2026-11-21 / Claude Code（Sonnet 5.5）。状態: **Opusレビュー（2026-11-21、指摘15件・高4）を反映済みの設計**。実装はこの版に従う。
 - 正本: DECISIONS D06（画像の上限・縮小・再エンコード）、REQUIREMENTS（Phase 3の画像）、DATABASE §5（`media_assets`・`media_references`）、ARCHITECTURE（保存先と配信）、AUTHZ（`media.*`）。確定事項は変えない。ここはその範囲で決めきれない細部。
 - 親設計: [p3-cms.md](p3-cms.md)（公開版が参照する画像を、公開版の間だけ公開する）。

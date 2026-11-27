@@ -2,45 +2,37 @@
 
 目的は、個人情報と活動履歴を守りながら変更できること。全行カバレッジを目標にせず、危険な境界と実際の操作を検証する。失敗したテストをskip、無条件成功、スナップショット一括更新で通さない。
 
-## 今実行できるもの
+## 実際に実行できるコマンドと、CIとの対応（2026-11-28時点）
 
-```sh
-node scripts/check.mjs
-node --test scripts/harness.test.mjs
-```
-
-準備用チェックは文書・設定・命名規則・禁止パスを検証する。テストはチェックの失敗系とStop hookの動作を検証する。CIはUbuntu上で同じコマンドを実行する。
-アプリ本体、Go、DB、Compose、E2Eはまだない。以下は実装と同時に追加する検証契約であり、実行済み結果ではない。
-
-## 検証の層と追加時期
-
-| 層 | 手段・方針 | いつ追加するか |
+| 何を検証するか | コマンド（ローカル） | CIジョブ（`.github/workflows/`） |
 |---|---|---|
-| 静的検査 | Next ESLint、`tsc --noEmit`、Go gofmt/vet、ビルド | P0で各実体追加と同じPR |
-| 単体 | Go標準testing、UIロジックはVitest/Testing Library候補。実装のコピーではなく入力と利用者から見える結果 | 業務ルールやUI状態を追加したPR |
-| API・DB統合 | 本番と同じPostgreSQLメジャー、実migration、HTTP handler経由で認証と認可。SQLiteで代替しない | P1の最初のDB/APIから |
-| 並行・障害 | 複数DB接続、同期して同時要求、件数・残数・履歴・outboxを照合。外部Discordは偽サーバーで429/5xx/timeout | P1権限移譲、P2貸出・通知、P3公開 |
-| E2E | Playwright候補。実API・ローカルDB・架空seedを使い主要導線を確認。モックだけで認証完了としない | P0既存サイトのsmoke、P1以降の各機能 |
-| 表示回帰 | 同じOS・ブラウザー・フォント・viewportで比較。アニメ停止・時刻固定。差分を人が確認 | P0移設前基準、以後の画面変更 |
-| 運用 | コンテナbuild、health/readiness、migration互換性、復元、前版イメージへの復帰 | 基盤PRごと、公開前に総合確認 |
+| 文書・設定・命名・禁止ファイルの準備用チェック、チェック自体のテスト | `node scripts/check.mjs`・`node --test scripts/harness.test.mjs` | `harness / repository`・`harness / policy` |
+| 公式サイト（lint・型・ビルド・単体） | `npm run web:ci && npm run web:lint && npm run web:typecheck && npm run web:build`・`npm run test:unit` | `web / lint-typecheck-build` |
+| 内部ポータル（lint・型・ビルド・単体） | `npm run admin:ci && npm run admin:lint && npm run admin:typecheck && npm run admin:test && npm run admin:build` | `admin / lint-typecheck-build` |
+| Go（api・bot・**agent**）の整形・vet・単体・race | `scripts/go-docker.sh services/<名前> sh -c 'test -z "$(gofmt -l .)" && go vet ./... && go test -race -count=1 ./...'` | `go / services/api`・`go / services/bot`・`go / services/agent` |
+| DB・クエリ（実PostgreSQLで本物のmigrationを適用。api・agent） | `scripts/test-integration.sh`（`TEST_DATABASE_URL`が無いと失敗し、skipしない）・`scripts/sqlc.sh generate`／`diff` | `go / integration`・`go / sqlc` |
+| コンテナのビルド（api・bot・migrate・agent） | `docker build`（CIと同じ） | `go / docker build` |
+| 全サービスの起動・全ルート・DB停止時の挙動・既存サイトとの一致・画面E2E | `npm run compose:smoke`（専用プロジェクトで起動して片付ける）・`npm run web:site-check`・`npm run web:e2e` | `compose / smoke` |
+| バックアップ→隔離環境での復元・Nginx・デプロイスクリプト・証明書確認 | `scripts/backup-restore-test.sh`・`scripts/nginx-test.sh`・`scripts/deploy-test.sh`・`scripts/cert-check-test.sh` | `ops / backup-restore`・`ops / nginx`・`ops / deploy-script` |
 
-ツールの具体的バージョンは採用PRで一次資料と互換性を調べて固定し、理由をDECISIONSに記録する。今は未インストールのコマンドを成功するダミーとして登録しない。
+- マージの必須チェック（ブランチ保護）は[DEVELOPMENT](DEVELOPMENT.md)。デプロイは、そのコミットの**CI全成功**（`ops`・`go / services/agent`を含む）を確認してから進む（`deploy.yml`の`verify`）。
+- **ぬる（`services/agent`）のテスト方針**: 実際のClaude API・Discordを呼ばない。`llm.Fake`（偽のClaude）・`llm.FakeBatch`・偽のSender/Store/設定で、判断・予算の段階・全停止/静か・公開/非公開・DM・忘れる処理・プロンプトの固定部分・ツールの安全（他人のデータを触れない）・入力のデータ扱いを検証する。DBを使う部分は統合テスト（実PostgreSQL）。**実機でしか分からないこと（Discordの権限の実際・応答の質・費用の実績）は、[NUL_LAUNCH](NUL_LAUNCH.md)のチェックリストで人が確認する**。
+- **実装した対象のテストを、同じPRでCIに足す**。導入済みの対象を、ファイルの存在チェックなどでskipして成功扱いにしない。
+- `node scripts/check.mjs`は準備用チェック（文書のリンク・設定・命名規則）で、**アプリの機能テストの成功を意味しない**。
 
-## P0で用意する共通コマンド
+## 検証の層（方針）
 
-以下の名前をルートnpm scripts / 実スクリプトへ接続し、READMEとCIを同時更新する。採用しない場合は同等の実行コマンドを明記する。
-
-| コマンド契約 | 実際に実行する内容 |
+| 層 | 手段・方針 |
 |---|---|
-| `npm run check` | 各Nextアプリのlintと型検査、準備用チェック |
-| `npm run test:unit` | 存在する単体テスト。テスト0件を暗黙に合格させない |
-| `npm run build` | 各Nextアプリのproduction build |
-| API/Bot各moduleで `go vet ./...` / `go test -race ./...` / `go build ./...` | Go検証。gofmt差分があればCI失敗 |
-| `npm run test:integration` | 隔離したPostgreSQLに実migrationを適用しAPI/DB検証 |
-| `npm run test:e2e` | 必要なサービスを起動しPlaywrightの主要操作を検証 |
-| `npm run test:visual` | 基準画像との比較。基準更新は別の明示操作 |
+| 静的検査 | Next ESLint、`tsc --noEmit`、Go gofmt/vet、ビルド |
+| 単体 | Go標準testing、UIロジックのテスト。実装のコピーではなく、入力と利用者から見える結果 |
+| API・DB統合 | 本番と同じPostgreSQLメジャー、実migration、HTTP handler経由で認証と認可。SQLiteで代替しない |
+| 並行・障害 | 複数DB接続、同時要求、件数・残数・履歴・outbox・上限の照合。外部Discord・Claudeは偽物で429/5xx/timeout |
+| E2E | Playwright。実API・ローカルDB・架空seedで主要導線。モックだけで認証完了としない |
+| 表示回帰 | 同じブラウザー・viewportで、移設前基準との比較（`web:site-check`・`compose / smoke`）。差分は人が確認 |
+| 運用 | コンテナbuild・health/readiness・migration互換性・復元・前版イメージへの復帰・Nginx |
 
-DB/E2Eのコマンドは対応実体を作る時に追加する。導入済み対象についてファイル存在チェックでテストをskipしない。P0最初のアプリPRでCIを拡張し、文書だけの準備CIでは完了としない。
+ツールの具体的バージョンは[TOOLCHAIN](TOOLCHAIN.md)。
 
 ## Phase別の必須シナリオ
 

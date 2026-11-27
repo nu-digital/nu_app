@@ -2,6 +2,8 @@
 
 認可判断はGo APIの`services/api/internal/authz`が行う。UIの非表示では代替しない。表の正本はコードで、`go test ./internal/authz`が**docs/API.mdの全エンドポイントとの1対1対応**と、この文書が全アクションを含むことを検査する。
 
+> **既知の整理事項**: 通知系は、同じエンドポイントに2系統のアクションID（`notifications.*`と`admin.notifications.*`）が定義されている（権限は同じ。コード`authz.go`とテストの両方を直す必要があるため、別PRで統一する。[BACKLOG](BACKLOG.md)）。`dashboard.feed`は認可表にあるが、APIは未実装。
+
 ## 共通ルール
 
 - 既定は拒否。表に無いアクションは拒否する。

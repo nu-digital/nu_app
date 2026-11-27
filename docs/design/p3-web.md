@@ -1,5 +1,7 @@
 # P3-04 設計メモ: 既存記事・画像の移行と公開サイトのAPI接続
 
+> **状態（2026-11-28）: 実装済み。これは設計の経緯と理由の記録（履歴）**で、実装の正本はコードと[docs/README.md](../README.md)の各正本文書（[ARCHITECTURE](../ARCHITECTURE.md)・[DATABASE](../DATABASE.md)・[API](../API.md)・[AUTHZ](../AUTHZ.md)）。以下の「暫定」「提案」「未実装」などの表現は、書かれた当時のもの。
+
 - 2026-11-21 / Claude Code（Sonnet 5.5）。状態: **Opusレビュー（2026-11-21、指摘15件・高5）を反映済みの設計**。実装はこの版に従う。
 - 正本: REQUIREMENTS（Phase 3）、DECISIONS D06・D08・D10・D12・D13、[p3-cms.md](p3-cms.md)（公開API・匿名化・日付）、[p3-media.md](p3-media.md)（画像の公開境界・キャッシュ要件）、`docs/legacy-baseline/`（移設前の比較基準）。確定事項は変えない。
 

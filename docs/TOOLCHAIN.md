@@ -22,6 +22,9 @@
 | github.com/bwmarrin/discordgo | v0.29.0（`services/agent/go.mod`。2025-05-24公開。ぬるP1-2） | Discordの接続（Gateway・REST・スラッシュコマンド）。Goで事実上標準のライブラリ。最新タグ。 |
 | github.com/gorilla/websocket | v1.5.4-0.20240701034025-d67f41855da4（`services/agent`。間接依存。discordgoが要求する1.4.2を上書き） | `govulncheck`が`GO-2026-6278`（WebSocketのマスクキーが弱い乱数）を検出。修正は未タグのコミットにだけあるため、そのコミットに固定（2024-07-01。2週間以上前）。タグ付きリリースが出たら置き換える。確認: 2026-11-27に`govulncheck`（v1.10.0）で「No vulnerabilities found」 |
 | golang.org/x/crypto | v0.59.0（`services/agent`。間接依存。apiと同じ版） | `GO-2026-5932`の修正済みの版へ上げた |
+| golang.org/x/text | v0.44.0（`services/agent/go.mod`） | 個人情報の形を検出するときに全角・半角をそろえる（NFKC。`internal/redact`）。標準ライブラリに正規化が無いため |
+| github.com/pressly/goose/v3 | v3.30.1（`services/agent`のテスト用。apiと同じ版） | agentの統合テストも本物のmigrationを適用する |
+| golang.org/x/net | v0.62.0（`services/agent`。間接依存。apiと同じ版）。x/sync・x/sysも間接依存 | discordgo・anthropic-sdk-goの依存。`govulncheck`の対象に含める |
 | github.com/gen2brain/webp | v0.6.4（`services/api/go.mod`。2026-07-01公開。P3-02-5） | WebPのエンコード（ロッシー・ロスレス・アルファ）。純Goにはロッシーが無く、cgo＋libwebpは`distroless/static`と合わない。libwebpをGoへトランスパイルした同梱実装を使う（`-tags nodynamic`で環境のlibwebpを使わない）。同梱の生成物の差分は確認できないため、更新は別PRで、`go.sum`固定・`govulncheck`の再実行を必須とする。脆弱性確認: 2026-11-21に`govulncheck`（v1.10.0、`-tags nodynamic`）を`services/api`全体に実行し「No vulnerabilities found」 |
 | 実行イメージ | `gcr.io/distroless/static-debian12:nonroot`（digest固定） | 静的バイナリのみを非rootで実行。シェル・パッケージ管理を持たず攻撃面が小さい |
 | 配信イメージ（web） | `nginxinc/nginx-unprivileged:1.30.6-alpine`（digest固定） | nginx stable 1.30系（[endoflife.date](https://endoflife.date/nginx)でサポート中）。1.30.7は同イメージ未公開のため1.30.6 |
@@ -44,4 +47,34 @@ scripts/go-docker.sh services/api sh -c 'test -z "$(gofmt -l .)" && go vet ./...
 
 ## migration
 
-`db/migrations/`のSQLを`db/Dockerfile`のgooseで適用する。最初の`00001_baseline.sql`は基盤確認用で業務テーブルを作らない（スキーマはP1）。再実行は「no migrations to run」で安全に終わる。本番でmigrationを実行する手順・順序はP4で決める。
+`db/migrations/`のSQLを`db/Dockerfile`のgooseで適用する。`00001_baseline.sql`から`00020`まで（2026-11-28時点）。再実行は「no migrations to run」で安全に終わる。本番では、デプロイ時に`migrate`サービスが`up`を実行する（前進のみ。[OPERATIONS](OPERATIONS.md)「DBの互換性のルール」）。
+
+## CI・GitHub Actions（固定）
+
+| 対象 | 固定 | 備考 |
+|---|---|---|
+| `actions/checkout` | v6（コミットSHAで固定） | 更新はDependabot（Actionsのみ。月1回）。メジャー更新（#3: v7）は全workflowのpinと合わせて別PRで確認する |
+| `actions/setup-go` | v7.1.0（コミットSHAで固定） | 同上 |
+| `actions/setup-node` | v6（コミットSHAで固定。#4: v7は未対応） | 同上 |
+| Dependabot | `github-actions`のみ（`.github/dependabot.yml`） | **Go・npmの依存は自動更新の対象外**。意図: 版は一次資料で確認して独立PRで更新する（固定方針）。**定期的に`govulncheck`（Go）と`npm audit`を実行して確認する**（最終実行: apiは2026-11-21、agentは2026-11-27。次は運用担当が四半期ごとに） |
+| ランナーの実行時間・GHCRの容量 | GitHub Organizationの無料枠に収まっているか、定期的に確認 | [COSTS_AND_CONTRACTS](COSTS_AND_CONTRACTS.md) |
+
+## 本番サーバーのソフトウェア（版の実績。正本は`RUNBOOK`の記録）
+
+Ubuntu 24.04 LTS（amd64）・Docker Engine（公式apt。記録時点29.10.1）・Docker Compose plugin・Nginx 1.24.0（Ubuntuのパッケージ。**CIも同じ1.24.0**で試験）・certbot 2.9.0（Ubuntuのパッケージ）。更新は`unattended-upgrades`（セキュリティ）と、必要に応じて手動。
+
+## 外部サービス（用途・採用理由・影響）
+
+費用・契約者・更新日は [COSTS_AND_CONTRACTS](COSTS_AND_CONTRACTS.md)。
+
+| サービス | 用途 | 採用理由 | 止まったときの影響 |
+|---|---|---|---|
+| さくらのVPS v5（石狩第1） | 本番サーバー（1台） | 国内・固定料金・Ubuntu 24.04が使える。事業者固有の機能に依存せず、Docker Composeだけで動く構成にして、他へ移行しやすくしている（[SERVER_SETUP](SERVER_SETUP.md)） | 全サービス停止。VPS外バックアップが無いため、ディスクを失うと復旧できない |
+| ドメイン `nu-digital.jp` | 公式サイト・ポータルのURL | 既存の団体のドメイン | 全サービスに到達できない（期限切れに注意） |
+| Cloudflare（DNSのみ） | DNS管理 | 無料枠で足りる・運用が簡単。**プロキシは使わない**（クライアントIPをNginxで取る構成のため。[RUNBOOK §3](RUNBOOK.md)） | 名前解決できない |
+| Let's Encrypt（certbot） | TLS証明書（無料・自動更新） | 無料・自動化できる。webroot方式でNginxを止めずに更新 | 期限切れでブラウザー警告。14日前からDiscordに通知 |
+| GitHub（Organization・Actions・GHCR） | リポジトリ・CI/CD・コンテナイメージ | コードとCIとイメージ置き場を1か所に。環境`production`の承認でデプロイを人が止められる | デプロイ・CIができない（本番は動き続ける）。GHCRが止まるとVPSがイメージをpullできない |
+| Discord（Botと運用Webhook） | ぬるの会話・nu_appの通知・運用通知 | 団体の連絡手段がDiscordのため | 通知が送信待ちに溜まる（業務は止まらない）。ぬるが応答しない |
+| Anthropic（Claude API：Messages・Batch・Web検索） | ぬるの頭脳 | 長い文脈・ツール利用・日本語の質。Teamプラン付属のAPIクレジット月$60の範囲で運用（追加課金なし） | ぬるが寝る（予算・クレジット切れ）。他に影響しない |
+| Claude Code（Claude Team） | 開発作業（AIエージェント） | 小さいPRを素早く回せる。内包使用量の範囲で使う（[CLAUDE_TEAM](CLAUDE_TEAM.md)） | 開発が止まる（本番に影響しない） |
+

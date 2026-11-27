@@ -1,29 +1,30 @@
-# Claudeへの依頼文
+# 新しいセッション・新しいAIエージェントの始め方
 
-準備PRをレビューしてmainへマージした後、Claude Codeをリポジトリ直下で起動して以下を渡す。未マージの準備ブランチではセットアップと準備チェックだけを確認し、機能実装は始めない。
+Claude Codeなどを、このリポジトリで新しく始めるとき（セッションの再開・担当の交代を含む）の手順と、渡す依頼文のひな形。**初回（P0-01）の依頼文は、役目を終えたので削除した**（経緯は[HISTORY](HISTORY.md)・[handoffs/P0-complete.md](handoffs/P0-complete.md)）。
 
-初回の人の作業は [WSL_SETUP](WSL_SETUP.md)。Team利用・モデル選択・中断再開は [CLAUDE_TEAM](CLAUDE_TEAM.md) に従う。
+## 1. 起動前（人）
+
+- 初回の環境準備は [WSL_SETUP](WSL_SETUP.md)。課金の境界・モデル選択・中断再開は [CLAUDE_TEAM](CLAUDE_TEAM.md)（追加課金・API・Fableは使わない。ぬるの**実行時**のAPIだけが例外）。
+- `claude`をリポジトリ直下で起動。`/memory`で指示（`CLAUDE.md`→`AGENTS.md`）、`/hooks`でStop hookを確認。**実行権限の全解除は不要**。
+- **秘密（APIキー・トークン・SSH鍵・VPSのパスワード）は渡さない**。本番へのデプロイ・VPSの操作・APIへの接続は、人が確認して行う。
+
+## 2. 依頼文のひな形（作業を頼むとき）
 
 ```text
-AGENTS.md / CLAUDE.mdとdocsの必読5文書、DEVELOPMENT、TESTING、DECISIONSを先に読んでください。
-CLAUDE_TEAM.mdに従い、Team内包使用量を優先し追加課金を許可しません。通常Sonnet、難しい設計Opus、軽量調査Haikuを優先し、作業の区切りで引き継ぎを保存してください。
-今回はBACKLOGのP0-01、GitHub Issue #2だけを完了してください。Issueを重複作成しないでください。
-
-既存サイトは https://github.com/nu-digital/nu_digital 、調査基準はdocs/LEGACY_SITE.mdです。
-まず現在のソース・主要URL・67記事・画像・日付・ギャラリーをローカルで再現し、移設前の比較基準を作成してください。
-必要な依存バージョンの整合性と、移設時に維持すべきURL・表示・ライセンス・履歴を調査してください。
-
-開始時に対象要件・影響範囲・DB変更・API変更・必要テスト・切り戻しを短く記載してください。
-Issue番号付きブランチを作り、日本語でコミット・PRを作成してください。
-node scripts/check.mjs と node --test scripts/harness.test.mjs に加え、調査対象サイトのlint/buildと実画面確認を行ってください。
-調査で既存不具合があれば、移設による差分と区別し、再現条件と影響を記録してください。
-
-通常の調査・ローカル修正・検証・作業ブランチへのpush・PR作成は自律的に進めて構いません。PR #28以降のマージは運用責任者のレビューを待ってください（Claudeはpush・Draft PR・CI確認まで。依存PRは積み重ねて構いません。docs/DEVELOPMENT.md の「マージとレビューの運用」）。
-重要な未確定仕様だけDECISIONSに提案と代替案を残し、それに依存しない作業は続けてください。
-CMS、物品管理、認証本体は今回実装せず、本番デプロイ・本番データ変更は行わないでください（mainマージで本番デプロイが走る変更は確認が必要）。
-完了時は対象SHA、差分、実行コマンドと実測結果、未実施検証、残件をPRと引き継ぎに残してください。
+README.md、AGENTS.md、docs/AI_GUIDE.md、docs/handoffs/LATEST.md を先に読んでください。
+git status・直近のコミット・開いているIssue/PR・直近のCIで、実際の状態を確認してください（文書より実態が正です）。
+今回の作業は <Issue番号 または 作業の内容> だけです。Issueを重複作成しないでください。
+作業の種類に応じて、AI_GUIDEの「変更の種類別の目安」に挙がった文書を読み、DECISIONSに関係する決定（D01〜D15・暫定採用）があれば従ってください。未確定の仕様は決めずに、DECISIONSに提案を書いてください。
+開始時に、対象要件・影響範囲・DB変更・API変更・必要なテスト・ロールバックの考え方を短く書いてください。
+Issue番号付きのブランチで、日本語のコミット・PRにしてください。実際に実行したコマンドと結果を示し、未実施の検証を分けて報告してください。
+本番のデプロイ・本番データの変更・実際のClaude API/Discordへの接続・秘密の扱いは、私が確認してから行います。しないでください。
+完了時は、docs/handoffs/ に対象SHA・実行結果・残件・次の一手を残してください。
 ```
 
-P0-01の受け入れ後にP0-02へ進む。内部アプリのUI作業では [DESIGN](DESIGN.md) に従い、現在の日本語UIを調査し、要件内のデザイン選択は自律的に行う。先に全Phaseを一気に実装する依頼はしない。
+## 3. 再開するとき
 
-Claude Code側では `/memory` でこのリポジトリの指示、`/hooks` でStop hookの認識を確認する。実行権限を全解除する設定は不要。CIとGitHub保護ルールの有効化状況は引き継ぎで確認する。
+使用量の制限などで止まったあとは、同じcloneで `claude --continue` または `claude --resume`。再開後は、指示ファイル・Issue・`docs/handoffs/`の最新・`git status`と差分・直近のCIを照合し、**不明な処理を完了と推測しない**（DB操作などを盲目的に再実行しない）。未完了の受け入れ条件から続ける。
+
+## 4. 次に読むもの
+
+[AI_GUIDE](AI_GUIDE.md)（設計思想・実装状況・落とし穴）・[docs/README.md](README.md)（文書の地図）。

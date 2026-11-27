@@ -1,4 +1,6 @@
-# nu_app REST API草案 v0.1
+# nu_app REST API契約
+
+状態: **実装済みの契約**（2026-11-28に更新。実際のルートは`services/api/internal/api/`）。各節は、概要の表（Method・Path・権限）と「実装済みの契約」の表（要求・応答・エラー）が補い合う。**食い違ったら、コードと「実装済みの契約」の表が正**（未実装のものは明記: `/dashboard/feed`）。
 
 Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワーク経由で公開コンテンツAPIを呼び出す。リクエスト/レスポンスは原則JSON。DBやAPIモデルを直接返さず、用途別にレスポンスを整形。
 
@@ -202,11 +204,11 @@ Markdownは許可リスト方式でサニタイズする。生のiframe/script/v
 
 | Method | Path | 権限 | 動作 |
 |---|---|---|---|
-| POST | `/media` | Member | 画像のアップロード（クエリ`purpose`が必須。**生のバイト列**。`Content-Type: image/jpeg|png|webp|application/octet-stream`）。P3-02aは`purpose=cms`のみ（avatar/inventoryは422。P3-02b）。形式は**中身で判定**（JPEG・PNG・WebPのみ。SVG・GIF等は415）。上限10MiB（超過は読み切らず413）・各辺10,000px・2,000万画素（**デコード前に**拒否）・アニメーション不可。**検査→縮小（長辺2,560px。拡大しない）→向き補正→再エンコード**で、EXIF・GPS・ICC・末尾の付加データは残らない（出力はJPEG/PNG）。利用者ごとに1分20回・同時1件・1日200枚/200MiB（429）、空き容量不足は507、混雑は503＋`Retry-After`。201 `{id, publicId, publicUrl:"/api/v1/public/media/<publicId>", url:"/api/v1/media/<id>", width, height, mimeType, byteSize, purpose}`（保存先のパスは返さない。`publicUrl`は公開中の版が参照するまで匿名には配信されない） |
+| POST | `/media` | Member | 画像のアップロード（クエリ`purpose`が必須。**生のバイト列**。`Content-Type: image/jpeg|png|webp|application/octet-stream`）。`purpose`は`cms`・`avatar`・`inventory`（`inventory`はAdminのみ。P3-02b）。形式は**中身で判定**（JPEG・PNG・WebPのみ。SVG・GIF等は415）。上限10MiB（超過は読み切らず413）・各辺10,000px・2,000万画素（**デコード前に**拒否）・アニメーション不可。**検査→縮小（長辺2,560px。拡大しない）→向き補正→再エンコード**で、EXIF・GPS・ICC・末尾の付加データは残らない（出力はJPEG/PNG）。利用者ごとに1分20回・同時1件・1日200枚/200MiB（429）、空き容量不足は507、混雑は503＋`Retry-After`。201 `{id, publicId, publicUrl:"/api/v1/public/media/<publicId>", url:"/api/v1/media/<id>", width, height, mimeType, byteSize, purpose}`（保存先のパスは返さない。`publicUrl`は公開中の版が参照するまで匿名には配信されない） |
 | GET | `/media/{id}` | アップロード者・参照するコンテンツの作者/共同編集者・Editor以上 | 認可つき配信。`Cache-Control: private, no-store`・`nosniff`・`CSP: sandbox`。権限が無い・存在しない・無効化済みは同じ404 |
 | GET | `/media/by-public/{publicId}` | 同上 | 本文のURL（`publicId`）からの下書きプレビュー用の認可つき配信 |
 | GET | `/public/media/{publicId}` | Public | **公開中の版が参照している画像だけ**（導出。公開停止で即座に404）。匿名・認証情報を見ない。強いETag・`Cache-Control: no-cache`・`CORP: cross-origin`。参照が無い・未公開・redacted・存在しないは同じ404 |
-| GET | `/dashboard/feed` | Member | CMS公開・アプリ更新等のイベント |
+| GET | `/dashboard/feed` | Member | **未実装**（契約だけ。CMS公開・アプリ更新等のイベント。認可表にはアクションが定義済み。実装するときにテーブル`dashboard_events`のmigrationとあわせて作る） |
 | GET | `/admin/notifications/settings` | Admin | イベント種別と通知先チャンネル一覧 |
 | PUT | `/admin/notifications/settings/{eventType}` | Admin | `{enabled, discordChannelId?}`。ON/OFFと送信チャンネル変更（数字5〜25桁。空/nullで未設定＝送信せず待機）。未知の種別は404、入力不正は422。監査ログに変更の事実だけ残す |
 | POST | `/admin/notifications/test` | Admin | `{discordChannelId}`のチャンネルへ接続テストを1通送る。200 `{ok:true}`／Bot未設定は503 `BOT_NOT_CONFIGURED`、Discordの拒否は502 `DISCORD_REJECTED`、上限は429 `DISCORD_RATE_LIMITED`、通信失敗は502 `DISCORD_UNAVAILABLE`、入力不正は422。応答にDiscordの本文・tokenを含めない |

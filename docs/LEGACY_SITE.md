@@ -12,7 +12,7 @@ READMEとPages workflowに記載された公開先: [nu-digital.github.io/nu_dig
 - Markdownはblog 45件、news 1件、project 21件、計67件。大文字やドットを含むslugがあるので勝手に小文字化・正規化しない。
 - 団体カラーは `#004aad`。写真ギャラリーは `ArticleMedia.tsx`、日付・カテゴリ・画像のグループ化は `lib/content-presentation.mjs`。
 - LocalEditorの `test:editor` はあるが、UI全体のE2Eや独立typecheck scriptはpackage.jsonにない。既存CIはlintとbuildを行う。
-- 既存 `docs/screenshots/website.png` は参考画像。撮影条件不明のためそのまま自動比較の基準にはしない。
+- 既存サイトの上流リポジトリ（`nu-digital/nu_digital`）の `docs/screenshots/website.png` は参考画像（**このリポジトリには含まれない**）。撮影条件不明のためそのまま自動比較の基準にはしない。
 
 ## P0の移設で守ること
 

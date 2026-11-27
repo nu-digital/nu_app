@@ -1,4 +1,6 @@
-# nu_app アーキテクチャ設計 v0.1（提案）
+# nu_app アーキテクチャ
+
+状態: **実装済みの構成の記述**（2026-11-28に実装に合わせて更新。当初の設計案から、実装で変わった点は各節に書いた）。全体像は[README](../README.md)、運用上の実際の構成・値は[RUNBOOK](RUNBOOK.md)、ぬるの詳細は[NUL_OVERVIEW](NUL_OVERVIEW.md)。
 
 ## A. サービス境界
 
@@ -12,7 +14,8 @@ Internet
 
 private Docker network
   ├─ services/api (Go; auth, member, inventory, CMS, media, notifications)
-  ├─ services/bot (Go; Discord outbound worker, API shared contracts)
+  ├─ services/bot (Go; 骨組みのみ。Discord通知workerはapiプロセス内で動く。§G)
+  ├─ services/agent (Go; AIメンバー「ぬる」。Discord・Claude APIへ出ていく。専用のDBロール`nu_agent`・`agent`スキーマ。nu_app本体のテーブルは読めない)
   ├─ PostgreSQL
   └─ persistent media directory (host-mounted; outside container image)
 ```
@@ -24,38 +27,35 @@ private Docker network
 - アプリランチャーのカードはコード上のアプリ定義（id, title, icon, route, release status）から作る。全員に共通表示。権限は個別APIで検証。
 - モノレポにまとめるが、Next.js web/adminは別のビルド・Dockerイメージにする。開発用サービスを本番VPSへ常駐させない。
 
-## B. 想定ディレクトリ
+## B. ディレクトリ構成（実体）
 
 ```text
-nu-system/
+nu_app/
 ├── apps/
-│   ├── web/                     # 既存公式サイトの移設先
-│   └── admin/                   # nu_app管理画面
+│   ├── web/                     # 公式サイト（既存サイトをsubtreeで移設。公開版APIから描画）
+│   └── admin/                   # 内部ポータル（app/配下に画面）
 ├── services/
 │   ├── api/
-│   │   ├── cmd/server/
-│   │   └── internal/{auth,members,inventory,cms,media,notifications,platform}/
-│   └── bot/                     # Discord worker（必要ならAPIと同一Go binaryも可）
+│   │   ├── cmd/{server,nuctl}/  # APIサーバー／運用CLI（初期Owner作成・緊急復旧・メディア整合・記事移行ほか）
+│   │   └── internal/{api,auth,authz,bootstrap,cmsrules,httpx,legacyimport,mdcheck,media,notify,platform,recovery,store,testutil}/
+│   ├── bot/                     # 骨組みのみ
+│   └── agent/                   # ぬる（cmd/agent、internal/{brain,budget,config,control,discord,health,imageprep,introspect,llm,redact,responder,schedule,store,summarize}）
 ├── db/
-│   ├── migrations/
-│   └── queries/                 # sqlc用SQL
+│   ├── migrations/              # goose（前進のみ。00001〜）
+│   ├── queries/                 # sqlc用SQL
+│   └── Dockerfile・sqlc.yaml
 ├── infrastructure/
-│   ├── compose.yaml
-│   ├── nginx/
-│   └── scripts/
-├── packages/                    # 共通TS型やUI等（必要なものだけ）
-├── docs/
-│   ├── REQUIREMENTS.md
-│   ├── ARCHITECTURE.md
-│   ├── DATABASE.md
-│   ├── API.md
-│   └── TASKS.md
-├── AGENTS.md
-└── .github/workflows/
+│   ├── compose.yaml・compose.prod.yaml
+│   ├── nginx/（設定・証明書の確認・systemd）  ├── backup/（バックアップ・復元検証・systemd）  └── deploy/（deploy.sh・ssh-entry.sh）
+├── scripts/                     # チェック・テスト・Goのdocker実行・sqlcなど
+├── docs/                        # 文書（docs/README.mdに一覧）
+├── AGENTS.md・CLAUDE.md
+└── .github/workflows/           # admin・compose・deploy・go・harness・ops・web
 ```
 
-- 既存サイトはnpm / Next.js。移行リスクを下げるため、初期モノレポはnpm workspacesを第一候補とする（pnpm等への移行は必須でない）。
-- Go PostgreSQLアクセスは `pgx/v5 + sqlc` を候補とする。SQLスキーマは明示的なマイグレーションで管理。
+
+- npmは各アプリ（`apps/web`・`apps/admin`）が独立したlockfileを持つ（workspacesは共有パッケージが必要になった時点で導入。[DECISIONS](DECISIONS.md)「npm構成の再評価」）。`packages/`は作っていない。
+- GoのPostgreSQLアクセスは `pgx/v5 + sqlc`（採用）。SQLスキーマは明示的なマイグレーションで管理。
 - 共有Goパッケージは必要最小限とし、循環依存を避ける。
 
 ## C. 認証・セキュリティ
@@ -76,7 +76,7 @@ nu-system/
 ## D. 画像・メディア
 
 - VPS永続領域：`/srv/nu-system/data/media` （例）、DBの`media_assets`にはID、所有者、状態、MIME、サイズ、ストレージキー、用途、参照を保持。
-- 公開画像 `/api/v1/public/media/{public_id}` は認証不要だが、**公開中の版が参照している間だけ**配信する（APIが毎回判定。複製・公開領域・公開フラグを持たない）。非公開画像 `/api/v1/media/{id}` は認可が必要。全ファイルは同じ非公開ディレクトリに置き、Nginx等が直接配信しない。再エンコード後の形式はJPEG/PNG（cgoを避けるためWebPは出力しない）。
+- 公開画像 `/api/v1/public/media/{public_id}` は認証不要だが、**公開中の版が参照している間だけ**配信する（APIが毎回判定。複製・公開領域・公開フラグを持たない）。非公開画像 `/api/v1/media/{id}` は認可が必要。全ファイルは同じ非公開ディレクトリに置き、Nginx等が直接配信しない。再エンコード後の形式は**WebP**（`gen2brain/webp`。cgoを使わない。P3-02で採用。[TOOLCHAIN](TOOLCHAIN.md)）。
 - 下書き画像は公開URLで配信されない（参照しているのが下書きだけなら404）。設計: [design/p3-media.md](design/p3-media.md)。
 - 新規アップロード（D06）: JPEG/PNG/WebPのみ。実体検査（拡張子を信用しない）、アニメーション画像・SVG拒否、サイズ（avatar 5MiB/他10MiB）、デコード**前**の寸法検査（≤2,000万画素・各辺≤10,000px）、向き補正、縮小（avatar≤512px、他は長辺≤2,560px、拡大しない）、再エンコード、EXIF削除、名前の無害化、ディレクトリトラバーサル防止。デコードの同時実行数を制限し、4GB環境のピークメモリを実測する。
 - 既存サイトの静的画像（約126MiB）はこの経路を通さず、移設で同一性（sha256）を保つ。上限を理由に黙って削除・変換しない。本番アップロードはVPS永続領域のみ。
@@ -108,6 +108,8 @@ nu-system/
 
 ## G. Discord通知
 
+> 実装: 通知workerは**apiプロセス内**で動く（`services/api/internal/notify`）。`services/bot`は骨組みのみ（Discordへは接続しない）。Botのtokenは`DISCORD_BOT_TOKEN`（未設定なら通知は送信待ちに溜まる）。ぬる（`services/agent`）は別のBotで、通知とは無関係。
+
 - 業務DB更新と同じトランザクションで`notification_outbox`へイベント保存。
 - Go workerが一定間隔で未送信イベントを取得し、Discord APIへ投稿。成功・失敗・試行回数・次回再試行をDB管理。
 - `notification_settings`でイベント種別別の有効/無効とDiscord channel idを管理。変更はAdmin/Ownerのみ。
@@ -124,3 +126,10 @@ nu-system/
 - 4GB VPSではビルド処理をしない。Next.js standaloneイメージを採用し、メモリ・ディスク・稼働状況を監視。
 - 外部バックアップは初期版ではない。VPS内バックアップは毎日03:00(JST)・成功7世代・DBとメディアを一組（D04、詳細は[OPERATIONS](OPERATIONS.md)）。VPS喪失時にデータを失う事実を隠さない。
 - Nginxの証明書は自動更新し、更新失敗・期限接近を検知して通知する（D03）。事業者固有機能に依存せずDocker Composeで構築（D07）。
+
+## I. AIメンバー「ぬる」（`services/agent`）
+
+- **別のサービス・別のDBスキーマ・別のDBロール**: コンテナ`agent`は、Discord（Gateway・REST）とClaude API（Anthropic）へ出ていく。DBは同じPostgreSQLの`agent`スキーマだけを、専用ロール`nu_agent`で使う（nu_app本体のテーブルは読めない）。nu_appのAPIは、ぬるのデータを読まない（管理画面の設計は[design/nul-admin-dashboard.md](design/nul-admin-dashboard.md)）。
+- 設定（Discordのtoken・APIキー・DBパスワード・ID類）が揃っていなければ**無効モード**（接続せず、ヘルスチェックだけ）。他のサービスに影響しない。デプロイの合否判定（ヘルスチェック）にも含めない（意図: ぬるの設定不備でサイトのデプロイを巻き戻さないため。[RUNBOOK §8](RUNBOOK.md)）。
+- 仕組み・安全・記憶・予算は[NUL_OVERVIEW](NUL_OVERVIEW.md)。仕様の経緯は[design/nul-agent.md](design/nul-agent.md)。
+
