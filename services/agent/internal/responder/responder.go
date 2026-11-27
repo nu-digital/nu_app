@@ -147,7 +147,7 @@ func (r *Responder) Handle(ctx context.Context, in discord.Incoming) {
 		return
 	}
 	out, err := r.Brain.Reply(ctx, brain.Input{UserID: m.AuthorID, ChannelID: m.ChannelID, AuthorName: m.AuthorName, Where: r.where(m),
-		History: hist, Text: text, Images: imgs, IsDM: m.GuildID == 0, MessageID: m.ID})
+		History: hist, Text: text, Images: imgs, IsDM: m.GuildID == 0, MessageID: m.ID, TargetID: target(m)})
 	switch {
 	case errors.Is(err, brain.ErrAsleep):
 		_ = r.Send.React(ctx, target(m), m.ID, emojiAsleep)

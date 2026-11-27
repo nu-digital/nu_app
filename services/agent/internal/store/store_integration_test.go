@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -488,5 +489,105 @@ func TestDiaryOnePerDayKindAndRandomOldSummary(t *testing.T) {
 	}
 	if _, ok, _ := s.RandomOldSummary(ctx, old, 8); ok {
 		t.Error("beforeを含んだ")
+	}
+}
+
+func TestRemindersLifecycleAndClaimIsAtomic(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+	now := time.Date(2026, 11, 28, 12, 0, 0, 0, time.UTC)
+	alice, bob := int64(1), int64(2)
+	id1, err := s.AddReminder(ctx, store.Reminder{UserID: alice, ChannelID: 50, Message: "会議", RemindAt: now.Add(-time.Minute)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	future, _ := s.AddReminder(ctx, store.Reminder{UserID: alice, ChannelID: 50, Message: "あとで", RemindAt: now.Add(time.Hour)})
+	if _, err := s.AddReminder(ctx, store.Reminder{UserID: alice, ChannelID: 50, Message: strings.Repeat("あ", 201), RemindAt: now}); err == nil {
+		t.Error("201文字を受け付けた")
+	}
+	// 本人だけが見える・取り消せる
+	if l, _ := s.ListReminders(ctx, bob); len(l) != 0 {
+		t.Error("他人のリマインダーが見えた")
+	}
+	if ok, _ := s.CancelReminder(ctx, future, bob); ok {
+		t.Error("他人のリマインダーを取り消せた")
+	}
+	// 確保は1回だけ（2回目は空）。並行でも二重に取れない
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	got := 0
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rs, err := s.ClaimDueReminders(ctx, now, 10)
+			if err != nil {
+				t.Error(err)
+			}
+			mu.Lock()
+			got += len(rs)
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	if got != 1 {
+		t.Fatalf("並行で確保した件数: %d（1のはず）", got)
+	}
+	// 失敗→pendingに戻る→再確保（attempts増加）→3回で failed
+	for attempt := 2; attempt <= 3; attempt++ {
+		if err := s.FinishReminder(ctx, id1, false); err != nil {
+			t.Fatal(err)
+		}
+		rs, _ := s.ClaimDueReminders(ctx, now, 10)
+		if len(rs) != 1 || rs[0].Attempts != attempt {
+			t.Fatalf("再確保 attempts=%d: %+v", attempt, rs)
+		}
+	}
+	_ = s.FinishReminder(ctx, id1, false) // 3回目の失敗 → failed
+	if rs, _ := s.ClaimDueReminders(ctx, now, 10); len(rs) != 0 {
+		t.Error("failedを再確保した")
+	}
+	// 配信中のまま落ちたもの（10分超）は再確保される
+	id2, _ := s.AddReminder(ctx, store.Reminder{UserID: bob, ChannelID: 9, Message: "x", RemindAt: now})
+	_, _ = s.ClaimDueReminders(ctx, now, 10)
+	if rs, _ := s.ClaimDueReminders(ctx, now.Add(5*time.Minute), 10); len(rs) != 0 {
+		t.Error("配信中を5分で再確保した")
+	}
+	if rs, _ := s.ClaimDueReminders(ctx, now.Add(11*time.Minute), 10); len(rs) != 1 || rs[0].ID != id2 {
+		t.Errorf("落ちたものを再確保しない: %+v", rs)
+	}
+	if err := s.FinishReminder(ctx, id2, true); err != nil {
+		t.Fatal(err)
+	}
+	if l, _ := s.ListReminders(ctx, bob); len(l) != 0 {
+		t.Error("配信後に残った")
+	}
+	// 未来のものは確保されない・取り消せる
+	if rs, _ := s.ClaimDueReminders(ctx, now, 10); len(rs) != 0 {
+		t.Error("未来を確保した")
+	}
+	if ok, _ := s.CancelReminder(ctx, future, alice); !ok {
+		t.Error("取り消せない")
+	}
+}
+
+func TestReminderLimitPerUserHoldsUnderConcurrency(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	for i := 0; i < 25; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _ = s.AddReminder(ctx, store.Reminder{UserID: 7, ChannelID: 1, Message: "x", RemindAt: time.Now().Add(time.Hour)})
+		}()
+	}
+	wg.Wait()
+	l, _ := s.ListReminders(ctx, 7)
+	if len(l) != store.MaxRemindersPerUser {
+		t.Errorf("同時登録で上限を超えた/満たない: %d", len(l))
+	}
+	if _, err := s.AddReminder(ctx, store.Reminder{UserID: 7, ChannelID: 1, Message: "x", RemindAt: time.Now().Add(time.Hour)}); !errors.Is(err, store.ErrReminderLimit) {
+		t.Errorf("%v", err)
 	}
 }

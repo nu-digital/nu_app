@@ -83,6 +83,18 @@ type AgentRelationship struct {
 	LastSeen      pgtype.Timestamptz
 }
 
+type AgentReminder struct {
+	ID        int64
+	UserID    int64
+	ChannelID int64
+	Message   string
+	RemindAt  pgtype.Timestamptz
+	Status    string
+	Attempts  int32
+	ClaimedAt pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
 type AgentSetting struct {
 	Key       string
 	Value     []byte

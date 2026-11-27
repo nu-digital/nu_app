@@ -109,6 +109,39 @@ func (s *speaker) Spontaneous(context.Context, brain.SpontInput) (string, error)
 	return s.text, s.err
 }
 
+type notifier struct {
+	sent []string
+	to   []int64
+	fail bool
+}
+
+func (n *notifier) Remind(_ context.Context, ch, user int64, text string) error {
+	if n.fail {
+		return errors.New("x")
+	}
+	n.sent = append(n.sent, text)
+	n.to = append(n.to, ch, user)
+	return nil
+}
+
+type remStore struct {
+	due      []store.Reminder
+	finished map[int64]bool
+}
+
+func (r *remStore) ClaimDueReminders(context.Context, time.Time, int) ([]store.Reminder, error) {
+	d := r.due
+	r.due = nil
+	return d, nil
+}
+func (r *remStore) FinishReminder(_ context.Context, id int64, sent bool) error {
+	if r.finished == nil {
+		r.finished = map[int64]bool{}
+	}
+	r.finished[id] = sent
+	return nil
+}
+
 type poster struct{ posts []string }
 
 func (p *poster) PostTimes(_ context.Context, t string) error {
@@ -475,5 +508,41 @@ func TestAPIKeyNagStartsFourteenDaysBeforeOncePerDayAtNight(t *testing.T) {
 	z.s.nagKey(context.Background(), at(27, 22))
 	if len(z.p.posts) != 0 {
 		t.Errorf("%v", z.p.posts)
+	}
+}
+
+func TestRemindersDeliverToRequesterPlaceAndStopHoldsThem(t *testing.T) {
+	x := newRig(t)
+	n, rs := &notifier{}, &remStore{due: []store.Reminder{{ID: 1, UserID: 5, ChannelID: 77, Message: "会議", RemindAt: x.now}, {ID: 2, UserID: 6, ChannelID: 88, Message: "古い", RemindAt: x.now.Add(-time.Hour)}}}
+	x.s.Notify, x.s.Rem = n, rs
+	x.s.deliverReminders(context.Background(), x.now)
+	if len(n.sent) != 2 || n.to[0] != 77 || n.to[1] != 5 || n.to[2] != 88 || n.to[3] != 6 {
+		t.Fatalf("送り先: %v %v", n.sent, n.to)
+	}
+	if !strings.Contains(n.sent[0], "会議") || strings.Contains(n.sent[0], "遅れて") || !strings.Contains(n.sent[1], "遅れてごめん") {
+		t.Errorf("%v", n.sent)
+	}
+	if !rs.finished[1] || !rs.finished[2] {
+		t.Error("成功を反映していない")
+	}
+	// 失敗は未送信として反映（再送される）
+	f, frs := &notifier{fail: true}, &remStore{due: []store.Reminder{{ID: 3, UserID: 5, ChannelID: 1, Message: "x", RemindAt: x.now}}}
+	x.s.Notify, x.s.Rem = f, frs
+	x.s.deliverReminders(context.Background(), x.now)
+	if sent, ok := frs.finished[3]; !ok || sent {
+		t.Error("失敗を反映していない")
+	}
+	// 全停止中は確保もしない（保留）。静かモードでは届ける
+	st, srs := &notifier{}, &remStore{due: []store.Reminder{{ID: 4, UserID: 5, ChannelID: 1, Message: "x", RemindAt: x.now}}}
+	x.s.Notify, x.s.Rem = st, srs
+	_ = x.s.Ctl.Set(context.Background(), control.Stopped)
+	x.s.deliverReminders(context.Background(), x.now)
+	if len(st.sent) != 0 || len(srs.due) != 1 {
+		t.Error("全停止中に配信/確保した")
+	}
+	_ = x.s.Ctl.Set(context.Background(), control.Quiet)
+	x.s.deliverReminders(context.Background(), x.now)
+	if len(st.sent) != 1 {
+		t.Error("静かモードでは届ける")
 	}
 }

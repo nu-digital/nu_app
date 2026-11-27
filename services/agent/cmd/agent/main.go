@@ -112,11 +112,11 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 	// 応答（P1-4a）: メンション・返信・DM・times。ぬるの頭脳は実Claude APIに繋ぐ（上限はbudgetが守る）
 	tracker := budget.New(db, budget.Config{}, nil)
 	claude := llm.NewAnthropic(cfg.AnthropicKey)
-	br := &brain.Brain{LLM: claude, Budget: tracker, State: brainState{db}, Memory: db, Log: log}
+	br := &brain.Brain{LLM: claude, Budget: tracker, State: brainState{db}, Memory: db, Reminders: db, Log: log}
 	resp := &responder.Responder{Ctl: ctl, Brain: br, Hist: db, Mem: db, Send: gw, Img: discord.NewImageFetcher(),
 		Reacts: db, BotID: gw.BotUserID, TimesChannel: int64(cfg.TimesChannel), Log: log}
 	gw.SetTimesChannel(cfg.TimesChannel)
-	sch := &schedule.Scheduler{Ctl: ctl, Budget: tracker, Brain: br, Post: gw, Mem: db, Set: db, TimesCh: int64(cfg.TimesChannel), BotID: gw.BotUserID, Log: log}
+	sch := &schedule.Scheduler{Ctl: ctl, Budget: tracker, Brain: br, Post: gw, Notify: gw, Rem: db, Mem: db, Set: db, TimesCh: int64(cfg.TimesChannel), BotID: gw.BotUserID, Log: log}
 	gw.OnIncoming = resp.Handle
 	gw.OnJoin = sch.Greet
 	if err := gw.Open(); err != nil {
