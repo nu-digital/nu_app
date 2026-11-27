@@ -2,9 +2,29 @@
 
 [TASKS](TASKS.md) のPhaseは維持する。以下のIDは分割案でありGitHub Issue番号ではない。Issue作成後は実番号を併記し、完了は実PRと検証結果に基づいて更新する。
 
-作成済み: [準備PR #1](https://github.com/nu-digital/nu_app/pull/1)、[P0-01 / Issue #2](https://github.com/nu-digital/nu_app/issues/2)。P0-01は完了（PR #5。調査結果は[legacy-baseline](legacy-baseline/README.md)）。P0-02〜P0-04は完了（PR #10・#14・#16・#18・#20と P0-04。[P0完了報告](handoffs/P0-complete.md)）。P1は進行中: P1-01（#26・#30・#28）はmainにマージ済み。P1-02（認証・招待・再設定・セッション・CSRF・レート制限・停止）は積み重ねDraft PR（#32 → #34 → #36 → #38 → #40 → #42）でレビュー待ち。P1-03（#44 Editor/Adminロール、#46 Owner二段階移譲、#48 緊急復旧CLI）も積み重ねDraft PRで実装済み。P1-04（内部アプリUI）は#50で実装済み（Draft PR）。P1の実装は一通り完了で、運用責任者のレビューと実機確認待ち。P2-01（プロフィール）は積み重ねDraft PR（#54 API → #56 メンバー一覧・個人情報 → #58 画面）で実装済み。次はP2-02（物品登録・貸出・返却）。実装ブランチ例は `chore/2-legacy-baseline`。
+**進捗サマリー（2026-11-28。実PR・CI・本番の実態で照合）:** **P0〜P4は完了し、公式サイト・内部ポータルは2026-11-26から本番稼働中**（VPS構築・DNS・TLS・自動デプロイ・初期Owner・既存記事67件の取り込みまで。記録は[RUNBOOK](RUNBOOK.md)・[HISTORY](HISTORY.md)）。**ぬる（AIメンバー）は P1〜P3・リマインダー・内省まで実装し、2026-11-28に本番で有効化**（運用前の独立レビューの指摘を修正済み。[NUL_OVERVIEW](NUL_OVERVIEW.md)・[NUL_LAUNCH](NUL_LAUNCH.md)）。以下の表の「依存」列は、当初の分割案の依存関係（履歴）。完了の根拠は各行のPR番号とGitHub。開いているPRはDependabot #3・#4のみ。
 
-**進捗サマリー（2026-11-22。実PR・CIで照合: マージ済みPR #1〜#115、開いているPRはDependabot #3・#4のみ）:** P0〜P3完了（P3-04 移行CLI #95・投稿者の管理 #97/#99・WebP #103・公式サイトの動的配信と基準比較 #105・アバター/物品写真 #107・公開版の本人情報の確認 #109）。P4は、VPS未契約でも作れる範囲を完了（バックアップ・復元検証 #111、本番Compose・Nginx・TLS確認 #113、デプロイ・切り戻し（既定で無効） #115）。**VPS構築・実機検証・DNS・TLS・GitHub/Discord設定は完了（2026-11-26。[RUNBOOK](RUNBOOK.md)）。自動デプロイ・初回デプロイ・初期Owner・本番への`import-legacy --apply`・`NOPASSWD:ALL`の解除・作業用鍵の整理も完了（2026-11-26。本番稼働中）。残りは運用責任者の判断が必要な項目**: 投稿者名の公開許可の確認・Botのtoken・VPS外バックアップ・本契約への移行。（以下は構築前の記述） VPS・DNS・secret・`production`環境の承認者・`DEPLOY_ENABLED`、4GBでの実測、実ドメインでのTLS取得、初回デプロイ、実環境での復元検証、本番への`import-legacy --apply`、投稿者名の公開許可の確認、Discordの実送信確認。
+## 今後の予定と課題（2026-11-28）
+
+| 区分 | 項目 | 状態・次の一手 |
+|---|---|---|
+| ぬる | **管理画面**（稼働状況・API使用額・エラー・記憶量をnu_appで確認・停止） | 設計済み（[design/nul-admin-dashboard.md](design/nul-admin-dashboard.md)）。**運用責任者の確認事項5点（§9）**のあと N-1（agent: 心拍・イベント・モードの定期読み直し・集計ビュー）→N-2（API）→N-3（UI）→N-4（通知） |
+| ぬる | GitHubの読み取り（NUL-P3の残り） | **GitHub Appの作成が必要**（運用責任者）。読み取り専用・ポーリング |
+| ぬる | nu_app連携（NUL-P4） | [DECISIONS NUL-1](DECISIONS.md)（サービストークン・アカウント紐づけ・本人の権限で代理実行・確認の強制）の設計の確認が先 |
+| ぬる | 思い出アルバム（NUL-P5） | 保存容量の判断が先（VPSの空き・バックアップ容量。[NUL_LAUNCH §1](NUL_LAUNCH.md)） |
+| ぬる | 人格・関係性の調整 | 運用しながら（プロンプトの方針は[NUL-14](DECISIONS.md)）。気まぐれ投稿の頻度・予算の付与日（`AnchorDay`）も実運用で確認 |
+| ポータル | ダッシュボードの自動フィード（`GET /dashboard/feed`・テーブル`dashboard_events`） | 未実装（要件にはあるが、手動のお知らせは不要とされた範囲。実装するか判断） |
+| 技術的負債 | 認可表の通知系アクションIDの重複（`notifications.*`と`admin.notifications.*`） | `authz.go`とテストを同時に直す小さなPR |
+| 技術的負債 | ブランチ保護の必須チェックに`go / services/agent`・`ops / *`が入っていない | 運用責任者が決めて、GitHubの保護ルールに追加（[DEVELOPMENT](DEVELOPMENT.md)） |
+| 技術的負債 | `services/bot`（骨組みのみ。通知workerはAPI内） | 廃止するか、実際のBotとして使うか判断 |
+| 技術的負債 | Dependabot #3（checkout v7）・#4（setup-node v7） | メジャー更新。全workflowのpinと合わせて別PRで確認 |
+| 技術的負債 | `govulncheck`・`npm audit`の定期確認 | 四半期ごと（[TOOLCHAIN](TOOLCHAIN.md)） |
+| 運用 | VPS外バックアップ | **当面なし**（運用責任者の判断。VPSを失うとデータを失う既知の制約） |
+| 運用 | 契約・費用・更新日の記入、無料お試し期間終了前の本契約 | [COSTS_AND_CONTRACTS](COSTS_AND_CONTRACTS.md)の「（要記入）」を運用責任者が埋める |
+| 運用 | 既存記事の投稿者名の公開許可の確認 | 管理画面「既存記事の投稿者」で、本人の許可を確認できた分だけ記録（それまでは「nu_digital」表示） |
+| 運用 | 引き継ぎ（卒業・交代） | [RUNBOOK §12](RUNBOOK.md)・[COSTS_AND_CONTRACTS §5](COSTS_AND_CONTRACTS.md)。現任のうちに、後任と復元検証と承認操作を一度やる |
+
+## 作業単位の一覧（履歴。P0〜P5）
 
 | ID | 作業と完了条件 | 依存 |
 |---|---|---|
@@ -25,13 +45,13 @@
 | P3-02 | メディア永続化・認可・公開と非公開の分離。D06の上限・縮小・再エンコード。画像攻撃/参照整合性/メモリ実測（設計: `docs/design/p3-media.md`・Opusレビュー反映済み。a: 基盤とCMS連携 #83 完了、b: アバター・物品写真の連携 #107 完了。**WebP出力 #103 完了**。完了） | P3-01 |
 | P3-03 | CMS UI・制作クレジット・公開同意/撤回の匿名化・YouTubeのみ埋め込みとサニタイズ（a: 一覧・編集・プレビュー・保存と競合・公開 #85 完了、b: 画像・共同編集者・制作メンバー・プロフィールの制作実績 #87 完了。完了） | P3-02 |
 | P3-04 | 再実行可能な記事/画像移行、公開サイトAPI接続、全URL/表示比較（設計: `docs/design/p3-web.md`・Opusレビュー反映済み。段階: P3-04-0 基準の固定 #91 完了→a 移行CLI #95（a-2 投稿者の管理API #97・a-3 確認画面 #99）→b 公式サイトの動的配信 #101/#105→c 基準との比較の常時実行（compose smoke）#105。完了。**残り: 本番へのimport-legacy実行（契約後・確認の上で）**） | P3-03 |
-| P4-01 | Actions経由のUbuntuデプロイ、Nginx/TLS自動更新と失敗検知/secret/healthcheck/失敗通知/切り戻し（a: 本番Compose・Nginx・TLS確認 #113 完了、b: デプロイ・切り戻し（既定で無効） #115 完了。**残り（VPS契約後）: セットアップ・実ドメインのTLS・secret・承認者の設定・`DEPLOY_ENABLED`・初回デプロイ**） | P1基盤、VPS契約後の実情報 |
-| P4-02 | DB+画像のVPS内バックアップ(毎日03:00 JST・7世代)/復元検証、4GB実測、運用手順、公開前総合検証（バックアップ・復元検証・自動テスト・手順 #111 完了。**残り（VPS契約後）: 4GB実測・実環境での復元検証・公開前総合検証**） | 対象Phase完成 |
-| NUL-P1 | **ぬる誕生**（仕様[nul-agent.md](design/nul-agent.md) §14。計画: [nul-agent-p1.md](design/nul-agent-p1.md)）: `services/agent`（Go・discordgo・anthropic-sdk-go）の新設、timesでの自由発言、メンション・DMへの応答、キャラと気分、Sonnet/Opusの切り替え、画像の読み取り、予算管理、緊急停止、ログの記録（過去ログの取り込みを含む）。Compose・デプロイ・切り戻しに乗せる。`agent`スキーマ（migration） | D15、運用責任者の計画確認、Claude APIキー（デプロイ直前に運用責任者が発行） |
-| NUL-P2 | **記憶**: ログ検索（pg_bigm/pg_trgm）、日次要約（Haiku・Batch API）、ノート（remember/recall/forget）、関係、「忘れて」、週報・月報、削除の連動（D08・Discordの削除） | NUL-P1 |
-| NUL-P3 | **調べもの**: Web検索、GitHubの読み取り（GitHub App・ポーリング）、研究日誌、気まぐれ投稿のネタ | NUL-P2 |
-| NUL-P4 | **nu_appとの連携**: Bot用認証（DECISIONS NUL-1: サービストークン・アカウント紐づけ・本人の権限での代理実行・確認の強制）、読み取り→確認付きの書き込み、写真の保存、nu_appの通知の受信 | NUL-P1、NUL-1の設計の確認 |
-| NUL-P5 | **遊び**: リマインダー、思い出アルバム（容量の上限を決めてから）、nu_appのイベントへの反応 | NUL-P4、アルバム容量（VPSのdf・バックアップ容量） |
+| P4-01 | Actions経由のUbuntuデプロイ、Nginx/TLS自動更新と失敗検知/secret/healthcheck/失敗通知/切り戻し（a: 本番Compose・Nginx・TLS確認 #113 完了、b: デプロイ・切り戻し（既定で無効） #115 完了。**残り（VPS契約後）: セットアップ・実ドメインのTLS・secret・承認者の設定・`DEPLOY_ENABLED`・初回デプロイ**） — **完了（2026-11-26に本番稼働。初回デプロイ・自動デプロイの有効化・TLS・承認者の設定まで済み。[RUNBOOK](RUNBOOK.md)）** | P1基盤、VPS契約後の実情報 |
+| P4-02 | DB+画像のVPS内バックアップ(毎日03:00 JST・7世代)/復元検証、4GB実測、運用手順、公開前総合検証（バックアップ・復元検証・自動テスト・手順 #111 完了。**残り（VPS契約後）: 4GB実測・実環境での復元検証・公開前総合検証**） — **完了（実機での4GB実測・復元検証・公開前の総合確認は[RUNBOOK §13](RUNBOOK.md)）** | 対象Phase完成 |
+| NUL-P1 | **ぬる誕生**（仕様[nul-agent.md](design/nul-agent.md) §14。計画: [nul-agent-p1.md](design/nul-agent-p1.md)）: `services/agent`（Go・discordgo・anthropic-sdk-go）の新設、timesでの自由発言、メンション・DMへの応答、キャラと気分、Sonnet/Opusの切り替え、画像の読み取り、予算管理、緊急停止、ログの記録（過去ログの取り込みを含む）。Compose・デプロイ・切り戻しに乗せる。`agent`スキーマ（migration） — **完了（#136〜#144。2026-11-28本番稼働）** | D15、運用責任者の計画確認、Claude APIキー（デプロイ直前に運用責任者が発行） |
+| NUL-P2 | **記憶**: ログ検索（pg_bigm/pg_trgm）、日次要約（Haiku・Batch API）、ノート（remember/recall/forget）、関係、「忘れて」、週報・月報、削除の連動（D08・Discordの削除） — **完了**（ノート・ログ検索 #146・日次要約 #148・週報月報 #150・内省 #160） | NUL-P1 |
+| NUL-P3 | **調べもの**: Web検索、GitHubの読み取り（GitHub App・ポーリング）、研究日誌、気まぐれ投稿のネタ — **一部完了**（Web検索 #152・研究日誌 #154・新メンバーへの反応/キー期限の催促 #156）。**GitHub読み取りは未**（GitHub App待ち） | NUL-P2 |
+| NUL-P4 | **nu_appとの連携**: Bot用認証（DECISIONS NUL-1: サービストークン・アカウント紐づけ・本人の権限での代理実行・確認の強制）、読み取り→確認付きの書き込み、写真の保存、nu_appの通知の受信 — **未着手**（NUL-1の設計の確認待ち） | NUL-P1、NUL-1の設計の確認 |
+| NUL-P5 | **遊び**: リマインダー、思い出アルバム（容量の上限を決めてから）、nu_appのイベントへの反応 — **一部完了**（リマインダー #158）。思い出アルバム・nu_appイベントへの反応は未 | NUL-P4、アルバム容量（VPSのdf・バックアップ容量） |
 
 P4は最後まで放置せず各Phaseで逐次実装する。本番公開は運用準備と公開対象機能の受け入れが揃ってから。大きすぎるIssueはさらに分割し、機能途中でもmainを壊さない単位にする。
 

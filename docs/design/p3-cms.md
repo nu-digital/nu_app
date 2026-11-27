@@ -1,5 +1,7 @@
 # P3 設計メモ: CMS（記事・作品）・メディア・公開API
 
+> **状態（2026-11-28）: 実装済み。これは設計の経緯と理由の記録（履歴）**で、実装の正本はコードと[docs/README.md](../README.md)の各正本文書（[ARCHITECTURE](../ARCHITECTURE.md)・[DATABASE](../DATABASE.md)・[API](../API.md)・[AUTHZ](../AUTHZ.md)）。以下の「暫定」「提案」「未実装」などの表現は、書かれた当時のもの。
+
 - 2026-11-21 / Claude Code（Sonnet 5.5）。状態: **Opusレビュー（2026-11-21、指摘15件）を反映済みの設計**。実装はこの版に従う。
 - 正本: REQUIREMENTS（Phase 3）、DATABASE §4、API §4、AUTHZ（`contents.*` / `public.*`）、DECISIONS D01・D06・D08・D10・D12。ここは**それらの範囲で決めきれない細部**を書く。確定事項（D01〜D13）は変えない。暫定は実装時にDECISIONSの「暫定採用」へ移す。
 - DATABASE §4 との差: `work_contributors`に`revision_id`を足し**版ごとに持つ**（§2。公開後の変更が公開されない・公開版の制作メンバーが固定されるため）。

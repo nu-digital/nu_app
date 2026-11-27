@@ -2,7 +2,7 @@
 
 対象は開発PC。VPSのOSインストールや本番secret設定ではない。現在のWindows cloneは残し、WSLのLinuxファイルシステムに別cloneを作る。同じ作業ツリーをWindowsとWSLから同時編集しない。
 
-2026-11-20のこのPCの確認では `wsl --list --verbose` は「インストールされているディストリビューションはありません」。Ubuntu導入はまだ実施していない。
+（2026-11-20の最初の確認では、このPCにUbuntuは未導入だった。**現在はこの手順でUbuntu 24.04のWSL2を導入して開発している**。）
 
 ## 1. Teamの利用条件を確認（人/Team管理者）
 
@@ -39,14 +39,7 @@ cd nu_app
 
 ブラウザーで人がGitHubログインし、対象repoへの権限を確認する。Windows側の一時認証スクリプトやtokenをコピーしない。`git config user.name` / `git config user.email`を確認し、未設定なら自分の名前とGitHubのnoreplyメール等をこのcloneに設定する。
 
-準備PR #1のマージ後はmainを使用。マージ前の準備確認だけ行う場合は以下で準備ブランチへ切り替える。
-
-```bash
-git fetch origin
-git switch --track origin/chore/bootstrap-agent-harness
-```
-
-実装開始時は最新mainからIssue番号付きブランチを作る。マージ前の準備ブランチで機能実装を始めない。
+**最新の`main`**から、Issue番号付きのブランチを作って作業する（[START_HERE](START_HERE.md)・[DEVELOPMENT](DEVELOPMENT.md)）。
 
 ## 4. Linux版NodeとClaude Code
 
@@ -96,12 +89,12 @@ docker version
 docker compose version
 ```
 
-daemonへ接続できることを確認する。dockerグループ追加などのホスト権限変更は人が確認する。Go/sqlc/migration tool/PlaywrightはP0で採用版を決めてから導入し、今はlatestを無作為にインストールしない。ブラウザーのシステム依存を入れるsudo操作が必要なら人が対応する。
+daemonへ接続できることを確認する。dockerグループ追加などのホスト権限変更は人が確認する。Go・sqlc・migration toolはDockerで動く固定版（`scripts/go-docker.sh`・`scripts/sqlc.sh`）なので、ホストへの導入は不要。Playwrightは`apps/web`の固定版（[TOOLCHAIN](TOOLCHAIN.md)）で、`npx playwright install chromium`。latestを無作為にインストールしない。ブラウザーのシステム依存を入れるsudo操作が必要なら人が対応する。
 
 ## 6. 引き渡しと再開
 
-[CLAUDE_HANDOFF](CLAUDE_HANDOFF.md)を渡してIssue #2から開始する。通常のコード・テスト・ブランチpush・Draft PRはClaudeへ任せる。人は課金/ログイン/OS権限、未確定仕様、PRマージ、本番公開判断を担当する。
+[CLAUDE_HANDOFF](CLAUDE_HANDOFF.md)の依頼文のひな形で作業を頼む。通常のコード・テスト・ブランチpush・Draft PRはClaudeへ任せる。人は課金/ログイン/OS権限、未確定仕様、PRマージ、本番公開判断を担当する。
 
 新しい `docs/handoffs/<issue番号>-progress.md` にOS、Node、CLI版、実際に確認したモデル、追加使用量無効の確認有無、テスト結果、未完了の環境項目を記録する。認証情報自体は記録しない。停止後は同じcloneで `claude --continue` または `claude --resume` を使う。
 
-参考: [Linux側にプロジェクトを置く理由（Microsoft）](https://learn.microsoft.com/en-us/windows/wsl/filesystems)。この文書のコマンドはセットアップ手順であり、この準備でWSLへのインストールを実行済みではない。
+参考: [Linux側にプロジェクトを置く理由（Microsoft）](https://learn.microsoft.com/en-us/windows/wsl/filesystems)。この文書のコマンドはセットアップ手順（実行するのは人）。

@@ -1,5 +1,7 @@
 # 既存サイト比較基準（P0-01 / Issue #2）
 
+> **P0時点（2026-11-21）の記録**。ツールの版（Playwright・Chromiumなど）は当時の実測で、現在の固定版は[TOOLCHAIN](../TOOLCHAIN.md)。比較は、その後`web:verify`・`web:site-check`・`compose / smoke`として常時実行されている。
+
 移設前の `nu-digital/nu_digital` を**無改変**で再現して採取した基準。移設（P0-02）後の差分はこの基準と比較する。
 参照SHA: `e1c031389c6cb621742caf4b270316da93b85168`（2026-11-04、全11コミット）。clone先は無視対象 `.local/legacy-site/`。
 

@@ -1,11 +1,11 @@
 # ぬる 本番運用開始ガイド（有効化の手順・実機テストのチェックリスト）
 
 対象: AIメンバー「ぬる」（`services/agent`）を本番で有効にする運用責任者。
-状態: 2026-11-28時点。実装（P1〜P3・リマインダー・内省）と、運用前の独立レビューへの対応は完了。**実際のDiscord・Claude APIには、一度も接続していない**（開発・CIは偽物で試験している）。この文書の手順は、有効化の前後に、運用責任者が実行・確認する。
+状態: **ぬるは2026-11-28に、この手順（全停止→静か→通常の段階）で本番有効化済み**。以後、この文書は (1) 有効化の記録、(2) **再有効化の手順**（サーバー移行・作り直し・長期停止のあと。[SERVER_SETUP §9](SERVER_SETUP.md)）、(3) 実機テストのチェックリストとして使う。以下の「未」「一度も接続していない」などの当時の記述は、有効化前の状態（履歴）。日常の運用は [RUNBOOK §16](RUNBOOK.md)、仕組みは [NUL_OVERVIEW](NUL_OVERVIEW.md)。開発・CIは今も偽物で試験し、実際のAPI・Discordには接続しない。
 
 - **本番デプロイの承認・API/Botの接続・有効化は、運用責任者の確認の後に行う**（開発側は行わない）。
 - 秘密（Botのtoken・Claude APIキー・DBパスワード）は、チャット・Git・ログに出さない。VPSの`/srv/nu_app/.env`に、運用責任者が自分で書く。
-- 仕様・決定: [nul-agent.md](design/nul-agent.md)・[DECISIONS](DECISIONS.md)（D15・NUL-1〜12）。日常の運用手順: [RUNBOOK §16](RUNBOOK.md)。独立レビューの結果: [handoffs/163-review.md](handoffs/163-review.md)。
+- 仕様・決定: [nul-agent.md](design/nul-agent.md)・[DECISIONS](DECISIONS.md)（D15・NUL-1〜14）。日常の運用手順: [RUNBOOK §16](RUNBOOK.md)。独立レビューの結果: [handoffs/163-review.md](handoffs/163-review.md)。
 
 ---
 
@@ -94,7 +94,7 @@ sudo docker compose -p nu_app -f /srv/nu_app/infrastructure/compose.prod.yaml --
 
 4. 既存のサイト・ポータルが通常どおり動くことを確認する（agentは別コンテナで、他に影響しない）。
 
-> 切り戻し: Actions → deploy → Run workflow → 戻したいSHA。DBのスキーマは前進のみで、前の版は新しいスキーマでも動く設計（RUNBOOK §8）。agentだけ止めるなら`docker compose stop agent`。
+> 切り戻し: Actions → deploy → Run workflow → 戻したいSHA。DBのスキーマは前進のみで、前の版は新しいスキーマでも動く設計（RUNBOOK §8）。agentだけ止めるなら`sudo docker stop nu_app-agent-1`（再開は[RUNBOOK §16.3](RUNBOOK.md)のコマンド。`docker compose`は`-p`・`-f`・`NU_TAG`が要る）。
 
 ---
 
@@ -155,7 +155,7 @@ sudo docker logs nu_app-agent-1 2>&1 | tail -20     # 「Discordに接続しま�
 ### 6.5 APIキーの期限を設定する
 
 ```
-echo "insert into agent.settings (key, value) values ('apikey.expires', '\"2027-02-25\"') on conflict (key) do update set value = excluded.value" | nupsql    # 日付はConsoleで確認した期限
+echo "insert into agent.settings (key, value) values ('apikey.expires', '\"YYYY-MM-DD\"') on conflict (key) do update set value = excluded.value" | nupsql    # YYYY-MM-DDは、Consoleで確認したAPIキーの期限の日付に置き換える（例: 発行日の90日後）
 ```
 
 ### 6.6 この時点（全停止）で確認すること

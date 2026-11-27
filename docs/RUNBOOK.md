@@ -4,7 +4,7 @@
 
 - 設計の方針・確定事項（D01〜D14）は [OPERATIONS](OPERATIONS.md)・[DECISIONS](DECISIONS.md)。この文書は「**今どう構成されていて、どう操作するか**」を書く。食い違いを見つけたら、実際の環境を確認してこの文書を直す。
 - **パスワード・秘密鍵・トークン・WebhookのURL・証明書の秘密鍵は、この文書にも、Git・チャット・Issue・ログにも書かない。** 場所と更新手順だけを書く。
-- 最終更新: 2026-11-26（本番稼働中。初回デプロイ・自動デプロイの有効化・初期Owner作成・既存記事の取り込みは実施済み。§15に記録）。
+- 最終更新: 2026-11-28（本番稼働中。初回デプロイ・自動デプロイの有効化・初期Owner作成・既存記事の取り込み・**ぬるの有効化**は実施済み。§15に記録）。サーバーの新規構築・移行の手順は [SERVER_SETUP](SERVER_SETUP.md)、費用・契約は [COSTS_AND_CONTRACTS](COSTS_AND_CONTRACTS.md)、サービス構成・`.env`・イメージの**正本はこの文書**。
 - 「（要記入）」は、運用責任者が把握して書き込む項目（契約者名など。コードからは分からない）。
 
 ---
@@ -20,7 +20,7 @@
                                    │   app.nu-digital.jp  → 127.0.0.1:3000  admin（内部ポータル。/api/v1 をapiへ中継）
                                    └──────────────────────────────────────────────────────────────
                        Docker Compose（/srv/nu_app/infrastructure/compose.prod.yaml）
-                         db(PostgreSQL 18) ─ migrate(1回) ─ api(Go) ─ bot ─ web(Next) ─ admin(Next)
+                         db(PostgreSQL 18) ─ migrate(1回) ─ api(Go) ─ bot(骨組み) ─ web(Next) ─ admin(Next) ─ agent(ぬる。Go)
                        永続データ: DB=Dockerの名前付きvolume nu_app_db-data ／ 画像=/srv/nu_app/media ／ バックアップ=/srv/nu_app/backups
 ```
 
@@ -52,7 +52,7 @@
 | パス | 所有者・権限 | 内容 |
 |---|---|---|
 | `/srv/nu_app/` | root・755 | リポジトリ（デプロイが同じコミットに揃える。**直接編集しない**） |
-| `/srv/nu_app/.env` | root・600 | 本番の設定（DBパスワード等の秘密を含む。Git外）。キー: `NU_REGISTRY`・`POSTGRES_USER`・`POSTGRES_DB`・`POSTGRES_PASSWORD`・`APP_BASE_URL`・`MEDIA_HOST_DIR`（`NU_TAG`はデプロイスクリプトが付ける） |
+| `/srv/nu_app/.env` | root・600 | 本番の設定（DBパスワード等の秘密を含む。Git外）。キー: `NU_REGISTRY`・`POSTGRES_USER`・`POSTGRES_DB`・`POSTGRES_PASSWORD`・`APP_BASE_URL`・`MEDIA_HOST_DIR`、ぬる用の`NUL_DISCORD_TOKEN`・`NUL_ANTHROPIC_API_KEY`・`NUL_DB_PASSWORD`・`NUL_GUILD_ID`・`NUL_TIMES_CHANNEL_ID`・`NUL_ADMIN_ROLE_ID`、任意のリソース上限`*_MEM_LIMIT`・`AGENT_GOMEMLIMIT`・`API_GOMEMLIMIT`（雛形: `.env.production.example`。`NU_TAG`はデプロイスクリプトが付ける） |
 | `/srv/nu_app/media/` | 65532:65532・750 | アップロード画像（APIコンテナのnonroot）。**バックアップ対象** |
 | `/srv/nu_app/backups/` | root・700 | バックアップの世代（§9） |
 | `/srv/nu_app/state/` | root・755 | `current_tag`（動いている版）・`previous_tag`・デプロイのロック |
@@ -123,7 +123,7 @@
 - 手動の切り戻し: Actions → deploy → Run workflow（入力: 戻したいコミットSHA）。
 
 ### 6.4 GHCR（コンテナイメージ）
-- イメージ: `ghcr.io/nu-digital/nu_app-{api,bot,migrate,web,admin}:<コミットSHA>`。ビルド・pushはActionsが`GITHUB_TOKEN`で行う（追加のsecret不要）。
+- イメージ: `ghcr.io/nu-digital/nu_app-{api,bot,migrate,web,admin,agent}:<コミットSHA>`。ビルド・pushはActionsが`GITHUB_TOKEN`で行う（追加のsecret不要）。
 - **サーバーがpullするための認証**: GitHubの**Personal access token (classic)**（スコープは`read:packages`のみ）を作り、サーバーで`sudo docker login ghcr.io -u <ユーザー名> --password-stdin`（トークンは標準入力に貼る。履歴・チャットに残さない）。認証は`/root/.docker/config.json`に保存される。**トークンの作成者: （要記入）**。作成者が卒業・退会したらトークンが失効するので、**後任が新しいトークンを作り直して同じコマンドで登録する**（有効期限を設定した場合は期限前に更新）。
 - 古いイメージの整理: GHCRのパッケージ画面から削除。**切り戻し用に、直近数版は残す**。VPS上の古いイメージは`sudo docker image prune -a --filter "until=720h"`（動いているコンテナのイメージは消えない）。
 
@@ -138,6 +138,8 @@
 ## 8. デプロイ・切り戻し
 
 **通常のデプロイ**（`DEPLOY_ENABLED=true`のとき）: mainにマージ → 自動で (1) そのコミットのCIが全成功か確認 → (2) GHCRへビルド・push → (3) **承認待ち**（承認者にGitHubから通知。Actionsの画面で内容・SHAを確認して「Approve and deploy」） → (4) VPSで`deploy.sh <SHA>`: 直列化 → リポジトリを同じSHAへ → イメージpull → **更新前バックアップ**（失敗したら更新しない）→ `compose up -d` → ヘルスチェック（api `/readyz`・web `/healthz/`・admin `/healthz`・`/blog/`） → 成功を通知。**失敗したら動いていた版へ自動で戻して通知**（DBのmigrationは戻らない）。
+
+**ヘルスチェックの範囲（意図）**: デプロイの合否は、api `/readyz`・web `/healthz/`・admin `/healthz`・公開サイト`/blog/`の4項目で判定する。**ぬる（agent）は含めない**: 秘密が未設定でも「無効モード」で起動してヘルスチェックに応答する設計で、ぬるの設定不備・障害でサイトのデプロイを巻き戻さないため。デプロイ後は、agentが起動しているか手動で確認する（`sudo docker logs nu_app-agent-1 2>&1 | tail -5`。「有効モードで起動します」「Discordに接続しました」）。
 
 **切り戻し（手動）**: Actions → deploy → Run workflow → 戻したいSHAを入力 → 承認。状態は`/srv/nu_app/state/current_tag`・`previous_tag`で確認。DBのスキーマは前進のみなので、**前の版が新しいスキーマで動く**ことがルール（[OPERATIONS](OPERATIONS.md)「デプロイ・切り戻し」の「DBの互換性のルール」）。DBまで巻き戻す必要がある場合は§9.4の復旧。
 
@@ -160,7 +162,7 @@ sudo env POSTGRES_IMAGE='postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc44
 隔離した一時コンテナ・一時ディレクトリに復元して、チェックサム・スキーマ・行数・メディアのファイル数・DBの行とファイルの整合（`nuctl media-verify`）を確認する。本番には触れない。`OK:`と出れば成功。
 
 ### 9.4 実際の復旧（障害時・手動）
-1. 影響を考え、`web`・`admin`・`api`・`bot`を止める（`compose stop web admin api bot`）。2. 復旧する世代を決める（`ls /srv/nu_app/backups`）。3. DB: 空のDBを用意し、**先にロールを作る**（`infrastructure/backup/roles.sql`を`psql`で実行。ダンプにはロールが含まれず、無いと`pg_restore`のGRANTが失敗する）→ `pg_restore --no-owner --clean --if-exists -d <db> db.dump`（`compose exec -T db pg_restore ...`）。復旧後、`nu_agent`のパスワードは§16.2で再設定する。4. メディア: `tar -xzf media.tar.gz -C /srv/nu_app/media`（所有者を`65532:65532`に）。5. `nuctl media-verify`で整合確認。6. 起動して`/healthz`・`/readyz`・サイトを確認。7. 事後: 失った期間の更新を関係者に伝える。**VPSごと失った場合**: 新しいVPSを§2・§5・§6の手順で構築し、(VPS外にバックアップが無いため)復旧できない。この場合に備えるなら、運用責任者がVPS外のバックアップ（別の場所へ`backups/`を定期コピー）を追加で決める（現在は未対応）。
+1. 影響を考え、`web`・`admin`・`api`・`bot`・**`agent`**（ぬる。DBの`agent`スキーマに書き込み続けるため、復元中は止める）を止める（`compose stop web admin api bot agent`）。2. 復旧する世代を決める（`ls /srv/nu_app/backups`）。3. DB: 空のDBを用意し、**先にロールを作る**（`infrastructure/backup/roles.sql`を`psql`で実行。ダンプにはロールが含まれず、無いと`pg_restore`のGRANTが失敗する）→ `pg_restore --no-owner --clean --if-exists -d <db> db.dump`（`compose exec -T db pg_restore ...`）。復旧後、`nu_agent`のパスワードは§16.2で再設定する。4. メディア: `tar -xzf media.tar.gz -C /srv/nu_app/media`（所有者を`65532:65532`に）。5. `nuctl media-verify`で整合確認。6. 起動して`/healthz`・`/readyz`・サイトを確認。7. 事後: 失った期間の更新を関係者に伝える。**VPSごと失った場合**: 新しいVPSを§2・§5・§6の手順で構築し、(VPS外にバックアップが無いため)復旧できない。この場合に備えるなら、運用責任者がVPS外のバックアップ（別の場所へ`backups/`を定期コピー）を追加で決める（現在は未対応）。
 
 ## 10. 定期・随時の更新作業
 
@@ -235,7 +237,7 @@ sudo env POSTGRES_IMAGE='postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc44
 
 | 項目 | 結果 |
 |---|---|
-| ビルド（api・bot・migrate・web・admin） | 全て成功（4コアで数分） |
+| ビルド（api・bot・migrate・web・admin。※ぬる（agent）の追加前の試験） | 全て成功（4コアで数分） |
 | 起動（`compose.prod.yaml`） | db→migrate→api→bot→web→adminの順に起動し全て healthy |
 | アイドル時のメモリ | api 7MiB・web 37MiB・admin 35MiB・bot 4MiB・db 31〜35MiB（合計約120MiB）。ホスト全体の使用は約0.9GB（ページキャッシュ含む） |
 | 公開サイトへ並列400リクエスト（`/blog/`・20並列） | 全て200・約6秒。web最大130MiB（上限384MiB）・api 13MiB・db 39MiB |
@@ -250,7 +252,7 @@ sudo env POSTGRES_IMAGE='postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc44
 
 **初回の本番デプロイ後の検証（2026-11-26）**: PR #127のマージ→`verify`→`build`（GHCRへpush）→承認→`deploy`が成功（コミット`20692e523c2f`）。GHCRからのpull成功。公式サイト（`/`・`/blog/`・`/project/`・`/terms/`）・管理アプリ（`/`・`/login`・`/healthz`）がHTTPS・HTTP/2・証明書検証OKで200、`http://`は301、公開ホストの`/api/v1/auth/me`は404、管理ホストでは未認証の401（JSON）。外部から`5432`・`8080`・`8081`・`3000`・`53`は閉じている（開いているのは22・80・443のみ）。メモリ（デプロイ直後）: web 46MiB・admin 37MiB・api 6MiB・bot 1MiB・db 33MiB、ホスト使用約0.9GB、ディスク5.3GB/197GB。**バックアップ（systemd経由）→隔離復元検証OK**（スキーマ12）、`nu-backup.timer`有効（毎日03:00 JST）。**VPS再起動後**、5つのコンテナ・Nginx・Docker・fail2ban・ufw・全タイマーが自動で復帰し、サイトは200（約1分）。**2回目のデプロイと手動の切り戻し（2026-11-26）**: PR #129のデプロイ（更新前バックアップを自動で取得→更新→ヘルスチェック成功）、続けて`deploy`ワークフローの手動実行（`workflow_dispatch`・入力＝1回目のSHA・承認）で**1回目の版へ切り戻し成功**（`current_tag`/`previous_tag`が入れ替わり、全コンテナが旧イメージで起動・サイト200）、さらに最新版へ戻して成功。1回の切り戻しは承認から約1分。未検証: 本番での**失敗時の自動切り戻し**（壊れたイメージをGHCRへ置かない方針のため、試験環境でのみ確認済み）。
 
-未確認: VPS再起動後の自動起動、GHCRからの実際のpull、本番サイズ（数百〜数千記事・画像数GB）での所要時間・容量、`nu-backup.timer`の実行（初回デプロイ後に有効化）、実際のデプロイ（未実施）。
+（この試験の時点で未確認だった項目は、その後の本番稼働で確認済み: 再起動後の自動起動・GHCRからのpull・`nu-backup.timer`の実行・実際のデプロイ。本番サイズ（数百〜数千記事・画像数GB）での所要時間・容量は、データが増えたら再確認する。）
 
 ## 14. 初回公開の手順（チェックリスト。2026-11-26に1〜6・10まで実施済み。今後サーバーを作り直すときの手順として残す。**各項目の実行前に運用責任者の確認を取る**）
 
@@ -272,10 +274,11 @@ sudo env POSTGRES_IMAGE='postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc44
 | 2026-11-26 | VPS構築（SSH強化・ufw・fail2ban・自動更新・Docker・ディレクトリ・deployユーザー・deploy key）、試験環境での実機検証（§13）、DNS（Cloudflare）・さくらのパケットフィルター設定、TLS証明書取得・Nginx起動、GitHub環境`production`・Secrets・GHCRログイン・Discord Webhook設定（運用責任者）。実施: 運用責任者とClaude Code（AI開発エージェント。SSHは作業用の鍵） |
 | 2026-11-26 | `DEPLOY_ENABLED=true`に設定（運用責任者の許可）。初回デプロイを開始（PR #127。結果は下に追記） |
 | 2026-11-26 | **初回デプロイ成功**（承認者が承認）。バックアップタイマーを有効化。再起動後の自動起動を確認。2回目のデプロイ（PR #129）と、手動の切り戻し・再前進を実機で確認 |
-| 2026-11-26 | **初期Ownerを作成**（ログインID `yura231997`・表示名 `yurarara`。招待tokenはサーバーのroot専用ファイルに一時保存し、本人が受け取った後に`shred`で削除。Ownerがパスワードを設定しログイン確認済み） |
+| 2026-11-26 | **初期Ownerを作成**（ログインID・表示名は運用記録（Git外）に。招待tokenはサーバーのroot専用ファイルに一時保存し、本人が受け取った後に`shred`で削除。Ownerがパスワードを設定しログイン確認済み） |
 | 2026-11-26 | **既存記事の取り込み（`import-legacy`）**: 運用責任者の確認のもと、取り込み直前に手動バックアップ→dry-run（新規67件）→`--apply`（新規67件）→再実行（新規0・スキップ67＝冪等）。投稿者（移行元）3件はすべて公開許可「未確認」（公開サイトでは「nu_digital」表示）。本番の`/`・`/blog/`・`/project/`等の全72ルート・記事67・画像532が基準と一致（`web-verify`）、指紋の比較は意図した差を除き一致（`/`のヒーロースライダーの表示中スライドが、実ネットワークの遅延で稀にずれて失敗する＝既知のフレーク。再実行で一致）。 |
 | 2026-11-26 | **一時設定の解除・鍵の整理**: `ubuntu`の`NOPASSWD:ALL`（`/etc/sudoers.d/90-nu-setup`）を削除（`sudo`はパスワード必須。`/etc/sudoers.d/20-nu-deploy`の`deploy`用の1行は残す）。AI開発エージェントの作業用SSH鍵`claude-nu_app-ops`を`ubuntu`の`authorized_keys`から削除し、エージェントの環境の鍵ファイル（作業用・Actionsデプロイ用の秘密鍵のコピー）も削除（Actionsの鍵はGitHubのsecretにのみ存在）。以後、サーバーの管理者は`nu_app-vps-admin`鍵の運用担当のみ。 |
-| （未実施） | 投稿者名の公開許可の確認と記録、Discord Botのtoken設定、VPS外バックアップの検討、無料お試し期間の終了前の本契約への移行 |
+| 2026-11-27〜28 | **ぬるを本番に追加・有効化**: migration 00013〜00020・agentコンテナのデプロイ（運用責任者が承認）→ `.env`にぬるの設定を追記（運用責任者）→ DBロール`nu_agent`の有効化 → 全停止で起動・過去ログの取り込み（124チャンネル）→ 静かモードで会話テスト・人格の調整 → 通常モード（2026-11-28）。経緯: [NUL_LAUNCH](NUL_LAUNCH.md) |
+| （未実施） | 投稿者名の公開許可の確認と記録、nu_appの通知用Botのtoken設定（ぬるのBotとは別）、無料お試し期間の終了前の本契約への移行。VPS外バックアップは**当面なし**（運用責任者の判断。2026-11-28） |
 
 **一時設定**: なし（構築中に付けた`ubuntu`のNOPASSWD:ALLは2026-11-26に解除済み。確認: `sudo -l`でパスワードを求められる）。
 
@@ -355,7 +358,7 @@ sudo bash -c 'set -a; . /srv/nu_app/.env; set +a
 
 ### 16.11 新メンバーへの反応・APIキー期限の催促（P3-3）
 - 新しいメンバーが入ると、timesに固定の文言で一言（APIは呼ばない）。1時間に5件まで。止めたいときは`/nul quiet`。
-- **APIキーの期限を設定する**（キーを発行したら必ず）: `... psql -c "insert into agent.settings (key, value) values ('apikey.expires', '\"2027-02-25\"') on conflict (key) do update set value = excluded.value"`（日付はConsoleで確認した期限）。14日前から毎日夜、timesで催促する。更新したら新しい日付に書き換える。
+- **APIキーの期限を設定する**（キーを発行したら必ず）: `... psql -c "insert into agent.settings (key, value) values ('apikey.expires', '\"YYYY-MM-DD\"') on conflict (key) do update set value = excluded.value"`（日付はConsoleで確認した期限）。14日前から毎日夜、timesで催促する。更新したら新しい日付に書き換える。
 - 必要な権限: Bot側でGuild Members Intent（特権）が有効であること（P0で設定済みの前提。無効だと参加イベントが来ない）。
 
 ### 16.12 リマインダー（P5-1）

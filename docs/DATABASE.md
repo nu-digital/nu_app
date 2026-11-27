@@ -1,6 +1,6 @@
-# nu_app DB設計 v0.1（論理モデル案）
+# nu_app DB設計（論理モデル）
 
-対象: PostgreSQL。主キーは原則 UUID、日時は `timestamptz`、全テーブルの外部キーとCHECK制約をマイグレーションで管理。以下は**設計案**であり、確定済みのDDLではない。
+状態: **実装済み**（2026-11-28に実装に合わせて更新）。**DDLの正本は `db/migrations/`**（goose・前進のみ・00001〜00020）。この文書は、各テーブルの役割と不変条件を説明する論理モデルで、細かな型・索引・CHECKはmigrationを見る。ぬるの`agent`スキーマは§8。
 
 ## 1. 認証・権限
 
@@ -67,12 +67,14 @@
 
 | テーブル | 主要カラム | 制約・補足 |
 |---|---|---|
-| `media_assets` | `id`, `public_id`（128bit乱数・22文字。idから導けない。本文の公開URLに使う）, `storage_key`（相対キー。絶対パスはAPIに出さない）, `mime_type`（保存するのはjpeg/png）, `byte_size`, `width`, `height`（向き補正後）, `sha256`, `purpose`（avatar/inventory/cms）, `uploaded_by`, `created_at`, `redacted_at` | **`visibility`列は持たない**: 公開は「公開中の版が参照しているか」で毎回導く（P3-02）。保存は再エンコード後の値（元のEXIF等を保持しない）。`redacted_at`は本人情報を含む画像を`nuctl media-redact`で無効化した印（行と参照は残し、ファイルを消し、配信・参照・公開を止める） |
+| `media_assets` | `id`, `public_id`（128bit乱数・22文字。idから導けない。本文の公開URLに使う）, `storage_key`（相対キー。絶対パスはAPIに出さない）, `mime_type`（保存するのはWebPのみ。再エンコード後）, `byte_size`, `width`, `height`（向き補正後）, `sha256`, `purpose`（avatar/inventory/cms）, `uploaded_by`, `created_at`, `redacted_at` | **`visibility`列は持たない**: 公開は「公開中の版が参照しているか」で毎回導く（P3-02）。保存は再エンコード後の値（元のEXIF等を保持しない）。`redacted_at`は本人情報を含む画像を`nuctl media-redact`で無効化した印（行と参照は残し、ファイルを消し、配信・参照・公開を止める） |
 | `media_references` | `media_id`（FK・RESTRICT）, `owner_type`（content_revision）, `owner_id`, `purpose`（cover/inline） | 版は不変なので、版への参照は追記専用（トリガー）。`content_revisions.cover_media_id`もFK |
 | `notification_settings` | `event_type`, `enabled`, `discord_channel_id`, `updated_by` | Adminが変更可能 |
 | `notification_outbox` | `id`, `event_type`, `dedupe_key`（1イベント1行・UNIQUE）, `payload_json`（機密を入れない）, `status`（pending/sent/dead）, `attempts`, `next_attempt_at`, `last_error`（要約のみ）, `created_at`, `sent_at` | DB処理と同一トランザクションで作成。チャンネル未設定の間はpendingで待機 |
 | `audit_logs` | `id`, `actor_user_id`, `action`, `target_type`, `target_id`, `summary_json`, `created_at` | 追記専用。トークン・パスワード・学生証番号の値を保存しない |
-| `dashboard_events` | `id`, `event_type`, `title`, `target_url`, `created_at` | 公開作品やアプリ更新を自動表示 |
+| ~~`dashboard_events`~~ | — | **未実装**（ダッシュボードの自動フィードは未実装。[FEATURES](FEATURES.md)）。実装するときにmigrationで作る |
+| `legacy_authors` | `id`, `source_name`（UNIQUE）, `publication_state`（unconfirmed/permitted/withdrawn。既定は未確認＝公開しない）, `confirmed_by/at/note`, `withdrawn_at`, `linked_user_id/by/at`, `erased_at` | 既存記事の投稿者（移行元の情報）。アプリのユーザーとは別に管理し、**本人の公開許可が記録されるまで公開サイトでは「nu_digital」と表示**（D14）。名前は版（不変）に保存しない。個人情報削除では匿名の記号に置換（00010） |
+| `bootstrap_state` | （1行） | 初期Ownerを**1回だけ**作れることを保証する印（00002）。2回目は別のログインIDでも拒否 |
 
 ## 6. 関係と不変条件
 
@@ -98,9 +100,31 @@ inventory_items ──1:N── inventory_loans
 
 ## 7. 確定済みの事項と、実装時に決めること
 
-D01〜D13は[DECISIONS](DECISIONS.md)で確定済み。実装時に決める詳細:
+D01〜D15は[DECISIONS](DECISIONS.md)で確定済み。以下は、当初の「実装時に決める詳細」と、その結果:
 
-- 各テーブルの具体的な型・索引・CHECK（DDLはP1以降のmigrationで確定）。
+- 各テーブルの具体的な型・索引・CHECK → `db/migrations`で確定済み。
 - `inventory_correction_events`から有効数量を求める集計方法（ビューか導出クエリ）。
 - バックアップのマニフェストに含めるスキーマ版の持ち方（[OPERATIONS](OPERATIONS.md)）。
-- 既存記事の`metadata_json`移行マッピング（P3-04）。
+- 既存記事の`metadata_json`移行マッピング → 実装済み（`nuctl import-legacy`。[RUNBOOK §14](RUNBOOK.md)）。
+
+## 8. `agent`スキーマ（ぬる。`services/agent`専用）
+
+専用のDBロール`nu_agent`（migration 00013で作成。**NOLOGIN→運用者がパスワードを設定してLOGIN**。[RUNBOOK §16.2](RUNBOOK.md)）が、`agent`スキーマだけを使える。**nu_app本体（`public`）のテーブルは読めない**。日本語の部分一致検索は`pg_trgm`（`agent`スキーマ内に作成。00014）。仕組み全体は[NUL_OVERVIEW](NUL_OVERVIEW.md)。
+
+| テーブル | 主な列・役割 | migration |
+|---|---|---|
+| `settings` | `key`・`value`(jsonb)。停止状態`control.mode`・予算の状態・各種の「一度きり」の記録（`intro.posted`・`report.*`・`diary.last`・`apikey.expires`など） | 00013 |
+| `state` | 1行。気分`mood`(-2〜2)・テンション`energy`・ハマり`hobby` | 00013 |
+| `relationships` | `discord_user_id`・親密度`closeness`（話した回数）・呼び名・最終 | 00013 |
+| `messages` | ログの記録。`message_id`・`channel_id`・`thread_id`・`kind`(guild/dm)・`author_*`・`is_bot`・`content`・`attachments`(メタ情報のみ)・`created_at`・`edited_at`・**`is_public`**（@everyoneが見られるチャンネルか。検索・要約の材料は公開のみ）。Discordで削除されたら物理削除 | 00013・00020 |
+| `import_progress` | 過去ログの取り込みの進捗（チャンネルごと。再開可能） | 00013 |
+| `api_usage` | Claude APIの使用量の記録（モデル・用途・トークン・金額`cost_micro_usd`・チャンネル・ユーザー）。**本文は入れない**。予算の根拠 | 00013 |
+| `daily_calls` | 一人あたりの1日の回数（kind: reply/opus/web） | 00013・00016 |
+| `reactions_daily` | リアクションの1日の件数 | 00013 |
+| `notes` | ぬるのノート。`subject_user_id`（本人についてのメモ。NULLは内省の一般メモ）・`content`≤500字・`private`（DM由来）・`source_message_id`（元のメッセージ。消されたらノートも消す） | 00014 |
+| `summaries` | 日次要約（チャンネル×日(JST)）。公開チャンネルだけ | 00015 |
+| `diary` | 研究日誌（`kind`: dig=古い要約から／web=Webで調べた／intro=内省の明日の話題。日×種別で1件） | 00017・00019 |
+| `reminders` | リマインダー（`user_id`・送り先`channel_id`・`message`≤200字・`remind_at`・`status`(pending/sending/failed)・`private`（DMで頼んだもの）。配信したら削除） | 00018・00020 |
+
+不変条件: DMの内容（`kind='dm'`・`private`）は検索・要約・他の人の会話に使わない／ノートは本人についてのメモだけ（他人のIDで作れない）／非公開チャンネルの内容は材料にしない／メッセージ・ノート・要約・リマインダーの上限と削除の連動（コードで強制。[NUL_OVERVIEW §5](NUL_OVERVIEW.md)）。バックアップは既存のDBダンプに含まれる（復元後は`nu_agent`のパスワードを再設定）。
+

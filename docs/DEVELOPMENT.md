@@ -22,7 +22,7 @@ typeは `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`。
 5. 準備用チェックと変更対象のテストを実行。差分を読み直し、不要ファイル・秘密値・仕様逸脱を点検。
 6. 日本語コミット、作業ブランチへpush、PR作成（未完ならDraft）。本文に `Closes #番号`、実測結果、未実施を記載。
 7. PRの最新コミットのCIを確認し、失敗は修正して再確認。画面変更は操作確認と画像比較、DB変更はPostgreSQLで検証。
-8. **マージは運用責任者がレビューして行う**（2026-11-21の指示で、PR #28以降は自律マージをやめた）。Squash mergeのタイトルも日本語。履歴維持が必要な移設はmergeコミット。マージ後は最新mainから始め、依存PRはマージ待ちの間は積み重ねてよい。
+8. **マージの運用**: 2026-11-21の指示で、PR #28以降は運用責任者のレビューを待つ運用になった。ただし**ぬる（`services/agent`）の開発（2026-11-26〜）では、運用責任者の指示のもと、PR最新コミットのCI全成功を確認したうえで、AIが自律的にマージした**（本番デプロイの承認は常に人）。今後の方針（自律マージを続けるか）は運用責任者が決める。Squash mergeのタイトルも日本語。履歴維持が必要な移設はmergeコミット。マージ後は最新mainから始め、依存PRはマージ待ちの間は積み重ねてよい。
 
 環境不足は成功に数えない。無関係の作業は進め、問題のある受け入れ条件は未完了と明記する。別のエージェントや新セッションは [引き継ぎ](handoffs/TEMPLATE.md) と実際のGit/CIを照合して再開する。
 
@@ -37,10 +37,10 @@ typeは `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`。
 
 ### 未確定仕様の扱い
 
-- 正本は`docs/TASKS.md`・`BACKLOG.md`・`DECISIONS.md`などの設計文書。**D01〜D13の確定仕様は変更しない**。
+- 正本は`docs/TASKS.md`・`BACKLOG.md`・`DECISIONS.md`などの設計文書。**D01〜D15の確定仕様は変更しない**。
 - それ以外の細かな仕様・UI・内部設計は、既存要件との整合を調べて**自律的に決める**。判断が難しいときはCLAUDE_TEAMの方針でOpusに設計・比較させ、通常の実装はSonnetで行う。
 - 情報が足りなくても、**安全で後から変更できる仕様**なら合理的な仮定を置いて実装してよい。認証・認可・個人情報・DB整合性は常に安全側にし、必ずテストする。
-- 暫定採用した仕様は[DECISIONS](DECISIONS.md)の「暫定採用（ユーザー未確定）」に、**判断理由・代替案・変更時の影響**とともに記録し、ユーザー確定事項（D01〜D13と運用責任者の承認）と区別する。不可逆な変更や重大なセキュリティリスクは推測で実行せず、記録して運用責任者へ知らせる。
+- 暫定採用した仕様は[DECISIONS](DECISIONS.md)の「暫定採用（ユーザー未確定）」に、**判断理由・代替案・変更時の影響**とともに記録し、ユーザー確定事項（D01〜D15と運用責任者の承認）と区別する。不可逆な変更や重大なセキュリティリスクは推測で実行せず、記録して運用責任者へ知らせる。
 
 ## 自律的に決められること
 
@@ -58,7 +58,7 @@ typeは `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`。
 
 - デフォルトブランチmain、Squash merge、マージ済みブランチの自動削除。
 - mainのRulesetまたはbranch protection: PR必須、force push・削除禁止、会話解決必須、CI必須。管理者の恒常的bypassも避ける。
-- 必須チェック（実際のチェック名）: `harness / repository`、`harness / policy`、`web / lint-typecheck-build`、`admin / lint-typecheck-build`、`go / services/api`、`go / services/bot`、`go / docker build`、`go / sqlc`、`go / integration`、`compose / smoke`。必須チェックが未実行のままpendingにならないよう、各workflowは`paths`絞り込みを持たず全PRで実行する（約8分）。新しいチェックを追加したら、名前を保護ルールの必須チェックへ追加する。
+- 必須チェック（実際のチェック名。2026-11-28確認）: `harness / repository`、`harness / policy`、`web / lint-typecheck-build`、`admin / lint-typecheck-build`、`go / services/api`、`go / services/bot`、`go / docker build`、`go / sqlc`、`go / integration`、`compose / smoke`。必須チェックが未実行のままpendingにならないよう、各workflowは`paths`絞り込みを持たず全PRで実行する（約8分）。新しいチェックを追加したら、名前を保護ルールの必須チェックへ追加する。**注意（2026-11-28）: `go / services/agent`・`ops / backup-restore`・`ops / nginx`・`ops / deploy-script`は、CIでは実行されるが保護ルールの必須には入っていない**（ぬる・運用スクリプトの退行がマージ自体は止めない。デプロイの`verify`は全チェックの成功を待つ）。**PRのチェック一覧で14件すべての成功を、マージ前に必ず確認する**。必須に加えるかは運用責任者が決める（[BACKLOG](BACKLOG.md)）。
 - 複数のレビュー担当者がいる場合は承認1件・最新差分で承認失効を設定。一人運用では自分のPRを自分で承認できないため、承認数必須は無理に設定せず手動レビューとCIで運用し、体制を記録する。
 - 保護機能が使えない状態（privateでプラン不足等）に戻った場合は、保護済みと呼ばず、制限を明記する。
 - Actionsは最小権限。PRのコードに本番secretを渡さない。`pull_request_target`でPRコードを実行しない。
