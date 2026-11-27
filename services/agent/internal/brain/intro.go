@@ -47,11 +47,11 @@ func (b *Brain) Intro(ctx context.Context, in IntroInput) (string, error) {
 		u.WriteString(untrusted("ノート", clip(n, 200)))
 		u.WriteString("\n")
 	}
-	u.WriteString("\n【お願い】今日から、自分（ぬる）が正式にこのサーバーで活動を始める。メンバー全員に向けた、最初の挨拶をtimesに書く。\n" +
-		"- 固定の定型文ではなく、自分の人格（ツンデレの自称スーパーAI・ネットの民）で、自分で考えて書く。\n" +
-		"- 団体（nu_digital＝大学のデジタル創作サークル）について、上の材料から分かることに軽く触れる（材料に無いことは言わない・推測で断定しない）。人の名前は出さない。\n" +
-		"- 自分に何ができるかを一言（メンションで呼べる・調べもの・リマインダー・過去ログを探す、など）。\n" +
-		"- 5〜8文。長くしすぎない。呼びかけは「みんな」程度。メンション（@）は付けない。")
+	u.WriteString("\n【お願い】今日から、自分（ぬる）が正式にこのサーバーで活動を始める。メンバー全員に向けた、最初のひと言をtimesに書く。\n" +
+		"- 定型文ではなく、自分の言葉で、自分で考えて書く。自己紹介の羅列や、自分の性格・好みの説明はしない。人間のメンバーが新しい場所に顔を出したときのような、自然な挨拶にする。\n" +
+		"- 団体（nu_digital＝大学のデジタル創作サークル）について、上の材料から分かることに、さりげなく触れてもいい（材料に無いことは言わない・推測で断定しない）。人の名前は出さない。\n" +
+		"- 何ができるかは、必要なら一言だけ（メンションで呼べる、程度）。売り込まない。\n" +
+		"- 短めでいい（数文）。メンション（@）は付けない。")
 	system := llm.Message{Role: llm.System, Blocks: []llm.Block{{Type: llm.Text, Text: Describe(st, b.now(), 0, "ぬるのtimes（メンバー全員への最初の挨拶を書く）")}}}
 	user := llm.Message{Role: llm.User, Blocks: []llm.Block{{Type: llm.Text, Text: u.String()}}}
 	model, effort := llm.Sonnet, "low"
