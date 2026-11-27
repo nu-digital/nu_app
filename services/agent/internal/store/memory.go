@@ -137,7 +137,7 @@ func (s *Store) ForgetNote(ctx context.Context, id, subjectUserID int64) (bool, 
 	return tag.RowsAffected() == 1, err
 }
 
-// ForgetPerson は、その人についてのノートを全部消す（「私のことを忘れて」）。親密度・呼び名も初期化する。消したノートの件数を返す。
+// ForgetPerson は、その人についてのノートと、リマインダー、親密度・呼び名を全部消す（「私のことを忘れて」）。サーバーの発言ログ（messages）と、それから作った要約は消さない（仕様どおり）。消したノートの件数を返す。
 func (s *Store) ForgetPerson(ctx context.Context, userID int64) (int64, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -149,6 +149,10 @@ func (s *Store) ForgetPerson(ctx context.Context, userID int64) (int64, error) {
 		return 0, err
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM relationships WHERE discord_user_id = $1`, userID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return 0, err
+	}
+	// 本人のリマインダー（DMで頼んだ私事を含む）も消す
+	if _, err := tx.Exec(ctx, `DELETE FROM reminders WHERE user_id = $1`, userID); err != nil {
 		return 0, err
 	}
 	return tag.RowsAffected(), tx.Commit(ctx)

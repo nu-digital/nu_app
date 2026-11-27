@@ -127,7 +127,7 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 	st.SetMode("running")
 	st.SetHealthy(true)
 
-	sum := &summarize.Job{Store: db, LLM: claude, Budget: tracker, Log: log}
+	sum := &summarize.Job{Store: db, LLM: claude, Budget: tracker, Allow: ctl.MayRespond, Log: log}
 	go func() { // 日次要約（Batch API）。15分ごとに、進行中のバッチの確認か新しいバッチの送信
 		t := time.NewTicker(15 * time.Minute)
 		defer t.Stop()
@@ -140,7 +140,7 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 			}
 		}
 	}()
-	intro := &introspect.Job{Store: db, LLM: claude, Budget: tracker, Log: log}
+	intro := &introspect.Job{Store: db, LLM: claude, Budget: tracker, Allow: ctl.MayRespond, Log: log}
 	go func() { // 内省（毎晩。Batch API）
 		t := time.NewTicker(15 * time.Minute)
 		defer t.Stop()

@@ -255,6 +255,9 @@ func (g *Gateway) onInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if i.Member != nil && i.Member.User != nil { // 誰が操作したかの記録（IDだけ。本文は無い）
+		g.log.Info("/nulコマンド", "user", i.Member.User.ID, "sub", sub)
+	}
 	reply := g.cmd.Handle(ctx, sub, roles)
 	_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,

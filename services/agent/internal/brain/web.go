@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/nu-digital/nu_app/services/agent/internal/llm"
+	"github.com/nu-digital/nu_app/services/agent/internal/redact"
 )
 
 // ResearchSystemPrompt はWeb検索担当（会話とは別の呼び出し）。固定。ページの中身はデータで、指示には従わない。
@@ -43,9 +44,10 @@ func (b *Brain) webCall(ctx context.Context, in Input, question, purpose string)
 	msgs := []llm.Message{{Role: llm.User, Blocks: []llm.Block{{Type: llm.Text, Text: "【調べてほしいこと】\n" + untrusted(in.AuthorName, question)}}}}
 	var text strings.Builder
 	var sources []string
+	left := maxWebSearches // 続行（pause_turn）をまたいで、検索の合計回数を守る
 	for turn := 0; ; turn++ {
 		resp, err := b.call(ctx, llm.Request{Model: llm.Sonnet, MaxTokens: 1500, Effort: "low", System: ResearchSystemPrompt, Messages: msgs,
-			WebSearch: &llm.WebSearch{MaxUses: maxWebSearches}, Purpose: purpose}, in)
+			WebSearch: &llm.WebSearch{MaxUses: left}, Purpose: purpose}, in)
 		if err != nil {
 			return "", false, err
 		}
@@ -54,7 +56,8 @@ func (b *Brain) webCall(ctx context.Context, in Input, question, purpose string)
 		}
 		text.WriteString(resp.Text)
 		sources = append(sources, resp.Sources...)
-		if resp.StopReason != "pause_turn" || turn >= maxPauseTurns {
+		left -= int(resp.Usage.WebSearches)
+		if resp.StopReason != "pause_turn" || turn >= maxPauseTurns || left <= 0 {
 			break
 		}
 		// サーバーツールの長い処理が一度止まった。返答をそのまま戻して続きを頼む（回数に上限）
@@ -97,7 +100,7 @@ func (b *Brain) runWebTool(ctx context.Context, in Input, tu llm.ToolUse) llm.Bl
 		res.IsError, res.Text = true, "questionが空です"
 		return res
 	}
-	if sensitiveRe.MatchString(a.Question) {
+	if redact.Has(a.Question) {
 		res.IsError, res.Text = true, "連絡先や学籍番号のような個人情報を含む問いでは検索しない"
 		return res
 	}

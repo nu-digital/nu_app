@@ -130,8 +130,19 @@ func (s *Store) UpdateMessage(ctx context.Context, id int64, content string, att
 	if err != nil {
 		return err
 	}
-	_, err = s.pool.Exec(ctx, `UPDATE messages SET content = $2, attachments = $3, edited_at = $4 WHERE message_id = $1`, id, content, b, editedAt)
-	return err
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `UPDATE messages SET content = $2, attachments = $3, edited_at = $4 WHERE message_id = $1`, id, content, b, editedAt); err != nil {
+		return err
+	}
+	// 編集したら、その日の要約は古い内容を含み得る（個人情報を書いて消した場合など）ので消して、残った内容で作り直す
+	if _, err := tx.Exec(ctx, `DELETE FROM summaries s USING messages m WHERE m.message_id = $1 AND s.channel_id = m.channel_id AND s.day = (m.created_at AT TIME ZONE 'Asia/Tokyo')::date`, id); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // DeleteMessages はDiscordでの削除に合わせて、記録から**物理削除**する。

@@ -89,8 +89,8 @@ func TestRememberLinksSourceAndScopesToSpeaker(t *testing.T) {
 	m2 := &fakeMem{}
 	fake2 := &llm.Fake{Responses: []llm.Response{toolCall("remember", map[string]any{"content": "来月ハッカソン", "about_speaker": false}), text("ok")}}
 	_, _ = memBrain(fake2, m2).Reply(context.Background(), input())
-	if m2.added[0].SubjectUserID != nil {
-		t.Error("一般のメモに人のIDが付いた")
+	if m2.added[0].SubjectUserID == nil || *m2.added[0].SubjectUserID != 7 {
+		t.Error("ノートは必ず話している本人についてのもの（一般のメモは内省だけが作る）")
 	}
 }
 
@@ -277,8 +277,8 @@ func TestWebResearchBudgetAndUserLimits(t *testing.T) {
 func TestWebResearchContinuesPauseTurnWithBound(t *testing.T) {
 	var rs []llm.Response
 	rs = append(rs, toolCall("web_research", map[string]any{"question": "x"}))
-	for i := 0; i < 10; i++ { // いつまでも pause_turn
-		rs = append(rs, webResp("途中", 1, "pause_turn"))
+	for i := 0; i < 10; i++ { // いつまでも pause_turn（検索は使わない）
+		rs = append(rs, webResp("途中", 0, "pause_turn"))
 	}
 	fake := &llm.Fake{Responses: rs}
 	b, _ := newBrain(fake, newLedger(), budget.Config{})
@@ -467,5 +467,49 @@ func TestReminderFromDMIsPrivateAndListKnowsWhereItIsAsked(t *testing.T) {
 	_, _ = remBrain(fake3, r3).Reply(context.Background(), input())
 	if r3.listedInDM {
 		t.Error("公開の場の一覧でDM扱い")
+	}
+}
+
+func TestWebSearchBudgetIsSharedAcrossPauseTurns(t *testing.T) {
+	rs := []llm.Response{toolCall("web_research", map[string]any{"question": "x"})}
+	for i := 0; i < 10; i++ {
+		rs = append(rs, webResp("途中", 1, "pause_turn")) // 毎回1回検索する
+	}
+	fake := &llm.Fake{Responses: rs}
+	b, _ := newBrain(fake, newLedger(), budget.Config{})
+	_, _ = b.Reply(context.Background(), input())
+	total, last := 0, 0
+	for _, c := range fake.Calls {
+		if c.WebSearch != nil {
+			total++
+			last = c.WebSearch.MaxUses
+		}
+	}
+	if total != maxWebSearches || last != 1 {
+		t.Errorf("検索の合計は%d回まで（続行ごとに残りが減る）: 呼び出し%d回・最後のMaxUses=%d", maxWebSearches, total, last)
+	}
+}
+
+func TestForgetMeRegexIsAnchoredAndSkipsCloseness(t *testing.T) {
+	yes := []string{"私のことを全部忘れて", "僕のこと忘れてください", "私に関する情報を消して", "わたしについてのメモを忘れて！", "私の記憶を忘れて。"}
+	no := []string{"私のこと忘れてない？", "私のことを忘れてたでしょ", "私のこと忘れてる？", "「私のことを忘れて」って言われた", "私のメモを消してから寝る", "あの人のことを忘れて"}
+	for _, s := range yes {
+		if !forgetMeRe.MatchString(s) {
+			t.Errorf("発動しない: %q", s)
+		}
+	}
+	for _, s := range no {
+		if forgetMeRe.MatchString(s) {
+			t.Errorf("誤爆: %q", s)
+		}
+	}
+	m := &fakeMem{}
+	b, _ := newBrain(&llm.Fake{}, newLedger(), budget.Config{})
+	b.Memory = m
+	in := input()
+	in.Text = "私のことを全部忘れて"
+	out, _ := b.Reply(context.Background(), in)
+	if !out.Forgot {
+		t.Error("Forgotが立たない（応答後に親密度を数え直してしまう）")
 	}
 }

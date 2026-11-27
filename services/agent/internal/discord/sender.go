@@ -84,6 +84,7 @@ func clip(s string) string {
 type ImageFetcher struct {
 	Client   *http.Client
 	MaxBytes int64
+	sem      chan struct{} // 同時に処理する画像の数（縮小は100MB級のメモリを使うので、全体で2つまで）
 }
 
 var cdnHosts = map[string]bool{"cdn.discordapp.com": true, "media.discordapp.net": true}
@@ -97,7 +98,7 @@ func NewImageFetcher() *ImageFetcher {
 			}
 			return nil
 		},
-	}, MaxBytes: 10 << 20}
+	}, MaxBytes: 10 << 20, sem: make(chan struct{}, 2)}
 }
 
 func allowedURL(u *url.URL) bool {
@@ -114,6 +115,14 @@ func (f *ImageFetcher) Fetch(ctx context.Context, a Attachment) ([]byte, error) 
 	}
 	if int64(a.Size) > f.MaxBytes {
 		return nil, imageprep.ErrTooLarge
+	}
+	if f.sem != nil {
+		select {
+		case f.sem <- struct{}{}:
+			defer func() { <-f.sem }()
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {

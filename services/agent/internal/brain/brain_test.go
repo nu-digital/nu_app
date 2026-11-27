@@ -189,8 +189,15 @@ func TestSeriousRequestAlwaysUsesOpus(t *testing.T) {
 	if m := models(fake); len(m) != 2 || m[0] != llm.Opus || m[1] != llm.Sonnet {
 		t.Errorf("モデル: %v", m)
 	}
-	if !strings.Contains(fake.Calls[1].Messages[len(fake.Calls[1].Messages)-1].Blocks[0].Text, "結論: 3つ") {
-		t.Error("Sonnetに、Opusの結論が渡っていない")
+	// Opusの結論は、システムではなく、データとして囲んだユーザーメッセージの一部として渡る
+	msgs := fake.Calls[1].Messages
+	if msgs[0].Role != llm.User || !strings.Contains(fmt.Sprint(msgs[0].Blocks), "結論: 3つ") || !strings.Contains(fmt.Sprint(msgs[0].Blocks), "untrusted_message") {
+		t.Error("Sonnetに、Opusの結論がデータとして渡っていない")
+	}
+	for _, m := range msgs {
+		if m.Role == llm.System && strings.Contains(fmt.Sprint(m.Blocks), "結論: 3つ") {
+			t.Error("Opusの出力がシステムのロールに入った")
+		}
 	}
 }
 

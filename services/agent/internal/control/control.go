@@ -25,9 +25,10 @@ type Settings interface {
 }
 
 type Controller struct {
-	st   Settings
-	mu   sync.RWMutex
-	mode Mode
+	st    Settings
+	setMu sync.Mutex // Set全体（保存とメモリの更新）を直列にする。2人が同時に操作しても食い違わない
+	mu    sync.RWMutex
+	mode  Mode
 }
 
 // New は保存された状態を読む。読めない・不明な値のときは**安全側（Stopped）**にする。
@@ -62,6 +63,8 @@ func (c *Controller) Set(ctx context.Context, m Mode) error {
 	if !valid(m) {
 		return fmt.Errorf("不明な状態です")
 	}
+	c.setMu.Lock()
+	defer c.setMu.Unlock()
 	if err := c.st.SetSetting(ctx, settingKey, m); err != nil {
 		return fmt.Errorf("停止状態を保存できません")
 	}

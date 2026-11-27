@@ -370,3 +370,18 @@ func (c chanRecorder) Reply(ctx context.Context, ch, id int64, t string) error {
 	*c.ch = ch
 	return c.fakeSender.Reply(ctx, ch, id, t)
 }
+
+type forgetBrain struct{}
+
+func (forgetBrain) Reply(context.Context, brain.Input) (brain.Output, error) {
+	return brain.Output{Text: "消した", Forgot: true}, nil
+}
+
+func TestForgetReplyDoesNotRecreateCloseness(t *testing.T) {
+	x := newRig(t)
+	x.r.Brain = forgetBrain{}
+	x.r.Handle(context.Background(), discord.Incoming{Msg: msg(timesCh, 1, "私のことを全部忘れて")})
+	if len(x.s.replies) != 1 || len(x.m.bumped) != 0 {
+		t.Errorf("replies=%v bumped=%v", x.s.replies, x.m.bumped)
+	}
+}
