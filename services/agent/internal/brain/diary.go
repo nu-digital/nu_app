@@ -8,6 +8,7 @@ import (
 
 	"github.com/nu-digital/nu_app/services/agent/internal/budget"
 	"github.com/nu-digital/nu_app/services/agent/internal/llm"
+	"github.com/nu-digital/nu_app/services/agent/internal/redact"
 	"github.com/nu-digital/nu_app/services/agent/internal/store"
 )
 
@@ -29,7 +30,7 @@ func splitTitle(text, fallback string) (title, body string) {
 }
 
 func cleanDiary(s string) string {
-	s = sensitiveRe.ReplaceAllString(s, "［伏せ字］")
+	s = redact.Redact(s)
 	if r := []rune(s); len(r) > 1400 {
 		s = string(r[:1400]) + "…"
 	}
@@ -59,7 +60,7 @@ func (b *Brain) Dig(ctx context.Context, sum store.Summary) (topic, content stri
 		return "", "", nil
 	}
 	t, body := splitTitle(clean(resp.Text), "昔のnu_digital")
-	return t, cleanDiary(body), nil
+	return diaryTopic(t, "昔のnu_digital"), cleanDiary(body), nil
 }
 
 // Study は、いまハマっていることについてWebで調べ、「調べもの日誌」を書く。
@@ -81,7 +82,7 @@ func (b *Brain) Study(ctx context.Context, hobby string, recent []string) (topic
 		return "", "", nil
 	}
 	t, body := splitTitle(out, hobby)
-	return t, cleanDiary(stripSources(body)), nil
+	return diaryTopic(t, hobby), cleanDiary(stripSources(body)), nil
 }
 
 // stripSources は「出典: …」の行（URL）を日誌から外す（URLは保存・投稿しない）。
@@ -94,4 +95,12 @@ func stripSources(s string) string {
 		keep = append(keep, l)
 	}
 	return strings.TrimSpace(strings.Join(keep, "\n"))
+}
+
+// diaryTopic は、題を整える（記号・個人情報の形を除く）。空になったら fallback。
+func diaryTopic(t, fallback string) string {
+	if t = redact.Topic(t, 40); t != "" {
+		return t
+	}
+	return redact.Topic(fallback, 40)
 }

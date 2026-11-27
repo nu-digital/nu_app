@@ -15,6 +15,7 @@ import (
 	"github.com/nu-digital/nu_app/services/agent/internal/brain"
 	"github.com/nu-digital/nu_app/services/agent/internal/budget"
 	"github.com/nu-digital/nu_app/services/agent/internal/control"
+	"github.com/nu-digital/nu_app/services/agent/internal/redact"
 	"github.com/nu-digital/nu_app/services/agent/internal/store"
 )
 
@@ -71,6 +72,7 @@ type Scheduler struct {
 	Now      func() time.Time
 	Rng      *rand.Rand
 	joinMu   sync.Mutex
+	rngMu    sync.Mutex
 	joins    []time.Time
 	MaxDaily int // 1日の気まぐれ投稿の上限（既定3。仕様は最大5）
 }
@@ -130,7 +132,7 @@ func (s *Scheduler) dailyMood(ctx context.Context, now time.Time) {
 	if err != nil {
 		return
 	}
-	next := brain.DailyDrift(brain.State{Mood: st.Mood, Energy: st.Energy, Hobby: st.Hobby}, s.rng())
+	next := brain.DailyDrift(brain.State{Mood: st.Mood, Energy: st.Energy, Hobby: st.Hobby}, rand.New(rand.NewPCG(s.rng().Uint64(), 3)))
 	hobby := st.Hobby
 	if hobby == "" || n.YearDay()%3 == 0 {
 		hobby = Hobbies[s.rng().IntN(len(Hobbies))]
@@ -264,11 +266,37 @@ func (s *Scheduler) maybeSpeak(ctx context.Context, now time.Time) {
 	}
 }
 
-func (s *Scheduler) rng() *rand.Rand {
+// rng は乱数を返す。*rand.Rand は並行に使えないので、使うときは rngMu を取る（Greet と Tick は別のgoroutineから呼ばれる）。
+func (s *Scheduler) rng() *lockedRand {
+	s.rngMu.Lock()
+	defer s.rngMu.Unlock()
 	if s.Rng == nil {
 		s.Rng = rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 1))
 	}
-	return s.Rng
+	return &lockedRand{r: s.Rng, mu: &s.rngMu}
+}
+
+type lockedRand struct {
+	r  *rand.Rand
+	mu *sync.Mutex
+}
+
+func (l *lockedRand) IntN(n int) int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.r.IntN(n)
+}
+
+func (l *lockedRand) Uint64() uint64 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.r.Uint64()
+}
+
+func (l *lockedRand) Float64() float64 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.r.Float64()
 }
 
 // Run は1分ごとに Tick を呼ぶ（ctxが終わるまで）。
@@ -442,9 +470,10 @@ func (s *Scheduler) maybeDiary(ctx context.Context, now time.Time) {
 			return
 		}
 		// 調べたことが、次のハマりになる（P1の候補リストを置き換える。長すぎる題は切る）
-		h := topic
-		if r := []rune(h); len(r) > 40 {
-			h = string(r[:40])
+		// Webの内容に由来する題は、システムメッセージ（気分の文）に入るので、記号・個人情報の形を除いて短くする
+		h := redact.Topic(topic, 30)
+		if h == "" {
+			return
 		}
 		cur.Hobby = h
 		if err := s.Mem.SaveState(ctx, cur); err != nil {
@@ -471,7 +500,7 @@ const (
 func sanitizeName(n string) string {
 	n = strings.Map(func(r rune) rune {
 		switch r {
-		case '\n', '\r', '@', '`', '<', '>', '*', '_', '~', '|', '\\':
+		case '\n', '\r', '@', '`', '<', '>', '*', '_', '~', '|', '\\', '[', ']', '(', ')', '{', '}', '/', ':', '.', '#':
 			return -1
 		}
 		return r

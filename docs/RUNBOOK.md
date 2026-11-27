@@ -283,6 +283,8 @@ sudo env POSTGRES_IMAGE='postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc44
 
 仕様: [nul-agent.md](design/nul-agent.md)・決定: [DECISIONS D15](DECISIONS.md)・計画: [nul-agent-p1.md](design/nul-agent-p1.md)。`services/agent`（コンテナ`nu_app-agent-1`）。**設定（秘密・ID）が揃うまでは「無効モード」**（Discordに接続せず、Claude APIも呼ばない。healthzだけ応答）。secretを置く前にデプロイしても、他のサービスには影響しない。
 
+**本番での有効化の手順・実機テストのチェックリスト・運用開始後の確認は [NUL_LAUNCH](NUL_LAUNCH.md)。** 以下は日常の運用の手順。
+
 ### 16.1 必要な設定（`/srv/nu_app/.env`。root・600。**運用責任者が自分で書く。チャット・Gitに出さない**）
 | キー | 内容 | 秘密 |
 |---|---|---|

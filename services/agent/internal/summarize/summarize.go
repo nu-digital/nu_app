@@ -7,6 +7,7 @@ package summarize
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/nu-digital/nu_app/services/agent/internal/budget"
 	"github.com/nu-digital/nu_app/services/agent/internal/llm"
+	"github.com/nu-digital/nu_app/services/agent/internal/redact"
 	"github.com/nu-digital/nu_app/services/agent/internal/store"
 )
 
@@ -30,6 +32,7 @@ type Job struct {
 	Store     Store
 	LLM       llm.Batch
 	Budget    *budget.Tracker
+	Allow     func() bool // 新しいバッチを送ってよいか（全停止中は送らない）。nilなら常に可
 	Log       *slog.Logger
 	Now       func() time.Time
 	MinMsgs   int   // 要約する最小の発言数（既定5）
@@ -144,11 +147,8 @@ func (j *Job) collect(ctx context.Context, p pendingBatch) {
 	_ = j.Store.SetSetting(ctx, keyPending, pendingBatch{})
 }
 
-// 要約に残してはいけない個人情報の形（ノートと同じ）。
-var sensitiveRe = regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]+|\d{2,4}[-ー－]\d{2,4}[-ー－]\d{3,4}|\d{7,}`)
-
 // Redact は個人情報の形を伏せる。
-func Redact(s string) string { return sensitiveRe.ReplaceAllString(s, "［伏せ字］") }
+func Redact(s string) string { return redact.Redact(s) }
 
 const (
 	maxChars    = 24000 // 1日ぶんの入力の上限（超える分は古い発言から落とさず、新しい側を切る）
@@ -156,8 +156,8 @@ const (
 )
 
 func (j *Job) submit(ctx context.Context) {
-	if j.Budget == nil || j.Budget.Remaining(ctx) <= 0 {
-		return // 予算の段階が通常でなければ、任意の仕事はしない
+	if j.Budget == nil || j.Budget.Remaining(ctx) <= 0 || (j.Allow != nil && !j.Allow()) {
+		return // 予算の段階が通常でなければ、任意の仕事はしない。全停止中も送らない
 	}
 	min, size, cap := j.MinMsgs, j.BatchSize, j.CapMicro
 	if min <= 0 {
@@ -225,6 +225,9 @@ func (j *Job) submit(ctx context.Context) {
 	}
 	bid, err := j.LLM.Submit(ctx, reqs)
 	if err != nil {
+		if errors.Is(err, llm.ErrCreditExhausted) {
+			_ = j.Budget.MarkCreditExhausted(ctx) // クレジット切れ: 次の期間まで寝る（15分ごとに叩き続けない）
+		}
 		j.Log.Warn("バッチを送れませんでした。次回に再試行します")
 		return
 	}

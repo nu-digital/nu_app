@@ -171,7 +171,9 @@ func (r *Responder) Handle(ctx context.Context, in discord.Incoming) {
 		r.Log.Error("返信を送れませんでした")
 		return
 	}
-	r.afterReply(ctx, m)
+	if !out.Forgot { // 「忘れて」の直後に、親密度の行を作り直さない
+		r.afterReply(ctx, m)
+	}
 }
 
 func (r *Responder) history(ctx context.Context, m discord.Msg) []brain.Turn {
