@@ -25,6 +25,8 @@ type Gateway struct {
 	lastUp    atomic.Int64 // 最後に接続していた時刻（unix秒）
 	// OnIncoming は、記録したメッセージを応答担当へ渡す（Open の前に設定する。nilなら応答しない）。
 	OnIncoming func(ctx context.Context, in Incoming)
+	// OnJoin は、サーバーに新しいメンバー（Bot以外）が入ったとき、その表示名で呼ばれる（nilなら何もしない）。
+	OnJoin func(ctx context.Context, name string)
 }
 
 // NewGateway は接続の準備をする（まだ接続しない）。token は秘密（ログに出さない）。
@@ -42,6 +44,7 @@ func NewGateway(token string, guildID uint64, rec *Recorder, cmd *Commander, log
 	s.AddHandler(g.onDisconnect)
 	s.AddHandler(g.onResumed)
 	s.AddHandler(g.onMessageCreate)
+	s.AddHandler(g.onMemberAdd)
 	s.AddHandler(g.onMessageUpdate)
 	s.AddHandler(g.onMessageDelete)
 	s.AddHandler(g.onMessageDeleteBulk)
@@ -133,6 +136,24 @@ func (g *Gateway) onMessageCreate(s *discordgo.Session, m *discordgo.MessageCrea
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer cancel()
 		g.OnIncoming(ctx, in)
+	}()
+}
+
+func (g *Gateway) onMemberAdd(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
+	if g.OnJoin == nil || m.Member == nil || m.User == nil || m.User.Bot || m.GuildID != g.guildID {
+		return
+	}
+	name := m.Nick
+	if name == "" {
+		name = m.User.GlobalName
+	}
+	if name == "" {
+		name = m.User.Username
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		g.OnJoin(ctx, name)
 	}()
 }
 

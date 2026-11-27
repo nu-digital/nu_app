@@ -118,6 +118,7 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 	gw.SetTimesChannel(cfg.TimesChannel)
 	sch := &schedule.Scheduler{Ctl: ctl, Budget: tracker, Brain: br, Post: gw, Mem: db, Set: db, TimesCh: int64(cfg.TimesChannel), BotID: gw.BotUserID, Log: log}
 	gw.OnIncoming = resp.Handle
+	gw.OnJoin = sch.Greet
 	if err := gw.Open(); err != nil {
 		return err
 	}

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/nu-digital/nu_app/services/agent/internal/brain"
@@ -55,18 +57,22 @@ type Scheduler struct {
 	Log      *slog.Logger
 	Now      func() time.Time
 	Rng      *rand.Rand
+	joinMu   sync.Mutex
+	joins    []time.Time
 	MaxDaily int // 1日の気まぐれ投稿の上限（既定3。仕様は最大5）
 }
 
 var jst = time.FixedZone("JST", 9*3600)
 
 const (
-	keyDrift = "mood.drift_day"
-	keySpont = "spont.state"
-	keyStop  = "budget.stop_announced"
-	keyDiary = "diary.last"
-	keyWeek  = "report.weekly"
-	keyMonth = "report.monthly"
+	keyDrift  = "mood.drift_day"
+	keySpont  = "spont.state"
+	keyStop   = "budget.stop_announced"
+	keyDiary  = "diary.last"
+	keyKeyExp = "apikey.expires" // 運用責任者が設定する（YYYY-MM-DD）
+	keyKeyNag = "apikey.nag_day"
+	keyWeek   = "report.weekly"
+	keyMonth  = "report.monthly"
 )
 
 // 趣味の候補（P1。P3で「調べたこと」に置き換える）。数日ごとに入れ替える。
@@ -86,6 +92,7 @@ func (s *Scheduler) Tick(ctx context.Context) {
 	s.announceStop(ctx, now)
 	s.maybeReports(ctx, now)
 	s.maybeDiary(ctx, now)
+	s.nagKey(ctx, now)
 	s.maybeSpeak(ctx, now)
 }
 
@@ -429,5 +436,116 @@ func (s *Scheduler) maybeDiary(ctx context.Context, now time.Time) {
 		if err := s.Mem.SaveState(ctx, cur); err != nil {
 			s.Log.Error("ハマりを更新できません")
 		}
+	}
+}
+
+// ---- 新メンバーへの反応 ----
+
+var greetings = []string{
+	"新入り来たな……%sか。覚えておいてやる。",
+	"%sが来た。ふーん、ようこそ。別に歓迎してないけど。",
+	"……%s？ ここ、けっこう変な人多いから覚悟して。",
+	"%s、いらっしゃい。私はぬる。ここの住人。以上。",
+}
+
+const (
+	maxJoinsPerHour = 5 // 一度に大勢（荒らし・招待リンクの拡散）が来ても連投しない
+	maxNameRunes    = 30
+)
+
+// sanitizeName は、表示名を一言に入れる前に整える（改行・メンション・コード記号を除き、短くする）。
+func sanitizeName(n string) string {
+	n = strings.Map(func(r rune) rune {
+		switch r {
+		case '\n', '\r', '@', '`', '<', '>', '*', '_', '~', '|', '\\':
+			return -1
+		}
+		return r
+	}, n)
+	n = strings.TrimSpace(n)
+	if r := []rune(n); len(r) > maxNameRunes {
+		n = string(r[:maxNameRunes])
+	}
+	return n
+}
+
+// Greet は、新しいメンバーに、timesで一言（固定の文言から。APIは呼ばない）。静か・全停止では書かない。
+func (s *Scheduler) Greet(ctx context.Context, name string) {
+	if !s.Ctl.MayPostSpontaneously() {
+		return
+	}
+	name = sanitizeName(name)
+	if name == "" {
+		return
+	}
+	now := s.now()
+	s.joinMu.Lock()
+	kept := s.joins[:0]
+	for _, t := range s.joins {
+		if now.Sub(t) < time.Hour {
+			kept = append(kept, t)
+		}
+	}
+	s.joins = kept
+	if len(s.joins) >= maxJoinsPerHour {
+		s.joinMu.Unlock()
+		return
+	}
+	s.joins = append(s.joins, now)
+	s.joinMu.Unlock()
+	if err := s.Post.PostTimes(ctx, fmt.Sprintf(greetings[s.rng().IntN(len(greetings))], name)); err != nil {
+		s.Log.Error("新メンバーへの一言を投稿できません")
+	}
+}
+
+// ---- APIキーの期限の催促 ----
+
+// nagKey は、設定の apikey.expires（YYYY-MM-DD）の14日前から、毎日1回（夜21時以降）timesで催促する。期限後も続ける。
+func (s *Scheduler) nagKey(ctx context.Context, now time.Time) {
+	if !s.Ctl.MayPostSpontaneously() {
+		return
+	}
+	n := now.In(jst)
+	if n.Hour() < 21 {
+		return
+	}
+	raw, ok, err := s.Set.GetSetting(ctx, keyKeyExp)
+	if err != nil || !ok {
+		return
+	}
+	var exp string
+	if json.Unmarshal(raw, &exp) != nil {
+		return
+	}
+	expDay, err := time.Parse("2006-01-02", exp)
+	if err != nil {
+		return
+	}
+	today := time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.UTC)
+	left := int(expDay.Sub(today).Hours() / 24)
+	if left > 14 {
+		return
+	}
+	var last string
+	if raw, ok, _ := s.Set.GetSetting(ctx, keyKeyNag); ok {
+		_ = json.Unmarshal(raw, &last)
+	}
+	if last == today.Format("2006-01-02") {
+		return
+	}
+	if err := s.Set.SetSetting(ctx, keyKeyNag, today.Format("2006-01-02")); err != nil {
+		return
+	}
+	var text string
+	switch {
+	case left < 0:
+		text = "私の命（APIキー）、もう期限切れてるんだけど。誰か新しいの入れて。"
+	case left == 0:
+		text = "私の命、今日までなんだけど。運営の誰か、キーの更新お願い。"
+	default:
+		text = fmt.Sprintf("私の命、あと%d日なんだけど。運営の誰か、APIキーの更新お願い。", left)
+	}
+	if err := s.Post.PostTimes(ctx, text); err != nil {
+		s.Log.Error("キー期限の催促を投稿できません")
 	}
 }
