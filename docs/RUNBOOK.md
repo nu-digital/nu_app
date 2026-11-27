@@ -361,3 +361,7 @@ sudo bash -c 'set -a; . /srv/nu_app/.env; set +a
 - 全停止（`/nul stop`）中は届かず保留され、再開後に届く（遅れた旨が付く）。`/nul quiet`中は届く。
 - 確認・手動の削除: `... psql -c "select id, user_id, channel_id, remind_at, status, attempts from agent.reminders order by remind_at"`、`delete from agent.reminders where id = …`。`failed`は送れなかったもの（チャンネルの削除・権限の変更など）で、3回失敗すると残る。
 
+### 16.13 内省（P2-4）
+- 毎晩、前日の要約から気分・一般のノート・明日の話題を更新する（Batch API・1日数円未満）。確認: `... psql -c "select day, kind, topic from agent.diary where kind='intro' order by id desc limit 7"`。進行中: `select value from agent.settings where key = 'introspect.pending'`。
+- 検証に通らない出力は捨てて、ログに「読めませんでした」と出る。変なノートが入ったとき: `delete from agent.notes where id = …`。
+

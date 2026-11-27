@@ -20,6 +20,7 @@ import (
 	"github.com/nu-digital/nu_app/services/agent/internal/control"
 	"github.com/nu-digital/nu_app/services/agent/internal/discord"
 	"github.com/nu-digital/nu_app/services/agent/internal/health"
+	"github.com/nu-digital/nu_app/services/agent/internal/introspect"
 	"github.com/nu-digital/nu_app/services/agent/internal/llm"
 	"github.com/nu-digital/nu_app/services/agent/internal/responder"
 	"github.com/nu-digital/nu_app/services/agent/internal/schedule"
@@ -132,6 +133,19 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 		defer t.Stop()
 		for {
 			sum.Tick(ctx)
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+			}
+		}
+	}()
+	intro := &introspect.Job{Store: db, LLM: claude, Budget: tracker, Log: log}
+	go func() { // 内省（毎晩。Batch API）
+		t := time.NewTicker(15 * time.Minute)
+		defer t.Stop()
+		for {
+			intro.Tick(ctx)
 			select {
 			case <-ctx.Done():
 				return

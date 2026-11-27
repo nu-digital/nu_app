@@ -469,6 +469,9 @@ func TestDiaryOnePerDayKindAndRandomOldSummary(t *testing.T) {
 	if ok, _ := s.AddDiary(ctx, store.Diary{Day: day, Kind: "web", Topic: "題2", Content: "本文2"}); !ok {
 		t.Error("種別が違えば入る")
 	}
+	if ok, err := s.AddDiary(ctx, store.Diary{Day: day, Kind: "intro", Topic: "明日の話題", Content: "内省"}); err != nil || !ok {
+		t.Errorf("intro: %v %v", ok, err)
+	}
 	if _, err := s.AddDiary(ctx, store.Diary{Day: day, Kind: "bad", Topic: "x", Content: "x"}); err == nil {
 		t.Error("不正な種別")
 	}
@@ -476,7 +479,7 @@ func TestDiaryOnePerDayKindAndRandomOldSummary(t *testing.T) {
 		t.Error("空の題")
 	}
 	ds, _ := s.RecentDiary(ctx, 5)
-	if len(ds) != 2 {
+	if len(ds) != 3 {
 		t.Errorf("%d", len(ds))
 	}
 	old := time.Date(2025, 5, 1, 0, 0, 0, 0, time.UTC)
