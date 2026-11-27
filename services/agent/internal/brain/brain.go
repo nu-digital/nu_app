@@ -147,6 +147,9 @@ func (b *Brain) Reply(ctx context.Context, in Input) (Output, error) {
 // runTool はツールを実行する。ツールは think_hard だけ。知らない名前は、エラーの結果を返す（実行しない）。
 func (b *Brain) runTool(ctx context.Context, in Input, tu llm.ToolUse, out *Output) llm.Block {
 	res := llm.Block{Type: llm.ToolResult, ToolUseID: tu.ID}
+	if tu.Name == webName {
+		return b.runWebTool(ctx, in, tu)
+	}
 	if tu.Name != thinkHardName {
 		return b.runMemoryTool(ctx, in, tu)
 	}
@@ -234,6 +237,7 @@ func tools() []llm.Tool {
 		{Name: rememberName, Description: "覚えておくことをノートに書く（個人情報は書けない）。", Schema: rememberSchema},
 		{Name: recallName, Description: "ノートから思い出す。", Schema: recallSchema},
 		{Name: forgetName, Description: "いま話している本人についてのノートを1件消す。", Schema: forgetSchema},
+		{Name: webName, Description: "Web検索で調べる（最新の情報・公式ドキュメント・ニュースなど）。1回ごとに費用がかかるので、雑談や自分で答えられることには使わない。", Schema: webResearchSchema},
 		{Name: thinkHardName, Description: "リポジトリの読解・長い文章の下書き・複数ステップの調べものなど、重い仕事を、頭のいい自分（Opus）に任せる。雑談では使わない。", Schema: thinkHardSchema}}
 }
 

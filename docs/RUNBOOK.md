@@ -341,3 +341,8 @@ sudo bash -c 'set -a; . /srv/nu_app/.env; set +a
 - 週報: 毎週金曜21:00(JST)以降に、前の7日間（金〜木）の日次要約から。月報: 毎月1日12:00以降に、先月の要約と前の予算期間の使用額から。どちらもtimesに1回だけ。`/nul quiet`・`/nul stop`・予算停止中は書かない。
 - 材料の日次要約が無い期間は書かずに見送る（要約の取り込みが終わるまで、初期の週報は出ないことがある）。再生成したいとき: `delete from agent.settings where key in ('report.weekly','report.monthly')`（金曜21時以降・月初12時以降なら、次の1分で書き直す）。
 
+### 16.9 Web検索（P3-1）
+- ぬるは`web_research`ツールで調べる（別の呼び出し・最大3回/依頼・一人1日5回・予算90%以上は使わない）。1回の検索は$0.01+読んだトークン。使用量は用途`web_research`で記録（`agent.api_usage`）。
+- **Anthropic側の準備（運用責任者）**: ConsoleのPrivacy（またはOrganization settings）で、組織の**Web検索を有効化**する。無効だとAPIがエラーを返し、ぬるは「調べられなかった」と答える（他の機能は動く）。支払い方法・auto-reloadは引き続き設定しない。
+- 止めたいとき: `/nul stop`（全部止まる）。Web検索だけ止めたいときは、Consoleで組織のWeb検索を無効にする（コード変更なしで止まる）。
+
