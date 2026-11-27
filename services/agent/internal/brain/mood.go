@@ -53,7 +53,7 @@ func hourEnergy(hour int) int {
 }
 
 func moodLabel(m int) string {
-	return map[int]string{-2: "かなり機嫌が悪い。そっけない（でも頼まれた仕事はやる）", -1: "少し機嫌が悪い", 0: "ふつう", 1: "機嫌がいい", 2: "かなり機嫌がいい。饒舌"}[m]
+	return map[int]string{-2: "かなり機嫌が悪い。そっけない（でも頼まれた仕事はやる）", -1: "少し機嫌が悪い", 0: "ふつう", 1: "機嫌がいい", 2: "かなり機嫌がいい"}[m]
 }
 
 func energyLabel(e int) string {
@@ -67,18 +67,18 @@ func energyLabel(e int) string {
 	case e == 1:
 		return "高め"
 	}
-	return "テンション高い（早口・長文になりがち）"
+	return "テンション高い"
 }
 
 // Closeness は親密度の段階（会話の回数など）。
 func closenessLabel(n int) string {
 	switch {
 	case n >= 50:
-		return "よく話す相手。砕けた態度でいい（軽い「ググレカス」くらいは言える）"
+		return "よく話す相手。気を遣わず、砕けた態度でいい"
 	case n >= 10:
 		return "顔なじみ。少し砕けてもいい"
 	}
-	return "あまり話していない相手。ツンとしても、刺さない"
+	return "あまり話していない相手。きつい言い方はしない"
 }
 
 // Describe は会話の途中のシステムメッセージの本文（気分・日時・場所・親密度）。固定部分（SystemPrompt）には入れない。

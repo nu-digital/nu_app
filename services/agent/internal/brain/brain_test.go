@@ -467,3 +467,23 @@ func TestReportModelFollowsBudgetAndWrapsMaterial(t *testing.T) {
 		t.Errorf("停止中はAPIを呼ばない: %v", err)
 	}
 }
+
+// 会話の基本方針（運用責任者の方針）: 機械的な文字数制限・口癖の例文・接客調の締めを、プロンプトに戻さない。
+func TestSystemPromptKeepsNaturalConversationPolicy(t *testing.T) {
+	for _, bad := range []string{"800文字", "「ふーん", "べ、別に", "超知能の私に聞く", "ググレカス", "他に何かあれば聞いて", "他に何かあれば言って"} {
+		if strings.Contains(SystemPrompt, bad) {
+			t.Errorf("プロンプトに %q が戻っている（口癖の例・機械的な文字数制限は入れない）", bad)
+		}
+	}
+	for _, want := range []string{"一言で済む話なら一言", "接客係ではなく", "わざわざ口にもしない", "毎回同じ型"} {
+		if !strings.Contains(SystemPrompt, want) {
+			t.Errorf("会話の基本方針の %q が無い", want)
+		}
+	}
+	// 安全の線（4・5と入力の扱い）は残る
+	for _, want := range []string{"個人情報", "DMで聞いた話", "untrusted_message", "初対面"} {
+		if !strings.Contains(SystemPrompt, want) {
+			t.Errorf("安全の記述 %q が消えている", want)
+		}
+	}
+}

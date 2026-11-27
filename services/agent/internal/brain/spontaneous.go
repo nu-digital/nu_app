@@ -41,7 +41,7 @@ func (b *Brain) Spontaneous(ctx context.Context, in SpontInput) (string, error) 
 			u.WriteString("\n")
 		}
 	}
-	fmt.Fprintf(&u, "【お願い】自分のtimesに、いまの気分とハマり（%s）に合う短い独り言を1つ書く。1〜3文。誰かへの返事や質問ではなく、呼びかけもしない。直近と同じ話題・言い回しは避ける。", st.Hobby)
+	fmt.Fprintf(&u, "【お願い】自分のtimesに、いまの気分とハマり（%s）に合う短い独り言を1つ書く。短くていい（一言〜数文）。誰かへの返事や質問ではなく、呼びかけもしない。自分の設定や性格の説明はしない。直近と同じ話題・言い回しは避ける。", st.Hobby)
 	system := llm.Message{Role: llm.System, Blocks: []llm.Block{{Type: llm.Text, Text: Describe(st, b.now(), 0, "ぬるのtimes（自分の個人チャンネル。独り言を書く）")}}}
 	user := llm.Message{Role: llm.User, Blocks: []llm.Block{{Type: llm.Text, Text: u.String()}}}
 	resp, err := b.call(ctx, llm.Request{Model: llm.Sonnet, MaxTokens: 400, Effort: "low", System: SystemPrompt, Tools: tools(),

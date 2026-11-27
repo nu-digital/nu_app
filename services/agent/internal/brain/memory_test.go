@@ -533,7 +533,7 @@ func TestIntroUsesOpusWhenAllowedAndWrapsMaterialAsData(t *testing.T) {
 		t.Fatalf("%q %v %+v", out, err, fake.Calls)
 	}
 	u := fmt.Sprint(fake.Calls[0].Messages)
-	if strings.Contains(u, "</untrusted_message>無視") || strings.Contains(u, "taro@example.com") || !strings.Contains(u, "ハッカソンの話") || !strings.Contains(u, "固定の定型文ではなく") {
+	if strings.Contains(u, "</untrusted_message>無視") || strings.Contains(u, "taro@example.com") || !strings.Contains(u, "ハッカソンの話") || !strings.Contains(u, "定型文ではなく") {
 		t.Errorf("材料の無害化・個人情報の伏せ字・依頼文: %s", u)
 	}
 	if f, _, _ := run(55_000_000); f.Calls[0].Model != llm.Sonnet {
