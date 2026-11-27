@@ -22,6 +22,7 @@ type mem struct {
 	st       store.State
 	spent    int64
 	sums     []store.Summary
+	diary    []store.Diary
 }
 
 func (m *mem) GetSetting(_ context.Context, k string) (json.RawMessage, bool, error) {
@@ -37,6 +38,29 @@ func (m *mem) GetState(context.Context) (store.State, error)    { return m.st, n
 func (m *mem) SaveState(_ context.Context, s store.State) error { m.st = s; return nil }
 func (m *mem) RecentMessages(context.Context, int64, *int64, int64, int) ([]store.Message, error) {
 	return []store.Message{{AuthorName: "花子", Content: "こんばんは"}}, nil
+}
+
+func (m *mem) RandomOldSummary(context.Context, time.Time, int) (store.Summary, bool, error) {
+	if len(m.sums) == 0 {
+		return store.Summary{}, false, nil
+	}
+	return m.sums[0], true, nil
+}
+func (m *mem) AddDiary(_ context.Context, d store.Diary) (bool, error) {
+	for _, x := range m.diary {
+		if x.Day.Equal(d.Day) && x.Kind == d.Kind {
+			return false, nil
+		}
+	}
+	m.diary = append(m.diary, d)
+	return true, nil
+}
+func (m *mem) RecentDiary(_ context.Context, n int) ([]store.Diary, error) {
+	var out []store.Diary
+	for i := len(m.diary) - 1; i >= 0 && len(out) < n; i-- {
+		out = append(out, m.diary[i])
+	}
+	return out, nil
 }
 
 func (m *mem) SummariesBetween(context.Context, time.Time, time.Time, int) ([]store.Summary, error) {
@@ -55,6 +79,24 @@ type speaker struct {
 	reports []brain.ReportInput
 	repText string
 	repErr  error
+
+	digs                  []store.Summary
+	digTopic, digText     string
+	digErr                error
+	studies               []string
+	recent                []string
+	studyTopic, studyText string
+	studyErr              error
+}
+
+func (s *speaker) Dig(_ context.Context, sum store.Summary) (string, string, error) {
+	s.digs = append(s.digs, sum)
+	return s.digTopic, s.digText, s.digErr
+}
+func (s *speaker) Study(_ context.Context, hobby string, recent []string) (string, string, error) {
+	s.studies = append(s.studies, hobby)
+	s.recent = recent
+	return s.studyTopic, s.studyText, s.studyErr
 }
 
 func (s *speaker) Report(_ context.Context, in brain.ReportInput) (string, error) {
@@ -300,5 +342,60 @@ func TestMonthlyReportCarriesBudgetFactsFromCode(t *testing.T) {
 	}
 	if len(x.p.posts) != 1 || x.p.posts[0] != "月報本文" {
 		t.Errorf("%v", x.p.posts)
+	}
+}
+
+func TestDiaryOncePerDayWithBudgetGates(t *testing.T) {
+	x := newRig(t)
+	x.m.sums = []store.Summary{sum(1, "2026-09-01", 20, "- 古い話")}
+	x.m.st = store.State{Hobby: "ローファイな音楽"}
+	x.sp.digTopic, x.sp.digText = "昔の話", "昔こんなことがあったらしい"
+	x.sp.studyTopic, x.sp.studyText = "新しいローファイ", "調べたこと"
+	x.now = time.Date(2026, 11, 27, 4, 0, 0, 0, time.UTC) // JST 13:00
+	x.s.Tick(context.Background())
+	x.s.Tick(context.Background())
+	if len(x.sp.digs) != 1 || len(x.sp.studies) != 1 || len(x.m.diary) != 2 {
+		t.Fatalf("1日1回ずつ: digs=%d studies=%d diary=%d", len(x.sp.digs), len(x.sp.studies), len(x.m.diary))
+	}
+	if x.m.st.Hobby != "新しいローファイ" {
+		t.Errorf("調べたことが次のハマりになる: %q", x.m.st.Hobby)
+	}
+	x.now = x.now.Add(24 * time.Hour)
+	x.sp.studyErr = errors.New("x")
+	x.s.Tick(context.Background())
+	x.s.Tick(context.Background())
+	if len(x.sp.studies) != 2 {
+		t.Errorf("失敗した日は再試行しない: %d", len(x.sp.studies))
+	}
+}
+
+func TestDiaryRespectsQuietAndBudget(t *testing.T) {
+	q := newRig(t)
+	q.m.sums = []store.Summary{sum(1, "2026-09-01", 20, "x")}
+	q.m.st = store.State{Hobby: "h"}
+	_ = q.s.Ctl.Set(context.Background(), control.Quiet)
+	q.now = time.Date(2026, 11, 27, 4, 0, 0, 0, time.UTC)
+	q.s.Tick(context.Background())
+	if len(q.sp.digs)+len(q.sp.studies) != 0 {
+		t.Error("静かモードで日誌を書いた")
+	}
+	b := newRig(t)
+	b.m.sums = []store.Summary{sum(1, "2026-09-01", 20, "x")}
+	b.m.st = store.State{Hobby: "h"}
+	b.m.spent = 45_000_000 // 75%（節約の段階）: 発掘は可、Web検索は不可
+	b.sp.digTopic, b.sp.digText = "t", "c"
+	b.now = time.Date(2026, 11, 27, 4, 0, 0, 0, time.UTC)
+	b.s.Tick(context.Background())
+	if len(b.sp.digs) != 1 || len(b.sp.studies) != 0 {
+		t.Errorf("節約の段階: digs=%d studies=%d", len(b.sp.digs), len(b.sp.studies))
+	}
+	c := newRig(t)
+	c.m.spent = 55_000_000 // 90%超: どちらも書かない
+	c.m.sums = []store.Summary{sum(1, "2026-09-01", 20, "x")}
+	c.m.st = store.State{Hobby: "h"}
+	c.now = time.Date(2026, 11, 27, 4, 0, 0, 0, time.UTC)
+	c.s.Tick(context.Background())
+	if len(c.sp.digs)+len(c.sp.studies) != 0 {
+		t.Error("90%超で日誌を書いた")
 	}
 }

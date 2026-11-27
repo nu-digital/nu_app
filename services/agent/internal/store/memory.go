@@ -267,3 +267,55 @@ func (s *Store) SummariesBetween(ctx context.Context, from, to time.Time, limit 
 	}
 	return out, rows.Err()
 }
+
+// ---- 研究日誌 ----
+
+type Diary struct {
+	ID      int64
+	Day     time.Time
+	Kind    string // dig | web
+	Topic   string
+	Content string
+}
+
+// AddDiary は日誌を1件加える（その日のその種別が既にあれば何もしない。加えたら true）。
+func (s *Store) AddDiary(ctx context.Context, d Diary) (bool, error) {
+	topic, content := strings.TrimSpace(d.Topic), strings.TrimSpace(d.Content)
+	if r := []rune(topic); len(r) == 0 || len(r) > 100 {
+		return false, errors.New("題は1〜100文字")
+	}
+	if r := []rune(content); len(r) == 0 || len(r) > 1500 {
+		return false, errors.New("日誌は1〜1500文字")
+	}
+	tag, err := s.pool.Exec(ctx, `INSERT INTO diary (day, kind, topic, content) VALUES ($1::date, $2, $3, $4) ON CONFLICT (day, kind) DO NOTHING`, d.Day, d.Kind, topic, content)
+	return tag.RowsAffected() == 1, err
+}
+
+// RecentDiary は最近の日誌（新しい順）。
+func (s *Store) RecentDiary(ctx context.Context, limit int) ([]Diary, error) {
+	rows, err := s.pool.Query(ctx, `SELECT id, day, kind, topic, content FROM diary ORDER BY day DESC, id DESC LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Diary
+	for rows.Next() {
+		var d Diary
+		if err := rows.Scan(&d.ID, &d.Day, &d.Kind, &d.Topic, &d.Content); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
+// RandomOldSummary は、before（含まない）より前の日の要約から、発言が minMsgs 件以上のものを1つランダムに返す（発掘日誌の材料）。無ければ ok=false。
+func (s *Store) RandomOldSummary(ctx context.Context, before time.Time, minMsgs int) (Summary, bool, error) {
+	var x Summary
+	err := s.pool.QueryRow(ctx, `SELECT channel_id, day, content, msg_count FROM summaries WHERE day < $1::date AND msg_count >= $2 ORDER BY random() LIMIT 1`,
+		before, minMsgs).Scan(&x.ChannelID, &x.Day, &x.Content, &x.MsgCount)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return x, false, nil
+	}
+	return x, err == nil, err
+}
