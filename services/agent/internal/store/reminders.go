@@ -14,6 +14,7 @@ type Reminder struct {
 	Message   string
 	RemindAt  time.Time
 	Attempts  int
+	Private   bool // DMで頼んだもの（公開の場の一覧には出さない）
 }
 
 const (
@@ -48,16 +49,16 @@ func (s *Store) AddReminder(ctx context.Context, r Reminder) (int64, error) {
 		return 0, ErrReminderLimit
 	}
 	var id int64
-	if err := tx.QueryRow(ctx, `INSERT INTO reminders (user_id, channel_id, message, remind_at) VALUES ($1,$2,$3,$4) RETURNING id`,
-		r.UserID, r.ChannelID, m, r.RemindAt).Scan(&id); err != nil {
+	if err := tx.QueryRow(ctx, `INSERT INTO reminders (user_id, channel_id, message, remind_at, private) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+		r.UserID, r.ChannelID, m, r.RemindAt, r.Private).Scan(&id); err != nil {
 		return 0, err
 	}
 	return id, tx.Commit(ctx)
 }
 
-// ListReminders は、その人の未配信のリマインダー（時刻順）。
-func (s *Store) ListReminders(ctx context.Context, userID int64) ([]Reminder, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id, user_id, channel_id, message, remind_at, attempts FROM reminders WHERE user_id = $1 AND status <> 'failed' ORDER BY remind_at, id`, userID)
+// ListReminders は、その人の未配信のリマインダー（時刻順）。DMで頼んだもの（private）は、DMの中（inDM）でだけ含める。
+func (s *Store) ListReminders(ctx context.Context, userID int64, inDM bool) ([]Reminder, error) {
+	rows, err := s.pool.Query(ctx, `SELECT id, user_id, channel_id, message, remind_at, attempts, private FROM reminders WHERE user_id = $1 AND status <> 'failed' AND (NOT private OR $2) ORDER BY remind_at, id`, userID, inDM)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +66,7 @@ func (s *Store) ListReminders(ctx context.Context, userID int64) ([]Reminder, er
 	var out []Reminder
 	for rows.Next() {
 		var r Reminder
-		if err := rows.Scan(&r.ID, &r.UserID, &r.ChannelID, &r.Message, &r.RemindAt, &r.Attempts); err != nil {
+		if err := rows.Scan(&r.ID, &r.UserID, &r.ChannelID, &r.Message, &r.RemindAt, &r.Attempts, &r.Private); err != nil {
 			return nil, err
 		}
 		out = append(out, r)

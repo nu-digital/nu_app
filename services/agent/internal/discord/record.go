@@ -35,7 +35,7 @@ func toStore(m Msg) store.Message {
 		att = append(att, store.Attachment{ID: a.ID, Filename: a.Filename, ContentType: a.ContentType, Size: a.Size})
 	}
 	return store.Message{ID: m.ID, ChannelID: m.ChannelID, ThreadID: m.ThreadID, Kind: kind, AuthorID: m.AuthorID, AuthorName: m.AuthorName,
-		IsBot: m.IsBot, Content: m.Content, Attachments: att, CreatedAt: m.CreatedAt, EditedAt: m.EditedAt}
+		IsBot: m.IsBot, Public: m.Public, Content: m.Content, Attachments: att, CreatedAt: m.CreatedAt, EditedAt: m.EditedAt}
 }
 
 func (r *Recorder) OnCreate(ctx context.Context, m Msg) {

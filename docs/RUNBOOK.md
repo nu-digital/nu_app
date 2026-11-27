@@ -365,3 +365,8 @@ sudo bash -c 'set -a; . /srv/nu_app/.env; set +a
 - 毎晩、前日の要約から気分・一般のノート・明日の話題を更新する（Batch API・1日数円未満）。確認: `... psql -c "select day, kind, topic from agent.diary where kind='intro' order by id desc limit 7"`。進行中: `select value from agent.settings where key = 'introspect.pending'`。
 - 検証に通らない出力は捨てて、ログに「読めませんでした」と出る。変なノートが入ったとき: `delete from agent.notes where id = …`。
 
+### 16.14 公開・非公開チャンネルの扱い（運用前の見直しで追加）
+- ぬるはBotの管理者権限で全チャンネルを読み・記録するが、**@everyoneが見られないチャンネル**（運営だけのチャンネルなど）の内容は、ログ検索・要約・日誌・週報・内省に使わない。判定は「サーバー全体の@everyoneの閲覧権限＋チャンネルの上書き」（スレッドは親、非公開スレッドは非公開）。5分ごとに再計算する。
+- 確認: `... psql -c "select channel_id, bool_or(is_public) as public, count(*) from agent.messages where kind='guild' group by 1 order by 3 desc limit 20"`。意図と違うチャンネルがあれば、Discordのチャンネル権限（@everyoneの「チャンネルを見る」）を確認する。
+- チャンネルを公開→非公開に変えると、**新しいメッセージ**から非公開になる。すでに作られた要約・日誌・ノートに残った内容は自動では消えない（必要なら`delete from agent.summaries where channel_id = …`）。
+

@@ -341,3 +341,28 @@ func TestConvertMessage(t *testing.T) {
 		t.Error("URLが含まれる")
 	}
 }
+
+func TestViewableByEveryone(t *testing.T) {
+	const gid = "100"
+	view := int64(discordgo.PermissionViewChannel)
+	cases := []struct {
+		name string
+		base int64
+		ows  []Overwrite
+		want bool
+	}{
+		{"普通の公開チャンネル", view, nil, true},
+		{"@everyoneの閲覧を拒否（運営だけのチャンネル）", view, []Overwrite{{ID: gid, IsRole: true, Deny: view}}, false},
+		{"拒否してから特定ロールだけ許可しても@everyoneは見えない", view, []Overwrite{{ID: gid, IsRole: true, Deny: view}, {ID: "200", IsRole: true, Allow: view}}, false},
+		{"拒否のあと@everyoneで許可し直し", view, []Overwrite{{ID: gid, IsRole: true, Deny: view, Allow: view}}, true},
+		{"サーバー全体で閲覧権限が無く、チャンネルで許可", 0, []Overwrite{{ID: gid, IsRole: true, Allow: view}}, true},
+		{"サーバー全体で閲覧権限が無い", 0, nil, false},
+		{"メンバー個人の上書きは@everyoneとは無関係", view, []Overwrite{{ID: gid, IsRole: false, Deny: view}}, true},
+		{"@everyoneに管理者権限", int64(discordgo.PermissionAdministrator), []Overwrite{{ID: gid, IsRole: true, Deny: view}}, true},
+	}
+	for _, c := range cases {
+		if got := ViewableByEveryone(c.base, c.ows, gid); got != c.want {
+			t.Errorf("%s: got %v want %v", c.name, got, c.want)
+		}
+	}
+}
