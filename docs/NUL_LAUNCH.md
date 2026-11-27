@@ -222,6 +222,7 @@ echo "delete from agent.settings where key = 'budget.exhausted_until'" | nupsql
 
 `/nul resume`
 
+- [ ] **`/nul resume`の直後（1分以内）に、ぬるがtimesへ最初の挨拶を1回だけ書く**（固定文ではなく自分で考えた文章。内容がキャラ・団体の実態に合っているか確認。再起動しても二度は書かない）
 - [ ] 1日以内に、timesへ自発投稿が最大3回（深夜に多め・間隔90分以上）。内容がキャラ（§2.5の線）から外れていない
 - [ ] リアクションがたまに付く（1日最大10件）。`reactions.enabled = false`で止められる（RUNBOOK §16.5）
 - [ ] 新メンバー（テスト用アカウント）の参加で、timesに一言（メンションなし）

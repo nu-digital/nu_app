@@ -323,3 +323,22 @@ func (s *Store) RandomOldSummary(ctx context.Context, before time.Time, minMsgs 
 	}
 	return x, err == nil, err
 }
+
+// RecentPublicMessages は、公開チャンネル（is_public）の最近の人間の発言（新しい順）。ぬるが団体の雰囲気を知るための材料（最初の挨拶など）。DM・Bot・非公開は含まない。
+func (s *Store) RecentPublicMessages(ctx context.Context, limit int) ([]Message, error) {
+	rows, err := s.pool.Query(ctx, `SELECT message_id, channel_id, content, created_at FROM messages
+	  WHERE kind = 'guild' AND is_public AND NOT is_bot AND char_length(content) >= 8 ORDER BY message_id DESC LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Message
+	for rows.Next() {
+		m := Message{Kind: "guild"}
+		if err := rows.Scan(&m.ID, &m.ChannelID, &m.Content, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}

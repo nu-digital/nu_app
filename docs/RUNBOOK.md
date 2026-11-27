@@ -372,3 +372,8 @@ sudo bash -c 'set -a; . /srv/nu_app/.env; set +a
 - 確認: `... psql -c "select channel_id, bool_or(is_public) as public, count(*) from agent.messages where kind='guild' group by 1 order by 3 desc limit 20"`。意図と違うチャンネルがあれば、Discordのチャンネル権限（@everyoneの「チャンネルを見る」）を確認する。
 - チャンネルを公開→非公開に変えると、**新しいメッセージ**から非公開になる。すでに作られた要約・日誌・ノートに残った内容は自動では消えない（必要なら`delete from agent.summaries where channel_id = …`）。
 
+### 16.15 最初の挨拶（通常モードへの移行時）
+- `/nul resume`で通常モードにすると、1分以内に、ぬるがtimesへ自分で考えた最初の挨拶を1回だけ書く（団体について、公開チャンネルの記録から分かる範囲で触れる）。確認: `... psql -c "select key, value from agent.settings where key = 'intro.posted'"`（`"done": true`なら投稿済み）。
+- 書かせたくないとき: 通常モードにする前に`insert into agent.settings (key, value) values ('intro.posted', '{"done": true}') on conflict (key) do update set value = excluded.value`。もう一度書かせたいとき: `delete from agent.settings where key = 'intro.posted'`（通常モードのまま次の1分で書く）。
+- 挨拶の内容に問題があるときは、`/nul stop`で止めて、timesの該当メッセージをDiscordで削除する（ぬるは自分の発言を削除できないので、人が消す）。
+

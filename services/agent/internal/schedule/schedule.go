@@ -39,6 +39,7 @@ type Speaker interface {
 	Spontaneous(ctx context.Context, in brain.SpontInput) (string, error)
 	Report(ctx context.Context, in brain.ReportInput) (string, error)
 	Dig(ctx context.Context, sum store.Summary) (topic, content string, err error)
+	Intro(ctx context.Context, in brain.IntroInput) (string, error)
 	Study(ctx context.Context, hobby string, recent []string) (topic, content string, err error)
 }
 
@@ -53,6 +54,9 @@ type Memory interface {
 	RecentMessages(ctx context.Context, channelID int64, threadID *int64, beforeID int64, limit int) ([]store.Message, error)
 	SummariesBetween(ctx context.Context, from, to time.Time, limit int) ([]store.Summary, error)
 	RandomOldSummary(ctx context.Context, before time.Time, minMsgs int) (store.Summary, bool, error)
+	RecentPublicMessages(ctx context.Context, limit int) ([]store.Message, error)
+	SearchSummaries(ctx context.Context, query string, limit int) ([]store.Summary, error)
+	SearchNotes(ctx context.Context, query string, askerID int64, inDM bool, limit int) ([]store.Note, error)
 	AddDiary(ctx context.Context, d store.Diary) (bool, error)
 	RecentDiary(ctx context.Context, limit int) ([]store.Diary, error)
 }
@@ -83,6 +87,7 @@ const (
 	keyDrift  = "mood.drift_day"
 	keySpont  = "spont.state"
 	keyStop   = "budget.stop_announced"
+	keyIntro  = "intro.posted"
 	keyDiary  = "diary.last"
 	keyKeyExp = "apikey.expires" // 運用責任者が設定する（YYYY-MM-DD）
 	keyKeyNag = "apikey.nag_day"
@@ -105,6 +110,7 @@ func (s *Scheduler) Tick(ctx context.Context) {
 	now := s.now()
 	s.dailyMood(ctx, now)
 	s.announceStop(ctx, now)
+	s.maybeIntro(ctx, now)
 	s.maybeReports(ctx, now)
 	s.maybeDiary(ctx, now)
 	s.nagKey(ctx, now)
@@ -619,5 +625,69 @@ func (s *Scheduler) deliverReminders(ctx context.Context, now time.Time) {
 		if err := s.Rem.FinishReminder(ctx, r.ID, sent); err != nil {
 			s.Log.Error("リマインダーの結果を保存できません")
 		}
+	}
+}
+
+// ---- 最初の挨拶 ----
+
+type introState struct {
+	Done  bool      `json:"done"`
+	Tries int       `json:"tries"`
+	Last  time.Time `json:"last"`
+}
+
+// maybeIntro は、通常モード（running）になって最初に、ぬる自身が考えた挨拶をtimesへ1回だけ投稿する。
+// 材料は、公開チャンネルの最近の発言（名前なし）・日次要約・日誌・一般のノート。先に試行を記録し、失敗は30分おき最大3回。
+// 静かモード・全停止では書かない（通常モードになってから）。
+func (s *Scheduler) maybeIntro(ctx context.Context, now time.Time) {
+	if !s.Ctl.MayPostSpontaneously() {
+		return
+	}
+	var st introState
+	if raw, ok, err := s.Set.GetSetting(ctx, keyIntro); err != nil {
+		return
+	} else if ok {
+		_ = json.Unmarshal(raw, &st)
+	}
+	if st.Done || st.Tries >= maxReportTries || (st.Tries > 0 && now.Sub(st.Last) < reportRetry) {
+		return
+	}
+	in := brain.IntroInput{ChannelID: s.TimesCh}
+	if rows, err := s.Mem.RecentPublicMessages(ctx, 30); err == nil {
+		for _, m := range rows {
+			in.Recent = append(in.Recent, m.Content)
+		}
+	}
+	if sums, err := s.Mem.SearchSummaries(ctx, "", 6); err == nil {
+		for _, x := range sums {
+			in.Summaries = append(in.Summaries, x.Content)
+		}
+	}
+	if ds, err := s.Mem.RecentDiary(ctx, 3); err == nil {
+		for _, d := range ds {
+			in.Diary = append(in.Diary, brain.Turn{AuthorName: d.Topic, Text: d.Content})
+		}
+	}
+	if ns, err := s.Mem.SearchNotes(ctx, "", 0, false, 5); err == nil {
+		for _, n := range ns {
+			if n.SubjectUserID == nil { // 一般のノートだけ（個人についてのノートは材料にしない）
+				in.Notes = append(in.Notes, n.Content)
+			}
+		}
+	}
+	st.Tries++
+	st.Last = now
+	_ = s.Set.SetSetting(ctx, keyIntro, st) // 先に数える（生成が失敗しても、続けて何度も呼ばない）
+	text, err := s.Brain.Intro(ctx, in)
+	if err != nil || text == "" {
+		return
+	}
+	if !s.Ctl.MayPostSpontaneously() { // 生成中に止められたら書かない
+		return
+	}
+	st.Done = true
+	_ = s.Set.SetSetting(ctx, keyIntro, st)
+	if err := s.Post.PostTimes(ctx, text); err != nil {
+		s.Log.Error("最初の挨拶をtimesへ投稿できません")
 	}
 }

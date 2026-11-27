@@ -691,3 +691,21 @@ func TestForgetPersonAlsoDeletesRemindersAndEditInvalidatesSummary(t *testing.T)
 		t.Errorf("7日たった失敗が残った: %d %v", n, err)
 	}
 }
+
+func TestRecentPublicMessagesExcludesPrivateDMBotAndShort(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+	at := time.Now()
+	add := func(id int64, kind, content string, bot, pub bool) {
+		_ = s.UpsertMessage(ctx, store.Message{ID: id, ChannelID: 1, Kind: kind, AuthorID: 1, AuthorName: "a", Content: content, CreatedAt: at, IsBot: bot, Public: pub})
+	}
+	add(1, "guild", "公開の長めの発言です", false, true)
+	add(2, "guild", "非公開の長めの発言です", false, false)
+	add(3, "dm", "DMの長めの発言です", false, true)
+	add(4, "guild", "Botの長めの発言です", true, true)
+	add(5, "guild", "短い", false, true)
+	got, err := s.RecentPublicMessages(ctx, 10)
+	if err != nil || len(got) != 1 || got[0].ID != 1 {
+		t.Errorf("%+v %v", got, err)
+	}
+}
