@@ -7,6 +7,7 @@ package introspect
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/nu-digital/nu_app/services/agent/internal/budget"
 	"github.com/nu-digital/nu_app/services/agent/internal/llm"
+	"github.com/nu-digital/nu_app/services/agent/internal/redact"
 	"github.com/nu-digital/nu_app/services/agent/internal/store"
 )
 
@@ -31,6 +33,7 @@ type Job struct {
 	Store  Store
 	LLM    llm.Batch
 	Budget *budget.Tracker
+	Allow  func() bool // 新しいバッチを送ってよいか（全停止中は送らない）。nilなら常に可
 	Log    *slog.Logger
 	Now    func() time.Time
 }
@@ -80,7 +83,7 @@ func (j *Job) Tick(ctx context.Context) {
 
 func (j *Job) submit(ctx context.Context) {
 	n := j.now().In(jst)
-	if n.Hour() < startHour || j.Budget == nil || j.Budget.Remaining(ctx) <= 0 {
+	if n.Hour() < startHour || j.Budget == nil || j.Budget.Remaining(ctx) <= 0 || (j.Allow != nil && !j.Allow()) {
 		return
 	}
 	today := n.Format("2006-01-02")
@@ -119,6 +122,9 @@ func (j *Job) submit(ctx context.Context) {
 	}
 	id, err := j.LLM.Submit(ctx, []llm.BatchRequest{{CustomID: "introspect", Model: model, System: system, User: b.String(), MaxTokens: 700}})
 	if err != nil {
+		if errors.Is(err, llm.ErrCreditExhausted) {
+			_ = j.Budget.MarkCreditExhausted(ctx)
+		}
 		j.Log.Warn("内省のバッチを送れませんでした。次回に再試行します")
 		return
 	}
@@ -169,8 +175,6 @@ type Output struct {
 	TopicMem string
 }
 
-var sensitiveRe = regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]+|\d{2,4}[-ー－]\d{2,4}[-ー－]\d{3,4}|\d{7,}|(パスワード|password|passwd)\s*[:：=は]`)
-
 // Parse はモデルの出力（JSON）を検証して取り出す。形が違う・範囲外の値は捨てる。ノートは最大3件・200文字以内・個人情報の形を含むものは捨てる。
 func Parse(text string) (Output, bool) {
 	text = strings.TrimSpace(text)
@@ -194,7 +198,7 @@ func Parse(text string) (Output, bool) {
 	}
 	for _, n := range raw.Notes {
 		n = strings.TrimSpace(n)
-		if r := []rune(n); len(r) == 0 || len(r) > maxNoteLen || sensitiveRe.MatchString(n) {
+		if r := []rune(n); len(r) == 0 || len(r) > maxNoteLen || redact.Has(n) {
 			continue
 		}
 		if len(o.Notes) < maxNotes {
@@ -202,7 +206,7 @@ func Parse(text string) (Output, bool) {
 		}
 	}
 	topic, memo := strings.TrimSpace(raw.Tomorrow.Topic), strings.TrimSpace(raw.Tomorrow.Memo)
-	if r := []rune(topic); len(r) > 0 && len(r) <= 40 && !sensitiveRe.MatchString(topic+memo) {
+	if r := []rune(topic); len(r) > 0 && len(r) <= 40 && !redact.Has(topic+memo) {
 		o.Topic = topic
 		if m := []rune(memo); len(m) > 0 && len(m) <= 200 {
 			o.TopicMem = memo

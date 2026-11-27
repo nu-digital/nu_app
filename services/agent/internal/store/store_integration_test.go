@@ -645,3 +645,49 @@ func TestOnlyPublicChannelMessagesAreSearchedAndSummarized(t *testing.T) {
 		t.Error("DMが検索に出た")
 	}
 }
+
+func TestForgetPersonAlsoDeletesRemindersAndEditInvalidatesSummary(t *testing.T) {
+	s, pool := newStore(t)
+	ctx := context.Background()
+	at := time.Now().Add(time.Hour)
+	_, _ = s.AddReminder(ctx, store.Reminder{UserID: 1, ChannelID: 5, Message: "会議", RemindAt: at})
+	_, _ = s.AddReminder(ctx, store.Reminder{UserID: 2, ChannelID: 5, Message: "他の人", RemindAt: at})
+	if _, err := s.ForgetPerson(ctx, 1); err != nil {
+		t.Fatal(err)
+	}
+	if l, _ := s.ListReminders(ctx, 1, true); len(l) != 0 {
+		t.Error("忘れてでリマインダーが残った")
+	}
+	if l, _ := s.ListReminders(ctx, 2, true); len(l) != 1 {
+		t.Error("他の人のリマインダーが消えた")
+	}
+	// 編集すると、その日の要約が消える
+	jst := time.FixedZone("JST", 9*3600)
+	day := time.Date(2026, 11, 20, 12, 0, 0, 0, jst)
+	_ = s.UpsertMessage(ctx, store.Message{ID: 500, ChannelID: 7, Kind: "guild", AuthorID: 1, AuthorName: "a", Content: "電話は090…", CreatedAt: day, Public: true})
+	_ = s.SaveSummary(ctx, store.Summary{ChannelID: 7, Day: time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC), Content: "- 電話の話", MsgCount: 1})
+	_ = s.SaveSummary(ctx, store.Summary{ChannelID: 8, Day: time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC), Content: "- 別のチャンネル", MsgCount: 1})
+	if err := s.UpdateMessage(ctx, 500, "（編集して消した）", nil, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := s.SearchSummaries(ctx, "", 10)
+	if len(got) != 1 || got[0].ChannelID != 8 {
+		t.Errorf("編集したメッセージの日の要約だけが消える: %+v", got)
+	}
+	// 配信に失敗したまま7日たったリマインダーは消える
+	id, _ := s.AddReminder(ctx, store.Reminder{UserID: 3, ChannelID: 5, Message: "古い失敗", RemindAt: time.Now().Add(-time.Hour)})
+	for i := 0; i < 3; i++ {
+		rs, _ := s.ClaimDueReminders(ctx, time.Now(), 10)
+		if len(rs) == 1 {
+			_ = s.FinishReminder(ctx, rs[0].ID, false)
+		}
+	}
+	_ = id
+	if _, err := s.ClaimDueReminders(ctx, time.Now().Add(8*24*time.Hour), 10); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := pool.QueryRow(ctx, `select count(*) from agent.reminders where user_id = 3`).Scan(&n); err != nil || n != 0 {
+		t.Errorf("7日たった失敗が残った: %d %v", n, err)
+	}
+}

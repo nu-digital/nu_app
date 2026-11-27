@@ -192,3 +192,12 @@ func TestRedactAndRender(t *testing.T) {
 		t.Errorf("1発言は切る: %d", n)
 	}
 }
+
+func TestNoBatchWhenStopped(t *testing.T) {
+	j, _, fb := newJob(t)
+	j.Allow = func() bool { return false }
+	j.Tick(context.Background())
+	if len(fb.Batches) != 0 {
+		t.Error("全停止中にバッチを送った")
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nu-digital/nu_app/services/agent/internal/llm"
+	"github.com/nu-digital/nu_app/services/agent/internal/redact"
 	"github.com/nu-digital/nu_app/services/agent/internal/store"
 )
 
@@ -25,10 +26,7 @@ type Memory interface {
 }
 
 // 「私のことを(全部)忘れて」: 話者についてのノートを全部消す。「それ忘れて」のような曖昧なものはツール（forget）で扱う。
-var forgetMeRe = regexp.MustCompile(`(私|わたし|僕|ぼく|俺|おれ|あたし)(の(こと|情報|メモ|ノート))(を|は)?(全部|ぜんぶ|すべて|全て)?(忘れて|わすれて|消して|けして)`)
-
-// sensitiveRe は、ノートに書かせない個人情報の形（メールアドレス・電話番号・長い数字＝学籍番号など）。
-var sensitiveRe = regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]+|\d{2,4}[-ー－]\d{2,4}[-ー－]\d{3,4}|\d{7,}|(パスワード|password|passwd)\s*[:：=は]`)
+var forgetMeRe = regexp.MustCompile(`(私|わたし|僕|ぼく|俺|おれ|あたし)(の(こと|情報|メモ|ノート|記憶)|に関する(こと|情報|メモ|ノート|記憶)|について(の(こと|情報|メモ|ノート|記憶))?)(を|は)?(全部|ぜんぶ|すべて|全て)?(忘れて|わすれて|消して|けして)(ください|下さい|くれ|ほしい|欲しい)?[\s。.!！〜~]*$`)
 
 func (b *Brain) runMemoryTool(ctx context.Context, in Input, tu llm.ToolUse) llm.Block {
 	res := llm.Block{Type: llm.ToolResult, ToolUseID: tu.ID}
@@ -79,13 +77,12 @@ func (b *Brain) runMemoryTool(ctx context.Context, in Input, tu llm.ToolUse) llm
 		res.Text = sb.String()
 	case rememberName:
 		var a struct {
-			Content      string `json:"content"`
-			AboutSpeaker bool   `json:"about_speaker"`
+			Content string `json:"content"`
 		}
 		if json.Unmarshal(tu.Input, &a) != nil || strings.TrimSpace(a.Content) == "" {
 			return fail("contentが空です")
 		}
-		if sensitiveRe.MatchString(a.Content) {
+		if redact.Has(a.Content) {
 			return fail("連絡先・学籍番号・パスワードのような個人情報はノートに書けない")
 		}
 		n := store.Note{Content: a.Content, Private: in.IsDM}
@@ -93,10 +90,9 @@ func (b *Brain) runMemoryTool(ctx context.Context, in Input, tu llm.ToolUse) llm
 			m, c := in.MessageID, in.ChannelID
 			n.SourceMessageID, n.SourceChannelID = &m, &c
 		}
-		if a.AboutSpeaker || in.IsDM { // DMでは必ず本人についてのメモ（privateなメモは、その相手とのDMでだけ使うため）
-			u := in.UserID
-			n.SubjectUserID = &u
-		}
+		// ノートは必ず、いま話している本人についてのメモ（一般のメモは内省だけが作る。他人についての書き込みや、全員に出る書き込みを防ぐ）
+		u := in.UserID
+		n.SubjectUserID = &u
 		id, err := b.Memory.AddNote(ctx, n)
 		if err != nil {
 			return fail("ノートに書けなかった（多すぎる・長すぎる）")

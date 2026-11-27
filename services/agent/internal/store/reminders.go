@@ -83,6 +83,10 @@ func (s *Store) CancelReminder(ctx context.Context, id, userID int64) (bool, err
 // ClaimDueReminders は、時刻が来たリマインダーを**原子的に確保**して返す（複数のプロセスでも二重に配信しない）。
 // 配信中（sending）のまま10分たったものは、落ちたとみなして再び確保する。確保のたびに attempts が増える。
 func (s *Store) ClaimDueReminders(ctx context.Context, now time.Time, limit int) ([]Reminder, error) {
+	// 送れなかったまま7日たったもの（内容は私事かもしれない）は消す
+	if _, err := s.pool.Exec(ctx, `DELETE FROM reminders WHERE status = 'failed' AND created_at < $1::timestamptz - interval '7 days'`, now); err != nil {
+		return nil, err
+	}
 	rows, err := s.pool.Query(ctx, `UPDATE reminders SET status = 'sending', claimed_at = $1, attempts = attempts + 1
 	  WHERE id IN (SELECT id FROM reminders WHERE remind_at <= $1 AND (status = 'pending' OR (status = 'sending' AND claimed_at < $1 - $3::interval))
 	               ORDER BY remind_at LIMIT $2 FOR UPDATE SKIP LOCKED)
