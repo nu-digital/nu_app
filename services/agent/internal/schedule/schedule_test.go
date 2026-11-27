@@ -23,6 +23,7 @@ type mem struct {
 	spent    int64
 	sums     []store.Summary
 	diary    []store.Diary
+	notes    []store.Note
 }
 
 func (m *mem) GetSetting(_ context.Context, k string) (json.RawMessage, bool, error) {
@@ -55,6 +56,16 @@ func (m *mem) AddDiary(_ context.Context, d store.Diary) (bool, error) {
 	m.diary = append(m.diary, d)
 	return true, nil
 }
+func (m *mem) RecentPublicMessages(context.Context, int) ([]store.Message, error) {
+	return []store.Message{{Content: "ハッカソンの日程どうする？"}, {Content: "今週の制作進捗を共有します"}}, nil
+}
+func (m *mem) SearchSummaries(context.Context, string, int) ([]store.Summary, error) {
+	return m.sums, nil
+}
+func (m *mem) SearchNotes(context.Context, string, int64, bool, int) ([]store.Note, error) {
+	return m.notes, nil
+}
+
 func (m *mem) RecentDiary(_ context.Context, n int) ([]store.Diary, error) {
 	var out []store.Diary
 	for i := len(m.diary) - 1; i >= 0 && len(out) < n; i-- {
@@ -80,6 +91,9 @@ type speaker struct {
 	repText string
 	repErr  error
 
+	intros                []brain.IntroInput
+	introText             string
+	introErr              error
 	digs                  []store.Summary
 	digTopic, digText     string
 	digErr                error
@@ -87,6 +101,11 @@ type speaker struct {
 	recent                []string
 	studyTopic, studyText string
 	studyErr              error
+}
+
+func (s *speaker) Intro(_ context.Context, in brain.IntroInput) (string, error) {
+	s.intros = append(s.intros, in)
+	return s.introText, s.introErr
 }
 
 func (s *speaker) Dig(_ context.Context, sum store.Summary) (string, string, error) {
@@ -575,5 +594,59 @@ func TestHobbyFromWebTopicIsSanitized(t *testing.T) {
 	y.s.Tick(context.Background())
 	if strings.ContainsAny(y.m.st.Hobby, "「」（）[]/") || len([]rune(y.m.st.Hobby)) > 30 || !strings.Contains(y.m.st.Hobby, "ローファイ") {
 		t.Errorf("記号の除去・長さ: %q", y.m.st.Hobby)
+	}
+}
+
+func TestIntroPostedOnceOnFirstRunningMinuteWithMaterialAndNotInQuietOrStopped(t *testing.T) {
+	uid := int64(5)
+	x := newRig(t)
+	x.sp.introText = "みんな、ぬるだ。今日から正式に住むことにした。"
+	x.m.sums = []store.Summary{sum(1, "2026-11-20", 30, "- ハッカソンの話")}
+	x.m.notes = []store.Note{{Content: "一般のメモ"}, {Content: "個人のメモ", SubjectUserID: &uid}}
+	_ = x.s.Ctl.Set(context.Background(), control.Quiet)
+	x.s.Tick(context.Background())
+	if len(x.sp.intros) != 0 || len(x.p.posts) != 0 {
+		t.Fatal("静かモードで挨拶した")
+	}
+	_ = x.s.Ctl.Set(context.Background(), control.Stopped)
+	x.s.Tick(context.Background())
+	if len(x.sp.intros) != 0 {
+		t.Fatal("全停止で挨拶した")
+	}
+	_ = x.s.Ctl.Set(context.Background(), control.Running)
+	x.s.Tick(context.Background())
+	x.s.Tick(context.Background())
+	var intro []string
+	for _, p := range x.p.posts {
+		if strings.Contains(p, "ぬるだ") {
+			intro = append(intro, p)
+		}
+	}
+	if len(intro) != 1 || len(x.sp.intros) != 1 {
+		t.Fatalf("通常モードになって1回だけ: posts=%v intros=%d", x.p.posts, len(x.sp.intros))
+	}
+	in := x.sp.intros[0]
+	if len(in.Recent) != 2 || len(in.Summaries) != 1 || len(in.Notes) != 1 || in.Notes[0] != "一般のメモ" {
+		t.Errorf("材料（公開の発言・要約・一般のノートだけ）: %+v", in)
+	}
+	// 再起動しても（設定が残っているので）二度と書かない
+	y := newRig(t)
+	y.m.settings = x.m.settings
+	y.sp.introText = "もう一度"
+	y.s.Tick(context.Background())
+	if len(y.sp.intros) != 0 {
+		t.Error("再起動後にもう一度挨拶した")
+	}
+}
+
+func TestIntroRetriesAreBoundedWhenGenerationFails(t *testing.T) {
+	x := newRig(t)
+	x.sp.introErr = errors.New("x")
+	for i := 0; i < 600; i++ {
+		x.s.maybeIntro(context.Background(), x.now)
+		x.now = x.now.Add(time.Minute)
+	}
+	if len(x.sp.intros) != maxReportTries || len(x.p.posts) != 0 {
+		t.Errorf("再試行の上限: %d", len(x.sp.intros))
 	}
 }
