@@ -27,7 +27,7 @@ func likePattern(q string) string {
 	return "%" + r.Replace(q) + "%"
 }
 
-// SearchMessages は、サーバーのチャンネルのログ（kind='guild'）の本文を部分一致で探す（新しい順）。
+// SearchMessages は、サーバーの**公開チャンネル**（@everyoneが見られる。is_public）のログの本文を部分一致で探す（新しい順）。
 // **DMは対象にしない**（DMは、そのDMの会話の中だけ。検索には混ぜない）。ぬる自身の発言は除く。
 func (s *Store) SearchMessages(ctx context.Context, query string, limit int) ([]Hit, error) {
 	query = strings.TrimSpace(query)
@@ -35,7 +35,7 @@ func (s *Store) SearchMessages(ctx context.Context, query string, limit int) ([]
 		return nil, nil
 	}
 	rows, err := s.pool.Query(ctx, `SELECT message_id, channel_id, author_name, content, created_at FROM messages
-	  WHERE kind = 'guild' AND NOT is_bot AND content ILIKE $1 ORDER BY message_id DESC LIMIT $2`, likePattern(query), limit)
+	  WHERE kind = 'guild' AND is_public AND NOT is_bot AND content ILIKE $1 ORDER BY message_id DESC LIMIT $2`, likePattern(query), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ type Group struct {
 func (s *Store) SummaryCandidates(ctx context.Context, before time.Time, since *time.Time, minMsgs, limit int) ([]Group, error) {
 	rows, err := s.pool.Query(ctx, `SELECT m.channel_id, d.day, count(*), sum(char_length(m.content))
 	  FROM messages m, LATERAL (SELECT (m.created_at AT TIME ZONE 'Asia/Tokyo')::date AS day) d
-	  WHERE m.kind = 'guild' AND NOT m.is_bot AND d.day < $1::date AND ($2::date IS NULL OR d.day >= $2::date)
+	  WHERE m.kind = 'guild' AND m.is_public AND NOT m.is_bot AND d.day < $1::date AND ($2::date IS NULL OR d.day >= $2::date)
 	    AND NOT EXISTS (SELECT 1 FROM summaries s WHERE s.channel_id = m.channel_id AND s.day = d.day)
 	  GROUP BY m.channel_id, d.day HAVING count(*) >= $3
 	  ORDER BY d.day DESC, m.channel_id LIMIT $4`, before, since, minMsgs, limit)
@@ -191,7 +191,7 @@ func (s *Store) SummaryCandidates(ctx context.Context, before time.Time, since *
 // DayMessages は、そのチャンネルのその日（JST）の人間の発言を古い順に返す（サーバーのチャンネルのみ）。
 func (s *Store) DayMessages(ctx context.Context, channelID int64, day time.Time, limit int) ([]Message, error) {
 	rows, err := s.pool.Query(ctx, `SELECT message_id, author_name, content, created_at FROM messages
-	  WHERE kind = 'guild' AND NOT is_bot AND channel_id = $1 AND (created_at AT TIME ZONE 'Asia/Tokyo')::date = $2::date
+	  WHERE kind = 'guild' AND is_public AND NOT is_bot AND channel_id = $1 AND (created_at AT TIME ZONE 'Asia/Tokyo')::date = $2::date
 	  ORDER BY message_id LIMIT $3`, channelID, day, limit)
 	if err != nil {
 		return nil, err

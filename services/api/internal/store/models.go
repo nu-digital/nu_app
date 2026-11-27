@@ -59,6 +59,7 @@ type AgentMessage struct {
 	Attachments []byte
 	CreatedAt   pgtype.Timestamptz
 	EditedAt    pgtype.Timestamptz
+	IsPublic    bool
 }
 
 type AgentNote struct {
@@ -93,6 +94,7 @@ type AgentReminder struct {
 	Attempts  int32
 	ClaimedAt pgtype.Timestamptz
 	CreatedAt pgtype.Timestamptz
+	Private   bool
 }
 
 type AgentSetting struct {

@@ -17,6 +17,7 @@ type Msg struct {
 	AuthorID    int64
 	AuthorName  string
 	IsBot       bool
+	Public      bool // @everyoneが見られるチャンネルのメッセージ（検索・要約などの材料にしてよい）
 	Content     string
 	Attachments []Attachment
 	CreatedAt   time.Time
@@ -38,6 +39,7 @@ type Channel struct {
 	ParentID int64 // スレッドのとき親
 	Name     string
 	IsThread bool
+	Public   bool
 }
 
 // History は過去ログを読む窓口（実体はdiscordgo、試験では偽物）。

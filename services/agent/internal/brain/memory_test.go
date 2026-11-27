@@ -364,11 +364,12 @@ func TestSpontaneousUsesDiaryAsDataAndSplitTitle(t *testing.T) {
 }
 
 type fakeRem struct {
-	added  []store.Reminder
-	list   []store.Reminder
-	cancel []int64
-	ok     bool
-	err    error
+	added      []store.Reminder
+	list       []store.Reminder
+	cancel     []int64
+	ok         bool
+	err        error
+	listedInDM bool
 }
 
 func (f *fakeRem) AddReminder(_ context.Context, r store.Reminder) (int64, error) {
@@ -378,7 +379,10 @@ func (f *fakeRem) AddReminder(_ context.Context, r store.Reminder) (int64, error
 	f.added = append(f.added, r)
 	return int64(len(f.added)), nil
 }
-func (f *fakeRem) ListReminders(context.Context, int64) ([]store.Reminder, error) { return f.list, nil }
+func (f *fakeRem) ListReminders(_ context.Context, _ int64, inDM bool) ([]store.Reminder, error) {
+	f.listedInDM = inDM
+	return f.list, nil
+}
 func (f *fakeRem) CancelReminder(_ context.Context, id, _ int64) (bool, error) {
 	f.cancel = append(f.cancel, id)
 	return f.ok, nil
@@ -440,5 +444,28 @@ func TestListAndCancelRemindersAreOwnOnly(t *testing.T) {
 	_, _ = remBrain(fake2, &fakeRem{ok: false}).Reply(context.Background(), input())
 	if !toolResult(t, fake2).IsError {
 		t.Error("他人のリマインダーの取り消しがエラーにならない")
+	}
+}
+
+func TestReminderFromDMIsPrivateAndListKnowsWhereItIsAsked(t *testing.T) {
+	r := &fakeRem{}
+	fake := &llm.Fake{Responses: []llm.Response{toolCall("remind", map[string]any{"at": "2026-11-28 10:00", "message": "病院"}), text("ok")}}
+	in := input()
+	in.IsDM = true
+	_, _ = remBrain(fake, r).Reply(context.Background(), in)
+	if len(r.added) != 1 || !r.added[0].Private {
+		t.Errorf("DMで頼んだものはprivate: %+v", r.added)
+	}
+	r2 := &fakeRem{}
+	fake2 := &llm.Fake{Responses: []llm.Response{toolCall("remind", map[string]any{"at": "2026-11-28 10:00", "message": "会議"}), text("ok")}}
+	_, _ = remBrain(fake2, r2).Reply(context.Background(), input())
+	if r2.added[0].Private {
+		t.Error("公開の場で頼んだものがprivate")
+	}
+	r3 := &fakeRem{}
+	fake3 := &llm.Fake{Responses: []llm.Response{toolCall("list_reminders", map[string]any{}), text("ok")}}
+	_, _ = remBrain(fake3, r3).Reply(context.Background(), input())
+	if r3.listedInDM {
+		t.Error("公開の場の一覧でDM扱い")
 	}
 }

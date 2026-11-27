@@ -14,7 +14,7 @@ import (
 // Reminders はリマインダーの保存先（store.Store が満たす。試験では偽物）。
 type Reminders interface {
 	AddReminder(ctx context.Context, r store.Reminder) (int64, error)
-	ListReminders(ctx context.Context, userID int64) ([]store.Reminder, error)
+	ListReminders(ctx context.Context, userID int64, inDM bool) ([]store.Reminder, error)
 	CancelReminder(ctx context.Context, id, userID int64) (bool, error)
 }
 
@@ -66,7 +66,7 @@ func (b *Brain) runReminderTool(ctx context.Context, in Input, tu llm.ToolUse) l
 		if target == 0 {
 			target = in.ChannelID
 		}
-		id, err := b.Reminders.AddReminder(ctx, store.Reminder{UserID: in.UserID, ChannelID: target, Message: a.Message, RemindAt: at})
+		id, err := b.Reminders.AddReminder(ctx, store.Reminder{UserID: in.UserID, ChannelID: target, Message: a.Message, RemindAt: at, Private: in.IsDM})
 		if err != nil {
 			if err == store.ErrReminderLimit {
 				return fail("リマインダーが10件たまっている。list_remindersで確認して、いらないものを取り消してもらう")
@@ -75,7 +75,7 @@ func (b *Brain) runReminderTool(ctx context.Context, in Input, tu llm.ToolUse) l
 		}
 		res.Text = fmt.Sprintf("登録した（id %d）。%s にここへ通知する", id, at.In(jstLoc).Format("1月2日 15:04"))
 	case listRemindName:
-		rs, err := b.Reminders.ListReminders(ctx, in.UserID)
+		rs, err := b.Reminders.ListReminders(ctx, in.UserID, in.IsDM)
 		if err != nil {
 			return fail("一覧を読めなかった")
 		}

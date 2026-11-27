@@ -17,6 +17,7 @@ import (
 type Gateway struct {
 	s         *discordgo.Session
 	guildID   string
+	vis       visCache
 	timesID   string // 自発投稿の送信先（設定した1チャンネルだけ）
 	rec       *Recorder
 	cmd       *Commander
@@ -188,7 +189,9 @@ func (g *Gateway) convert(m *discordgo.Message) (Msg, bool) {
 		return Msg{}, false
 	}
 	parent, thread := g.threadParent(m.ChannelID)
-	return ConvertMessage(m, parent, thread), true
+	msg := ConvertMessage(m, parent, thread)
+	msg.Public = m.GuildID != "" && g.channelPublic(m.ChannelID)
+	return msg, true
 }
 
 // threadParent は、ChannelID がスレッドなら (親チャンネルID, スレッドID) を返す。
@@ -274,10 +277,13 @@ func (h *HistoryReader) Channels(ctx context.Context, guildID int64) ([]Channel,
 	}
 	var out []Channel
 	var parents []string
+	base, baseOK := h.g.everyoneBase()
+	public := map[string]bool{} // 親チャンネルID → 公開か（取れなければ非公開）
 	for _, c := range chans {
+		public[c.ID] = baseOK && ViewableByEveryone(base, overwritesOf(c), h.g.guildID)
 		switch c.Type {
 		case discordgo.ChannelTypeGuildText, discordgo.ChannelTypeGuildNews:
-			out = append(out, Channel{ID: atoi(c.ID), Name: c.Name})
+			out = append(out, Channel{ID: atoi(c.ID), Name: c.Name, Public: public[c.ID]})
 			parents = append(parents, c.ID)
 		case discordgo.ChannelTypeGuildForum:
 			parents = append(parents, c.ID) // フォーラム自体にはメッセージが無い。投稿（スレッド）を取る
@@ -286,7 +292,8 @@ func (h *HistoryReader) Channels(ctx context.Context, guildID int64) ([]Channel,
 	active, err := h.g.s.GuildThreadsActive(gid, discordgo.WithContext(ctx))
 	if err == nil {
 		for _, t := range active.Threads {
-			out = append(out, Channel{ID: atoi(t.ID), ParentID: atoi(t.ParentID), Name: t.Name, IsThread: true})
+			out = append(out, Channel{ID: atoi(t.ID), ParentID: atoi(t.ParentID), Name: t.Name, IsThread: true,
+				Public: public[t.ParentID] && t.Type != discordgo.ChannelTypeGuildPrivateThread})
 		}
 	}
 	for _, p := range parents { // アーカイブ済みの公開スレッド
@@ -297,7 +304,7 @@ func (h *HistoryReader) Channels(ctx context.Context, guildID int64) ([]Channel,
 				break
 			}
 			for _, t := range list.Threads {
-				out = append(out, Channel{ID: atoi(t.ID), ParentID: atoi(t.ParentID), Name: t.Name, IsThread: true})
+				out = append(out, Channel{ID: atoi(t.ID), ParentID: atoi(t.ParentID), Name: t.Name, IsThread: true, Public: public[t.ParentID]})
 				if t.ThreadMetadata != nil {
 					ts := t.ThreadMetadata.ArchiveTimestamp
 					before = &ts
@@ -330,7 +337,9 @@ func (h *HistoryReader) MessagesBefore(ctx context.Context, ch Channel, beforeID
 		if ch.IsThread {
 			parent, thread = strconv.FormatInt(ch.ParentID, 10), strconv.FormatInt(ch.ID, 10)
 		}
-		out = append(out, ConvertMessage(m, parent, thread))
+		cm := ConvertMessage(m, parent, thread)
+		cm.Public = ch.Public
+		out = append(out, cm)
 	}
 	return out, nil
 }

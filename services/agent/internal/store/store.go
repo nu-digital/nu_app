@@ -76,6 +76,7 @@ type Message struct {
 	AuthorID    int64
 	AuthorName  string
 	IsBot       bool
+	Public      bool // @everyoneが見られるチャンネルのメッセージ
 	Content     string
 	Attachments []Attachment
 	CreatedAt   time.Time
@@ -105,14 +106,14 @@ func (s *Store) insert(ctx context.Context, m Message, update bool) error {
 	if err != nil {
 		return err
 	}
-	q := `INSERT INTO messages (message_id, channel_id, thread_id, kind, author_id, author_name, is_bot, content, attachments, created_at, edited_at)
-	      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`
+	q := `INSERT INTO messages (message_id, channel_id, thread_id, kind, author_id, author_name, is_bot, content, attachments, created_at, edited_at, is_public)
+	      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`
 	if update {
-		q += ` ON CONFLICT (message_id) DO UPDATE SET content = EXCLUDED.content, attachments = EXCLUDED.attachments, edited_at = EXCLUDED.edited_at, author_name = EXCLUDED.author_name`
+		q += ` ON CONFLICT (message_id) DO UPDATE SET content = EXCLUDED.content, attachments = EXCLUDED.attachments, edited_at = EXCLUDED.edited_at, author_name = EXCLUDED.author_name, is_public = EXCLUDED.is_public`
 	} else {
 		q += ` ON CONFLICT (message_id) DO NOTHING`
 	}
-	_, err = s.pool.Exec(ctx, q, m.ID, m.ChannelID, m.ThreadID, m.Kind, m.AuthorID, m.AuthorName, m.IsBot, m.Content, att, m.CreatedAt, m.EditedAt)
+	_, err = s.pool.Exec(ctx, q, m.ID, m.ChannelID, m.ThreadID, m.Kind, m.AuthorID, m.AuthorName, m.IsBot, m.Content, att, m.CreatedAt, m.EditedAt, m.Public && m.Kind == "guild")
 	return err
 }
 

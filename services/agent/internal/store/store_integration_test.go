@@ -33,7 +33,7 @@ func newStore(t *testing.T) (*store.Store, *pgxpool.Pool) {
 }
 
 func msg(id int64, content string) store.Message {
-	return store.Message{ID: id, ChannelID: 10, Kind: "guild", AuthorID: 7, AuthorName: "テスト太郎", Content: content, CreatedAt: time.Now()}
+	return store.Message{ID: id, ChannelID: 10, Kind: "guild", AuthorID: 7, AuthorName: "テスト太郎", Content: content, CreatedAt: time.Now(), Public: true}
 }
 
 func TestSettingsRoundTrip(t *testing.T) {
@@ -387,7 +387,7 @@ func TestSummariesCandidatesSaveAndDeletionLink(t *testing.T) {
 	var id int64
 	add := func(ch int64, at time.Time, kind string, bot bool) int64 {
 		id++
-		m := store.Message{ID: id, ChannelID: ch, Kind: kind, AuthorID: 7, AuthorName: "太郎", Content: "発言", CreatedAt: at, IsBot: bot}
+		m := store.Message{ID: id, ChannelID: ch, Kind: kind, AuthorID: 7, AuthorName: "太郎", Content: "発言", CreatedAt: at, IsBot: bot, Public: true}
 		if err := s.UpsertMessage(ctx, m); err != nil {
 			t.Fatal(err)
 		}
@@ -509,7 +509,7 @@ func TestRemindersLifecycleAndClaimIsAtomic(t *testing.T) {
 		t.Error("201文字を受け付けた")
 	}
 	// 本人だけが見える・取り消せる
-	if l, _ := s.ListReminders(ctx, bob); len(l) != 0 {
+	if l, _ := s.ListReminders(ctx, bob, false); len(l) != 0 {
 		t.Error("他人のリマインダーが見えた")
 	}
 	if ok, _ := s.CancelReminder(ctx, future, bob); ok {
@@ -562,7 +562,7 @@ func TestRemindersLifecycleAndClaimIsAtomic(t *testing.T) {
 	if err := s.FinishReminder(ctx, id2, true); err != nil {
 		t.Fatal(err)
 	}
-	if l, _ := s.ListReminders(ctx, bob); len(l) != 0 {
+	if l, _ := s.ListReminders(ctx, bob, false); len(l) != 0 {
 		t.Error("配信後に残った")
 	}
 	// 未来のものは確保されない・取り消せる
@@ -586,11 +586,62 @@ func TestReminderLimitPerUserHoldsUnderConcurrency(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	l, _ := s.ListReminders(ctx, 7)
+	l, _ := s.ListReminders(ctx, 7, false)
 	if len(l) != store.MaxRemindersPerUser {
 		t.Errorf("同時登録で上限を超えた/満たない: %d", len(l))
 	}
 	if _, err := s.AddReminder(ctx, store.Reminder{UserID: 7, ChannelID: 1, Message: "x", RemindAt: time.Now().Add(time.Hour)}); !errors.Is(err, store.ErrReminderLimit) {
 		t.Errorf("%v", err)
+	}
+}
+
+func TestPrivateRemindersOnlyListedInDM(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+	at := time.Now().Add(time.Hour)
+	_, _ = s.AddReminder(ctx, store.Reminder{UserID: 1, ChannelID: 5, Message: "公開", RemindAt: at})
+	_, _ = s.AddReminder(ctx, store.Reminder{UserID: 1, ChannelID: 6, Message: "病院", RemindAt: at, Private: true})
+	if l, _ := s.ListReminders(ctx, 1, false); len(l) != 1 || l[0].Message != "公開" {
+		t.Errorf("公開の場の一覧にprivateが出た: %+v", l)
+	}
+	if l, _ := s.ListReminders(ctx, 1, true); len(l) != 2 {
+		t.Errorf("DMでは両方: %+v", l)
+	}
+}
+
+func TestOnlyPublicChannelMessagesAreSearchedAndSummarized(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+	jst := time.FixedZone("JST", 9*3600)
+	at := time.Date(2026, 11, 20, 12, 0, 0, 0, jst)
+	for i := int64(1); i <= 6; i++ {
+		_ = s.UpsertMessage(ctx, store.Message{ID: i, ChannelID: 1, Kind: "guild", AuthorID: 1, AuthorName: "a", Content: "公開の話 秘密A", CreatedAt: at, Public: true})
+		_ = s.UpsertMessage(ctx, store.Message{ID: 100 + i, ChannelID: 2, Kind: "guild", AuthorID: 1, AuthorName: "a", Content: "運営だけの話 秘密A", CreatedAt: at, Public: false})
+	}
+	hits, _ := s.SearchMessages(ctx, "秘密A", 20)
+	for _, h := range hits {
+		if h.ChannelID != 1 {
+			t.Fatalf("非公開チャンネルの発言が検索に出た: %+v", h)
+		}
+	}
+	if len(hits) != 6 {
+		t.Errorf("公開の発言が検索に出ない: %d", len(hits))
+	}
+	gs, _ := s.SummaryCandidates(ctx, time.Date(2026, 11, 22, 0, 0, 0, 0, time.UTC), nil, 5, 10)
+	if len(gs) != 1 || gs[0].ChannelID != 1 {
+		t.Errorf("非公開チャンネルが要約の候補に入った: %+v", gs)
+	}
+	if ms, _ := s.DayMessages(ctx, 2, gs[0].Day, 10); len(ms) != 0 {
+		t.Error("非公開チャンネルの発言を要約の材料に取れた")
+	}
+	// 権限が変わって非公開になったら、次の更新で非公開になる
+	_ = s.UpsertMessage(ctx, store.Message{ID: 1, ChannelID: 1, Kind: "guild", AuthorID: 1, AuthorName: "a", Content: "公開の話 秘密A", CreatedAt: at, Public: false})
+	if h, _ := s.SearchMessages(ctx, "公開の話", 20); len(h) != 5 {
+		t.Errorf("公開→非公開の更新が反映されない: %d", len(h))
+	}
+	// DMは、公開フラグが付いていても検索・要約に出ない
+	_ = s.UpsertMessage(ctx, store.Message{ID: 999, ChannelID: 9, Kind: "dm", AuthorID: 1, AuthorName: "a", Content: "DMの秘密A", CreatedAt: at, Public: true})
+	if h, _ := s.SearchMessages(ctx, "DMの秘密A", 20); len(h) != 0 {
+		t.Error("DMが検索に出た")
 	}
 }
