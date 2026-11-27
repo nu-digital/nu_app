@@ -23,6 +23,17 @@ type Poster interface {
 	PostTimes(ctx context.Context, text string) error
 }
 
+// Notifier は、リマインダーを依頼された場所へ送る（依頼した本人にだけメンションする）。
+type Notifier interface {
+	Remind(ctx context.Context, channelID, userID int64, text string) error
+}
+
+// ReminderStore はリマインダーの確保と結果の反映（store.Store が満たす）。
+type ReminderStore interface {
+	ClaimDueReminders(ctx context.Context, now time.Time, limit int) ([]store.Reminder, error)
+	FinishReminder(ctx context.Context, id int64, sent bool) error
+}
+
 type Speaker interface {
 	Spontaneous(ctx context.Context, in brain.SpontInput) (string, error)
 	Report(ctx context.Context, in brain.ReportInput) (string, error)
@@ -50,6 +61,8 @@ type Scheduler struct {
 	Budget   *budget.Tracker
 	Brain    Speaker
 	Post     Poster
+	Notify   Notifier // nilならリマインダーを配信しない
+	Rem      ReminderStore
 	Mem      Memory
 	Set      Settings
 	TimesCh  int64
@@ -93,6 +106,7 @@ func (s *Scheduler) Tick(ctx context.Context) {
 	s.maybeReports(ctx, now)
 	s.maybeDiary(ctx, now)
 	s.nagKey(ctx, now)
+	s.deliverReminders(ctx, now)
 	s.maybeSpeak(ctx, now)
 }
 
@@ -547,5 +561,34 @@ func (s *Scheduler) nagKey(ctx context.Context, now time.Time) {
 	}
 	if err := s.Post.PostTimes(ctx, text); err != nil {
 		s.Log.Error("キー期限の催促を投稿できません")
+	}
+}
+
+// ---- リマインダーの配信 ----
+
+const lateAfter = 10 * time.Minute
+
+// deliverReminders は、時刻が来たリマインダーを配信する。全停止中は配信しない（保留。再開後に届く）。
+// 静かモードでは配信する（頼まれたものなので）。失敗は最大3回まで再送。
+func (s *Scheduler) deliverReminders(ctx context.Context, now time.Time) {
+	if s.Notify == nil || s.Rem == nil || !s.Ctl.MayRespond() {
+		return
+	}
+	rs, err := s.Rem.ClaimDueReminders(ctx, now, 10)
+	if err != nil {
+		return
+	}
+	for _, r := range rs {
+		text := "⏰ リマインド: " + r.Message
+		if now.Sub(r.RemindAt) > lateAfter {
+			text = "⏰ リマインド（遅れてごめん）: " + r.Message
+		}
+		sent := s.Notify.Remind(ctx, r.ChannelID, r.UserID, text) == nil
+		if !sent {
+			s.Log.Warn("リマインダーを送れませんでした", "attempts", r.Attempts)
+		}
+		if err := s.Rem.FinishReminder(ctx, r.ID, sent); err != nil {
+			s.Log.Error("リマインダーの結果を保存できません")
+		}
 	}
 }

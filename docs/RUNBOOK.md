@@ -356,3 +356,8 @@ sudo bash -c 'set -a; . /srv/nu_app/.env; set +a
 - **APIキーの期限を設定する**（キーを発行したら必ず）: `... psql -c "insert into agent.settings (key, value) values ('apikey.expires', '\"2027-02-25\"') on conflict (key) do update set value = excluded.value"`（日付はConsoleで確認した期限）。14日前から毎日夜、timesで催促する。更新したら新しい日付に書き換える。
 - 必要な権限: Bot側でGuild Members Intent（特権）が有効であること（P0で設定済みの前提。無効だと参加イベントが来ない）。
 
+### 16.12 リマインダー（P5-1）
+- 使い方: 「明日の10時に会議のリマインドして」とぬるに頼む（メンション・DM・times）。依頼した場所に、依頼した本人へメンションして通知する。「リマインダー見せて」「さっきのやめて」で確認・取り消し。1人10件まで、繰り返しは未対応。
+- 全停止（`/nul stop`）中は届かず保留され、再開後に届く（遅れた旨が付く）。`/nul quiet`中は届く。
+- 確認・手動の削除: `... psql -c "select id, user_id, channel_id, remind_at, status, attempts from agent.reminders order by remind_at"`、`delete from agent.reminders where id = …`。`failed`は送れなかったもの（チャンネルの削除・権限の変更など）で、3回失敗すると残る。
+

@@ -48,6 +48,17 @@ func (g *Gateway) PostTimes(ctx context.Context, text string) error {
 	return err
 }
 
+// Remind は、リマインダーを送る。送り先は、依頼を受けた場所（チャンネル・スレッド・DM）。**メンションは依頼した本人にだけ**（everyone・here・ロール・他の人には飛ばない）。
+func (g *Gateway) Remind(ctx context.Context, channelID, userID int64, text string) error {
+	uid := strconv.FormatInt(userID, 10)
+	body := clip("<@" + uid + "> " + text)
+	_, err := g.s.ChannelMessageSendComplex(strconv.FormatInt(channelID, 10), &discordgo.MessageSend{
+		Content:         body,
+		AllowedMentions: &discordgo.MessageAllowedMentions{Users: []string{uid}},
+	}, discordgo.WithContext(ctx))
+	return err
+}
+
 // React は絵文字リアクションを付ける。
 func (g *Gateway) React(ctx context.Context, channelID, messageID int64, emoji string) error {
 	return g.s.MessageReactionAdd(strconv.FormatInt(channelID, 10), strconv.FormatInt(messageID, 10), emoji, discordgo.WithContext(ctx))
