@@ -48,6 +48,12 @@ schema=$(q "SELECT coalesce(max(version_id),0) FROM goose_db_version")
 counts=$(q "SELECT (SELECT count(*) FROM users)||' '||(SELECT count(*) FROM contents)||' '||(SELECT count(*) FROM media_assets)")
 [ "$counts" = "$(manifest users_contents_media_assets)" ] || fail "行数が違います（復元 $counts・マニフェスト $(manifest users_contents_media_assets)）"
 
+# ぬる（agentスキーマ）: 記録・ノート・要約などの行数がマニフェストと一致するか（古い世代にagent_countsが無ければ飛ばす）
+if grep -q '^agent_counts=' "$gen/manifest.txt"; then
+  agent=$(docker exec -i "$pg" psql -U restore -d restore -At < "$(dirname "$0")/agent-counts.sql")
+  [ "$agent" = "$(manifest agent_counts)" ] || fail "agentスキーマの行数が違います（復元 $agent・マニフェスト $(manifest agent_counts)）"
+fi
+
 log "メディアを展開"
 mkdir -p "$tmp/media"
 tar -xzf "$gen/media.tar.gz" -C "$tmp/media"
@@ -61,4 +67,4 @@ docker run --rm --network "$net" --user 65532:65532 \
   -e "DATABASE_URL=postgres://restore:${pgpass}@${pg}:5432/restore?sslmode=disable" -e MEDIA_DIR=/media \
   -v "$tmp/media:/media" --entrypoint /nuctl "$NUCTL_IMAGE" media-verify || fail "DBの行とメディアのファイルが食い違っています"
 
-log "OK: $(basename "$gen") を隔離環境へ復元し、スキーマ $schema・行数 $counts・メディア ${files}ファイルの整合を確認しました（本番には触れていません）"
+log "OK: $(basename "$gen") を隔離環境へ復元し、スキーマ $schema・行数 $counts・agent ${agent:-なし}・メディア ${files}ファイルの整合を確認しました（本番には触れていません）"

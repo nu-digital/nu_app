@@ -76,6 +76,9 @@ toc=$(compose exec -T "$DB_SERVICE" pg_restore --list < "$work/db.dump" | wc -l)
 schema=$(compose exec -T "$DB_SERVICE" sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT coalesce(max(version_id),0) FROM goose_db_version"')
 counts=$(compose exec -T "$DB_SERVICE" sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT (SELECT count(*) FROM users)||chr(32)||(SELECT count(*) FROM contents)||chr(32)||(SELECT count(*) FROM media_assets)"')
 
+# ぬる（agentスキーマ）の行数。復元の確認で突き合わせる（スキーマが無い版では none）
+agent_counts=$(compose exec -T "$DB_SERVICE" sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At' < "$(dirname "$0")/agent-counts.sql")
+
 step="メディアのアーカイブ"
 [ -d "$MEDIA_DIR" ]
 tar -C "$MEDIA_DIR" --exclude=./tmp -czf "$work/media.tar.gz" .
@@ -89,6 +92,7 @@ step="マニフェストとチェックサム"
   echo "created_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "schema_version=$schema"
   echo "users_contents_media_assets=$counts"
+  echo "agent_counts=$agent_counts"
   echo "media_files=$media_files"
   echo "deployed_tag=$DEPLOYED_TAG"
 } > "$work/manifest.txt"
