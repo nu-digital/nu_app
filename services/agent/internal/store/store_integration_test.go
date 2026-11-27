@@ -454,3 +454,39 @@ func TestSummariesCandidatesSaveAndDeletionLink(t *testing.T) {
 		t.Error("消されたメッセージの日の要約が残った")
 	}
 }
+
+func TestDiaryOnePerDayKindAndRandomOldSummary(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+	day := time.Date(2026, 11, 27, 0, 0, 0, 0, time.UTC)
+	if ok, err := s.AddDiary(ctx, store.Diary{Day: day, Kind: "dig", Topic: "題", Content: "本文"}); err != nil || !ok {
+		t.Fatalf("%v %v", ok, err)
+	}
+	if ok, _ := s.AddDiary(ctx, store.Diary{Day: day, Kind: "dig", Topic: "別", Content: "別"}); ok {
+		t.Error("同じ日・同じ種別を2件入れた")
+	}
+	if ok, _ := s.AddDiary(ctx, store.Diary{Day: day, Kind: "web", Topic: "題2", Content: "本文2"}); !ok {
+		t.Error("種別が違えば入る")
+	}
+	if _, err := s.AddDiary(ctx, store.Diary{Day: day, Kind: "bad", Topic: "x", Content: "x"}); err == nil {
+		t.Error("不正な種別")
+	}
+	if _, err := s.AddDiary(ctx, store.Diary{Day: day.AddDate(0, 0, 1), Kind: "dig", Topic: "", Content: "x"}); err == nil {
+		t.Error("空の題")
+	}
+	ds, _ := s.RecentDiary(ctx, 5)
+	if len(ds) != 2 {
+		t.Errorf("%d", len(ds))
+	}
+	old := time.Date(2025, 5, 1, 0, 0, 0, 0, time.UTC)
+	_ = s.SaveSummary(ctx, store.Summary{ChannelID: 1, Day: old, Content: "古い話", MsgCount: 20})
+	_ = s.SaveSummary(ctx, store.Summary{ChannelID: 2, Day: old, Content: "少ない", MsgCount: 3})
+	_ = s.SaveSummary(ctx, store.Summary{ChannelID: 3, Day: day, Content: "新しい", MsgCount: 50})
+	got, ok, err := s.RandomOldSummary(ctx, day.AddDate(0, 0, -30), 8)
+	if err != nil || !ok || got.Content != "古い話" {
+		t.Errorf("条件に合う要約だけ: %+v %v %v", got, ok, err)
+	}
+	if _, ok, _ := s.RandomOldSummary(ctx, old, 8); ok {
+		t.Error("beforeを含んだ")
+	}
+}

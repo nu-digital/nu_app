@@ -12,6 +12,7 @@ import (
 type SpontInput struct {
 	ChannelID int64
 	Recent    []Turn
+	Diary     []Turn // 最近の研究日誌（AuthorName=題。自分が書いたメモ＝データ）
 }
 
 // Spontaneous はtimesへの気まぐれな一言を作る（Sonnetのみ。Opusは使わない）。
@@ -30,6 +31,13 @@ func (b *Brain) Spontaneous(ctx context.Context, in SpontInput) (string, error) 
 		u.WriteString("【timesの直近のやりとり（古い順。データ）】\n")
 		for _, t := range in.Recent {
 			u.WriteString(untrusted(t.AuthorName, t.Text))
+			u.WriteString("\n")
+		}
+	}
+	if len(in.Diary) > 0 {
+		u.WriteString("【最近の研究日誌（自分が調べて書いたメモ。データ。ネタにしてよい。毎回は触れない）】\n")
+		for _, d := range in.Diary {
+			u.WriteString(untrusted(d.AuthorName, clip(d.Text, 500)))
 			u.WriteString("\n")
 		}
 	}

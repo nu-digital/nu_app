@@ -24,6 +24,8 @@ type Poster interface {
 type Speaker interface {
 	Spontaneous(ctx context.Context, in brain.SpontInput) (string, error)
 	Report(ctx context.Context, in brain.ReportInput) (string, error)
+	Dig(ctx context.Context, sum store.Summary) (topic, content string, err error)
+	Study(ctx context.Context, hobby string, recent []string) (topic, content string, err error)
 }
 
 type Settings interface {
@@ -36,6 +38,9 @@ type Memory interface {
 	SaveState(ctx context.Context, st store.State) error
 	RecentMessages(ctx context.Context, channelID int64, threadID *int64, beforeID int64, limit int) ([]store.Message, error)
 	SummariesBetween(ctx context.Context, from, to time.Time, limit int) ([]store.Summary, error)
+	RandomOldSummary(ctx context.Context, before time.Time, minMsgs int) (store.Summary, bool, error)
+	AddDiary(ctx context.Context, d store.Diary) (bool, error)
+	RecentDiary(ctx context.Context, limit int) ([]store.Diary, error)
 }
 
 type Scheduler struct {
@@ -59,6 +64,7 @@ const (
 	keyDrift = "mood.drift_day"
 	keySpont = "spont.state"
 	keyStop  = "budget.stop_announced"
+	keyDiary = "diary.last"
 	keyWeek  = "report.weekly"
 	keyMonth = "report.monthly"
 )
@@ -79,6 +85,7 @@ func (s *Scheduler) Tick(ctx context.Context) {
 	s.dailyMood(ctx, now)
 	s.announceStop(ctx, now)
 	s.maybeReports(ctx, now)
+	s.maybeDiary(ctx, now)
 	s.maybeSpeak(ctx, now)
 }
 
@@ -213,7 +220,13 @@ func (s *Scheduler) maybeSpeak(ctx context.Context, now time.Time) {
 			recent = append(recent, brain.Turn{AuthorName: name, Text: m.Content})
 		}
 	}
-	text, err := s.Brain.Spontaneous(ctx, brain.SpontInput{ChannelID: s.TimesCh, Recent: recent})
+	var diary []brain.Turn
+	if ds, err := s.Mem.RecentDiary(ctx, 3); err == nil {
+		for _, d := range ds {
+			diary = append(diary, brain.Turn{AuthorName: d.Topic, Text: d.Content})
+		}
+	}
+	text, err := s.Brain.Spontaneous(ctx, brain.SpontInput{ChannelID: s.TimesCh, Recent: recent, Diary: diary})
 	if err != nil || text == "" {
 		return // 失敗・寝ている・空のときは書かない（次のチャンスを待つ）
 	}
@@ -341,5 +354,80 @@ func (s *Scheduler) report(ctx context.Context, now time.Time, setKey, period, k
 	save()
 	if err := s.Post.PostTimes(ctx, text); err != nil {
 		s.Log.Error("報告をtimesへ投稿できません")
+	}
+}
+
+// ---- 研究日誌 ----
+
+type diaryState struct {
+	Dig string `json:"dig"` // 最後に発掘日誌を書いた日（JST）
+	Web string `json:"web"` // 最後に調べもの日誌を書いた日（JST）
+}
+
+const (
+	digHour = 5 // JST。毎日、この時刻以降の最初のTickで試す
+	webHour = 6
+	// 発掘に使う要約は、これより前（日数）の、発言がこれ以上の日のものだけ
+	digMinAgeDays = 30
+	digMinMsgs    = 8
+)
+
+// maybeDiary は、毎日1回ずつ「発掘日誌」（古い要約から。Web検索なし）と「調べもの日誌」（Web検索あり。予算が通常の段階のときだけ）を書く。
+// 失敗しても、その日は再試行しない（費用の暴走を避ける）。投稿はしない（気まぐれ投稿のネタになる）。
+func (s *Scheduler) maybeDiary(ctx context.Context, now time.Time) {
+	if !s.Ctl.MayPostSpontaneously() {
+		return
+	}
+	n := now.In(jst)
+	today := n.Format("2006-01-02")
+	var st diaryState
+	if raw, ok, err := s.Set.GetSetting(ctx, keyDiary); err != nil {
+		return
+	} else if ok {
+		_ = json.Unmarshal(raw, &st)
+	}
+	day := time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.UTC)
+	if n.Hour() >= digHour && st.Dig != today && s.Budget.SpontaneousFactor(ctx) > 0 {
+		st.Dig = today
+		_ = s.Set.SetSetting(ctx, keyDiary, st) // 先に記録する
+		if sum, ok, err := s.Mem.RandomOldSummary(ctx, day.AddDate(0, 0, -digMinAgeDays), digMinMsgs); err == nil && ok {
+			if topic, content, err := s.Brain.Dig(ctx, sum); err == nil && content != "" {
+				if _, err := s.Mem.AddDiary(ctx, store.Diary{Day: day, Kind: "dig", Topic: topic, Content: content}); err != nil {
+					s.Log.Error("発掘日誌を保存できません")
+				}
+			}
+		}
+	}
+	if n.Hour() >= webHour && st.Web != today && s.Budget.Remaining(ctx) > 0 && s.Ctl.MayPostSpontaneously() {
+		st.Web = today
+		_ = s.Set.SetSetting(ctx, keyDiary, st)
+		cur, err := s.Mem.GetState(ctx)
+		if err != nil || cur.Hobby == "" {
+			return
+		}
+		var recent []string
+		if ds, err := s.Mem.RecentDiary(ctx, 6); err == nil {
+			for _, d := range ds {
+				if d.Kind == "web" {
+					recent = append(recent, d.Topic)
+				}
+			}
+		}
+		topic, content, err := s.Brain.Study(ctx, cur.Hobby, recent)
+		if err != nil || content == "" {
+			return
+		}
+		if ok, err := s.Mem.AddDiary(ctx, store.Diary{Day: day, Kind: "web", Topic: topic, Content: content}); err != nil || !ok {
+			return
+		}
+		// 調べたことが、次のハマりになる（P1の候補リストを置き換える。長すぎる題は切る）
+		h := topic
+		if r := []rune(h); len(r) > 40 {
+			h = string(r[:40])
+		}
+		cur.Hobby = h
+		if err := s.Mem.SaveState(ctx, cur); err != nil {
+			s.Log.Error("ハマりを更新できません")
+		}
 	}
 }

@@ -35,12 +35,17 @@ func (b *Brain) research(ctx context.Context, in Input, question string) (string
 	if ok, err := b.Budget.AllowUser(ctx, in.UserID, "web"); err != nil || !ok {
 		return "", false, nil
 	}
+	return b.webCall(ctx, in, question, "web_research")
+}
+
+// webCall はWeb検索つきの呼び出し（予算・回数の確認は呼び出し側）。結果の本文＋出典。空・拒否のときは ok=false。
+func (b *Brain) webCall(ctx context.Context, in Input, question, purpose string) (string, bool, error) {
 	msgs := []llm.Message{{Role: llm.User, Blocks: []llm.Block{{Type: llm.Text, Text: "【調べてほしいこと】\n" + untrusted(in.AuthorName, question)}}}}
 	var text strings.Builder
 	var sources []string
 	for turn := 0; ; turn++ {
 		resp, err := b.call(ctx, llm.Request{Model: llm.Sonnet, MaxTokens: 1500, Effort: "low", System: ResearchSystemPrompt, Messages: msgs,
-			WebSearch: &llm.WebSearch{MaxUses: maxWebSearches}, Purpose: "web_research"}, in)
+			WebSearch: &llm.WebSearch{MaxUses: maxWebSearches}, Purpose: purpose}, in)
 		if err != nil {
 			return "", false, err
 		}

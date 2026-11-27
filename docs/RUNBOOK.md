@@ -346,3 +346,8 @@ sudo bash -c 'set -a; . /srv/nu_app/.env; set +a
 - **Anthropic側の準備（運用責任者）**: ConsoleのPrivacy（またはOrganization settings）で、組織の**Web検索を有効化**する。無効だとAPIがエラーを返し、ぬるは「調べられなかった」と答える（他の機能は動く）。支払い方法・auto-reloadは引き続き設定しない。
 - 止めたいとき: `/nul stop`（全部止まる）。Web検索だけ止めたいときは、Consoleで組織のWeb検索を無効にする（コード変更なしで止まる）。
 
+### 16.10 研究日誌（P3-2）
+- 毎日2件まで書く（発掘＝古い要約から・Web検索なし／調べもの＝Web検索あり。予算70%未満のときだけ）。確認: `... psql -c "select day, kind, topic, left(content,60) from agent.diary order by id desc limit 10"`。投稿はされず、気まぐれ投稿のネタになる。
+- 変な内容が混じったとき: `delete from agent.diary where id = …`。ハマりを変えるとき: `update agent.state set hobby = '…'`。
+- 調べもの日誌の費用の目安: 1日あたり検索最大3回（$0.03）＋トークン（数セント）。月$2〜3。止めたいときはConsoleで組織のWeb検索を無効にする（発掘日誌は動く）。
+

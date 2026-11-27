@@ -29,6 +29,15 @@ type AgentDailyCall struct {
 	N             int32
 }
 
+type AgentDiary struct {
+	ID        int64
+	Day       pgtype.Date
+	Kind      string
+	Topic     string
+	Content   string
+	CreatedAt pgtype.Timestamptz
+}
+
 type AgentImportProgress struct {
 	ChannelID       int64
 	OldestMessageID pgtype.Int8
