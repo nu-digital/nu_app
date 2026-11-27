@@ -78,6 +78,14 @@ export function repositoryErrors(repositoryRoot = root) {
   for (const file of required) {
     if (!existsSync(resolve(repositoryRoot, file))) errors.push(`必須ファイルなし: ${file}`);
   }
+  // README.mdはプロジェクトの入口。空・ほぼ空にならないことを検査する（過去に編集ミスで空になり、気づかれなかった）
+  const readmePath = resolve(repositoryRoot, 'README.md');
+  if (existsSync(readmePath)) {
+    const readme = readFileSync(readmePath, 'utf8');
+    if (readme.split('\n').length < 30 || !readme.includes('## まず読む') || !readme.includes('docs/README.md')) {
+      errors.push('README.md が空に近いか、入口に必要な内容（「まず読む」の節・docs/README.mdへのリンク）がありません');
+    }
+  }
   const files = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
     cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024,
   }).split('\0').filter(Boolean);
