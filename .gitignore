@@ -19,3 +19,6 @@ CLAUDE.local.md
 .DS_Store
 Thumbs.db
 .e2e-out/
+
+# Goのビルド成果物（コミットしない）
+/services/bot/bot
