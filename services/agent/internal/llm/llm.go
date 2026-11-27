@@ -66,8 +66,16 @@ type Request struct {
 	System   string
 	Tools    []Tool
 	Messages []Message
+	// WebSearch があれば、サーバー側のWeb検索ツール（Anthropicが実行する）を使えるようにする。自前のツールとは別の呼び出しで使う
+	WebSearch *WebSearch
 	// Purpose は予算の記録用（chat|think_hard|reaction|...）。APIには送らない
 	Purpose string
+}
+
+// WebSearch はWeb検索ツールの設定。MaxUses は1回の呼び出しで検索できる最大回数（費用の上限）。
+type WebSearch struct {
+	MaxUses        int
+	BlockedDomains []string
 }
 
 type ToolUse struct {
@@ -81,6 +89,7 @@ type Usage struct {
 	OutputTokens     int64
 	CacheReadTokens  int64
 	CacheWriteTokens int64
+	WebSearches      int64 // Web検索の回数（1回ごとに課金）
 }
 
 type Response struct {
@@ -93,6 +102,8 @@ type Response struct {
 	// Model は実際に応答したモデル（フォールバックで変わり得る）
 	Model string
 	Usage Usage
+	// Sources はWeb検索で参照されたページ（URL。最大8件）
+	Sources []string
 	// Assistant はこの返答をそのまま履歴へ戻すためのメッセージ
 	Assistant Message
 }

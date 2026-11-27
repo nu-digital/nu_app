@@ -201,3 +201,41 @@ func TestInvalidRequestsAreRejectedBeforeSending(t *testing.T) {
 		t.Errorf("不正なリクエストを送信した: %d", len(*reqs))
 	}
 }
+
+const webBody = `{"id":"msg_w","type":"message","role":"assistant","model":"claude-sonnet-5-5","content":[
+ {"type":"server_tool_use","id":"srv_1","name":"web_search","input":{"query":"Go 1.27 リリース"}},
+ {"type":"web_search_tool_result","tool_use_id":"srv_1","content":[{"type":"web_search_result","url":"https://go.dev/doc/go1.27","title":"Go 1.27","encrypted_content":"x","page_age":null}]},
+ {"type":"text","text":"Go 1.27が出ている"}],
+ "stop_reason":"pause_turn","stop_sequence":null,
+ "usage":{"input_tokens":100,"output_tokens":20,"server_tool_use":{"web_search_requests":2,"web_fetch_requests":0}}}`
+
+func TestWebSearchToolRequestAndParse(t *testing.T) {
+	c, reqs, _ := serve(t, 200, webBody)
+	req := baseReq()
+	req.Tools = nil
+	req.WebSearch = &WebSearch{MaxUses: 3, BlockedDomains: []string{"example.com"}}
+	resp, err := c.Complete(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tools := (*reqs)[0]["tools"].([]any)
+	ws := tools[len(tools)-1].(map[string]any)
+	if ws["type"] != "web_search_20260209" || ws["name"] != "web_search" || ws["max_uses"].(float64) != 3 || ws["blocked_domains"].([]any)[0] != "example.com" {
+		t.Errorf("web_searchの定義: %v", ws)
+	}
+	if resp.Usage.WebSearches != 2 || resp.StopReason != "pause_turn" || resp.Text != "Go 1.27が出ている" {
+		t.Errorf("%+v", resp)
+	}
+	if len(resp.Sources) != 1 || resp.Sources[0] != "https://go.dev/doc/go1.27" {
+		t.Errorf("出典: %v", resp.Sources)
+	}
+}
+
+func TestSearchURLsIgnoresErrorsAndOddSchemes(t *testing.T) {
+	if got := searchURLs(`{"type":"web_search_tool_result","content":{"type":"web_search_tool_result_error","error_code":"max_uses_exceeded"}}`); len(got) != 0 {
+		t.Errorf("%v", got)
+	}
+	if got := searchURLs(`{"content":[{"url":"javascript:alert(1)"},{"url":"https://a.example/x"}]}`); len(got) != 1 {
+		t.Errorf("%v", got)
+	}
+}

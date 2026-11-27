@@ -68,6 +68,13 @@ func buildParams(req Request) (anthropic.BetaMessageNewParams, error) {
 			InputSchema: anthropic.BetaToolInputSchemaParam{Properties: schema.Properties, Required: schema.Required}}
 		p.Tools = append(p.Tools, anthropic.BetaToolUnionParam{OfTool: &tp})
 	}
+	if ws := req.WebSearch; ws != nil {
+		t := anthropic.BetaWebSearchTool20260209Param{BlockedDomains: ws.BlockedDomains}
+		if ws.MaxUses > 0 {
+			t.MaxUses = anthropic.Int(int64(ws.MaxUses))
+		}
+		p.Tools = append(p.Tools, anthropic.BetaToolUnionParam{OfWebSearchTool20260209: &t})
+	}
 	for _, m := range req.Messages {
 		bm, err := toBetaMessage(m)
 		if err != nil {
@@ -135,7 +142,7 @@ func toBetaMessage(m Message) (anthropic.BetaMessageParam, error) {
 func parse(msg *anthropic.BetaMessage) Response {
 	r := Response{StopReason: string(msg.StopReason), Model: string(msg.Model), Refused: msg.StopReason == anthropic.BetaStopReasonRefusal,
 		Usage: Usage{InputTokens: msg.Usage.InputTokens, OutputTokens: msg.Usage.OutputTokens,
-			CacheReadTokens: msg.Usage.CacheReadInputTokens, CacheWriteTokens: msg.Usage.CacheCreationInputTokens}}
+			CacheReadTokens: msg.Usage.CacheReadInputTokens, CacheWriteTokens: msg.Usage.CacheCreationInputTokens, WebSearches: msg.Usage.ServerToolUse.WebSearchRequests}}
 	var raws []json.RawMessage
 	var text strings.Builder
 	for _, b := range msg.Content {
@@ -143,10 +150,15 @@ func parse(msg *anthropic.BetaMessage) Response {
 		switch b.Type {
 		case "text":
 			text.WriteString(b.AsText().Text)
+		case "web_search_tool_result":
+			r.Sources = append(r.Sources, searchURLs(b.RawJSON())...)
 		case "tool_use":
 			tu := b.AsToolUse()
 			r.ToolUses = append(r.ToolUses, ToolUse{ID: tu.ID, Name: tu.Name, Input: json.RawMessage(tu.JSON.Input.Raw())})
 		}
+	}
+	if len(r.Sources) > 8 {
+		r.Sources = r.Sources[:8]
 	}
 	r.Text = text.String()
 	r.Assistant = Message{Role: Assistant, native: raws, Blocks: []Block{{Type: Text, Text: r.Text}}}
@@ -170,4 +182,27 @@ func classify(err error) error {
 		return err
 	}
 	return errors.New("Claude APIに接続できません")
+}
+
+// searchURLs は web_search_tool_result ブロックから、参照されたページのURL（httpsのみ）を取り出す。
+func searchURLs(raw string) []string {
+	var b struct {
+		Content json.RawMessage `json:"content"`
+	}
+	if json.Unmarshal([]byte(raw), &b) != nil {
+		return nil
+	}
+	var items []struct {
+		URL string `json:"url"`
+	}
+	if json.Unmarshal(b.Content, &items) != nil { // エラーの結果はオブジェクト
+		return nil
+	}
+	var out []string
+	for _, it := range items {
+		if strings.HasPrefix(it.URL, "https://") || strings.HasPrefix(it.URL, "http://") {
+			out = append(out, it.URL)
+		}
+	}
+	return out
 }

@@ -160,6 +160,9 @@ func TestUsageAndDailyCounters(t *testing.T) {
 			t.Errorf("%d回目: %d %v", want, got, err)
 		}
 	}
+	if got, err := s.IncDaily(ctx, now, 7, "web"); err != nil || got != 1 {
+		t.Errorf("web: %d %v", got, err)
+	}
 	if got, _ := s.IncDaily(ctx, now, 7, "opus"); got != 1 {
 		t.Errorf("opus: %d", got)
 	}

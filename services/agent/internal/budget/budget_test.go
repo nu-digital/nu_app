@@ -212,3 +212,13 @@ func TestCreditExhaustionSleepsUntilNextPeriodAndFailsSafe(t *testing.T) {
 		t.Error("読めないときはAPIを呼ばない")
 	}
 }
+
+func TestWebSearchesAreBilledPerRequest(t *testing.T) {
+	// 検索1回 = $0.01。トークン代に加算する
+	if c := Cost(llm.Sonnet, llm.Usage{WebSearches: 3}); c != 30_000 {
+		t.Errorf("3回: %d", c)
+	}
+	if c := Cost(llm.Sonnet, llm.Usage{InputTokens: 1_000_000, WebSearches: 2}); c != 2_020_000 {
+		t.Errorf("トークン＋検索: %d", c)
+	}
+}

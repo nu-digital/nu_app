@@ -26,6 +26,9 @@ var Prices = map[string]Price{
 // priceScale は Prices の単位（$/MTok × 1000）からマイクロドルへの換算。
 const priceScale = 1000
 
+// webSearchMicro はWeb検索1回の料金（$10 / 1,000回 = $0.01）。
+const webSearchMicro = 10_000
+
 // Cost は使用量の金額（マイクロドル）。未知のモデルは、安全側（最も高いOpus）の単価で数える。
 func Cost(model string, u llm.Usage) int64 {
 	p, ok := Prices[model]
@@ -33,7 +36,7 @@ func Cost(model string, u llm.Usage) int64 {
 		p = Prices[llm.Opus]
 	}
 	milli := u.InputTokens*p.In + u.OutputTokens*p.Out + u.CacheReadTokens*p.CacheRead + u.CacheWriteTokens*p.CacheWrite
-	return (milli + priceScale - 1) / priceScale // 切り上げ（少なく数えない）
+	return (milli+priceScale-1)/priceScale + u.WebSearches*webSearchMicro // 切り上げ（少なく数えない）
 }
 
 type Tier int
@@ -63,6 +66,7 @@ type Config struct {
 	AnchorDay       int            // 月の始まり（クレジットの付与日。1〜28。既定1）
 	ReplyPerUserDay int            // 一人あたりの1日の返答の上限（既定20）
 	OpusPerUserDay  int            // 一人あたりの1日のOpus依頼の上限（既定3）
+	WebPerUserDay   int            // 一人あたりの1日のWeb検索の依頼の上限（既定5）
 	Location        *time.Location // 日付の基準（JST）
 }
 
@@ -78,6 +82,9 @@ func (c Config) withDefaults() Config {
 	}
 	if c.OpusPerUserDay <= 0 {
 		c.OpusPerUserDay = 3
+	}
+	if c.WebPerUserDay <= 0 {
+		c.WebPerUserDay = 5
 	}
 	if c.Location == nil {
 		c.Location = time.FixedZone("JST", 9*3600)
@@ -155,6 +162,9 @@ func (t *Tracker) AllowAPI(ctx context.Context) bool { return t.State(ctx).Tier 
 // AllowOpus は、Opusを使ってよいか。
 func (t *Tracker) AllowOpus(ctx context.Context) bool { return t.State(ctx).Tier < NoOpus }
 
+// AllowWeb は、Web検索を使ってよいか（検索は1回ごとに課金されるので、90%以上では使わない）。
+func (t *Tracker) AllowWeb(ctx context.Context) bool { return t.State(ctx).Tier < NoOpus }
+
 // SpontaneousFactor は自発投稿の頻度の倍率（通常1.0・節約0.5・それ以降0）。
 func (t *Tracker) SpontaneousFactor(ctx context.Context) float64 {
 	switch t.State(ctx).Tier {
@@ -214,11 +224,14 @@ func (t *Tracker) PreviousPeriod(ctx context.Context) (spent int64, start time.T
 // Limit は月の上限（マイクロドル）。
 func (t *Tracker) Limit() int64 { return t.cfg.LimitMicro }
 
-// AllowUser は、一人あたりの1日の上限（連打対策）。kind は "reply" か "opus"。数えてから判定する（上限を超えた回は拒否）。
+// AllowUser は、一人あたりの1日の上限（連打対策）。kind は "reply"・"opus"・"web"。数えてから判定する（上限を超えた回は拒否）。
 func (t *Tracker) AllowUser(ctx context.Context, userID int64, kind string) (bool, error) {
 	limit := t.cfg.ReplyPerUserDay
-	if kind == "opus" {
+	switch kind {
+	case "opus":
 		limit = t.cfg.OpusPerUserDay
+	case "web":
+		limit = t.cfg.WebPerUserDay
 	}
 	n, err := t.l.IncDaily(ctx, t.now().In(t.cfg.Location), userID, kind)
 	if err != nil {
