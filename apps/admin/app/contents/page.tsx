@@ -1,5 +1,6 @@
 "use client";
 
+import { previewUrlTransform } from "@/lib/markdown-preview.mjs";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -38,7 +39,7 @@ function Thumb({ c }: { c: ContentListItem }) {
     <div className={`thumb thumb-${c.section}`}>
       {c.coverUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={c.coverUrl} alt="" loading="lazy" />
+        <img src={previewUrlTransform(c.coverUrl)} alt="" loading="lazy" />
       ) : (
         <span className="thumb-empty" aria-hidden="true">{c.type === "project" ? "作品" : "記事"}</span>
       )}
