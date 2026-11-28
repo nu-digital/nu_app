@@ -37,8 +37,6 @@ type itemView struct {
 	PhotoMediaID *string `json:"photoMediaId"`
 	// BorrowedByMe は自分が借りている未返却の数量（0なら借りていない）。
 	BorrowedByMe int64 `json:"borrowedByMe"`
-	// Images は物品の画像（メディアID。先頭がメイン）。詳細だけに入る。
-	Images []string `json:"images,omitempty"`
 }
 
 type unitView struct {
@@ -62,6 +60,7 @@ type outstandingLoanView struct {
 	Quantity            int32     `json:"quantity"` // 未返却の数量
 	BorrowedAt          time.Time `json:"borrowedAt"`
 	ElapsedDays         int       `json:"elapsedDays"`
+	Mine                bool      `json:"mine"` // 自分の貸出
 }
 
 // elapsedDays は貸出日時から表示時点までの経過日数（返却期限は持たない）。
@@ -558,9 +557,9 @@ func (s *server) getItem(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, r)
 		return
 	}
-	view.Images = make([]string, 0, len(imgs))
+	images := make([]string, 0, len(imgs))
 	for _, m := range imgs {
-		view.Images = append(view.Images, m.String())
+		images = append(images, m.String())
 	}
 	loans, err := q.ListItemLoansOutstanding(r.Context(), id)
 	if err != nil {
@@ -569,14 +568,16 @@ func (s *server) getItem(w http.ResponseWriter, r *http.Request) {
 	}
 	lv := make([]outstandingLoanView, 0, len(loans))
 	for _, l := range loans {
-		if l.BorrowerUserID == a.Identity.UserID {
+		mine := l.BorrowerUserID == a.Identity.UserID
+		if mine {
 			view.BorrowedByMe += int64(l.Outstanding)
 		}
-		lv = append(lv, outstandingLoanView{ID: l.ID.String(), BorrowerDisplayName: l.BorrowerDisplayName, Quantity: l.Outstanding, BorrowedAt: l.BorrowedAt.Time, ElapsedDays: elapsedDays(l.BorrowedAt.Time, now)})
+		lv = append(lv, outstandingLoanView{ID: l.ID.String(), BorrowerDisplayName: l.BorrowerDisplayName, Quantity: l.Outstanding, BorrowedAt: l.BorrowedAt.Time, ElapsedDays: elapsedDays(l.BorrowedAt.Time, now), Mine: mine})
 	}
 	httpx.JSON(w, http.StatusOK, struct {
 		itemView
-		Units []unitView            `json:"units"`
-		Loans []outstandingLoanView `json:"loans"`
-	}{view, uv, lv})
+		Images []string              `json:"images"` // 物品の画像（メディアID。先頭がメイン）
+		Units  []unitView            `json:"units"`
+		Loans  []outstandingLoanView `json:"loans"`
+	}{view, images, uv, lv})
 }

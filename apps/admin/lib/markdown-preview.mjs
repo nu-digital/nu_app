@@ -19,12 +19,15 @@ export const rehypePlugins = [rehypeRaw, ...sanitizePlugins];
 
 /**
  * プレビュー専用のURL変換。下書きの画像は公開されるまで匿名には配信されないため、
- * 本文のアップロード画像URL（/api/v1/public/media/<public_id>）を、認証つきのプレビュー経路へ読み替えて表示する。
+ * 本文のアップロード画像URL（/api/v1/public/media/<public_id>）を、認証つきのプレビュー経路へ読み替え、既存記事の画像（/images/…）は公式サイトのファイルを中継して表示する。
  * サニタイズの後に適用されるので、許可されたURLだけがここへ来る。
  */
 export function previewUrlTransform(url) {
   const m = /^\/api\/v1\/public\/media\/([A-Za-z0-9_-]{22})$/.exec(url);
-  return m ? `/api/v1/media/by-public/${m[1]}` : url;
+  if (m) return `/api/v1/media/by-public/${m[1]}`;
+  // 既存記事の画像（/images/…）は公式サイト側のファイル。管理ポータルには無いので、中継（next.config.ts の /web-images）経由で表示する
+  if (url.startsWith("/images/") && !url.includes("..") && !/[?#]/.test(url)) return `/web-images/${url.slice("/images/".length)}`;
+  return url;
 }
 
 /** 本文のYouTube URLから動画IDを取り出す（既存サイトのlib/youtube.tsと同じ許可ホスト・11桁ID。D10）。 */

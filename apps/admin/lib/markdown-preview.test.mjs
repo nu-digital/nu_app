@@ -118,7 +118,11 @@ test("YouTubeのdata属性は、11桁のIDだけが残る", () => {
 test("プレビューのURL変換: アップロード画像だけを認証つきのプレビュー経路へ読み替える", () => {
   const id = "AbCdEfGhIjKlMnOpQrStUv";
   assert.equal(previewUrlTransform(`/api/v1/public/media/${id}`), `/api/v1/media/by-public/${id}`);
-  assert.equal(previewUrlTransform("/images/a.webp"), "/images/a.webp");
+  // 既存記事の画像は公式サイトのファイル。プレビューでは中継経由で表示する
+  assert.equal(previewUrlTransform("/images/a.webp"), "/web-images/a.webp");
+  assert.equal(previewUrlTransform("/images/contents/2025/x.png"), "/web-images/contents/2025/x.png");
+  assert.equal(previewUrlTransform("/images/../etc/passwd"), "/images/../etc/passwd");
+  assert.equal(previewUrlTransform("/images/a.webp?x=1"), "/images/a.webp?x=1");
   assert.equal(previewUrlTransform(`/api/v1/public/media/${id}?x=1`), `/api/v1/public/media/${id}?x=1`);
   assert.equal(previewUrlTransform("https://example.com/"), "https://example.com/");
 });

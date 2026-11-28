@@ -1,10 +1,20 @@
-import MediaImg from "@/components/MediaImg";
+"use client";
+
+import { useState } from "react";
+
+import { mediaUrl } from "@/lib/api";
 
 /** メンバーのアイコン。画像が無いときは表示名の頭文字を丸に表示する。画像はログイン中のメンバーだけが取得できる。 */
 export function Avatar({ name, mediaId, size = 32 }: { name: string; mediaId?: string | null; size?: number }) {
+  const [failed, setFailed] = useState(false); // 画像が取得できない（停止中のユーザー等）ときは頭文字にする
   return (
     <span className="ui-avatar" style={{ width: size, height: size, fontSize: Math.round(size * 0.45) }} title={name}>
-      {mediaId ? <MediaImg id={mediaId} alt="" lazy /> : <span aria-hidden="true">{Array.from(name.trim())[0] ?? "?"}</span>}
+      {mediaId && !failed ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={mediaUrl(mediaId)} alt="" loading="lazy" onError={() => setFailed(true)} />
+      ) : (
+        <span aria-hidden="true">{Array.from(name.trim())[0] ?? "?"}</span>
+      )}
     </span>
   );
 }

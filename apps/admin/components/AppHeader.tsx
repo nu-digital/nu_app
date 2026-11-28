@@ -43,7 +43,7 @@ export default function AppHeader({ displayName, onLogout, busy, showNav = true 
         <nav className="app-nav" aria-label="アプリ">
           <ul>
             {NAV.map((n) => {
-              const current = pathname === n.href || pathname.startsWith(n.href + "/") || (n.href === "/admin/users" && pathname.startsWith("/admin/"));
+              const current = pathname === n.href || pathname.startsWith(n.href + "/") || (n.href === "/admin/users" && pathname.startsWith("/admin/") && !pathname.startsWith("/admin/inventory")) || (n.href === "/inventory" && pathname.startsWith("/admin/inventory"));
               return (
                 <li key={n.href}>
                   <Link href={n.href} aria-current={current ? "page" : undefined}>

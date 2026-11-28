@@ -37,7 +37,7 @@ ORDER BY r.revision_no DESC;
 SELECT EXISTS (SELECT 1 FROM content_collaborators WHERE content_id = $1 AND user_id = $2);
 
 -- name: ListContentCollaborators :many
-SELECT c.user_id, COALESCE(p.display_name, '') AS display_name
+SELECT c.user_id, COALESCE(p.display_name, '') AS display_name, p.avatar_media_id
 FROM content_collaborators c LEFT JOIN profiles p ON p.user_id = c.user_id
 WHERE c.content_id = $1
 ORDER BY c.added_at, c.user_id;
@@ -61,7 +61,7 @@ INSERT INTO work_contributors (content_id, revision_id, user_id, role_label, sor
 VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: ListWorkContributors :many
-SELECT w.user_id, w.role_label, w.sort_order, COALESCE(p.display_name, '') AS display_name
+SELECT w.user_id, w.role_label, w.sort_order, COALESCE(p.display_name, '') AS display_name, p.avatar_media_id
 FROM work_contributors w LEFT JOIN profiles p ON p.user_id = w.user_id
 WHERE w.revision_id = $1
 ORDER BY w.sort_order, w.id;
@@ -75,15 +75,25 @@ FROM work_contributors src WHERE src.revision_id = @from_revision_id::uuid;
 -- 一覧。編集できる人（Editor以上・作者・共同編集者）には作業版の値、それ以外には**公開版の値だけ**を返す
 -- （公開中の記事の未公開の書き換えを、他のメンバーに見せない）。
 -- name: ListContents :many
-SELECT c.id, c.type, c.section, c.slug, c.updated_at, (c.published_revision_id IS NOT NULL)::boolean AS is_published,
+-- 一覧。編集できるものは作業版、そうでない公開中のものは**公開版の値だけ**を返す（カバー・日付・タイトルも同じ）。
+-- q: タイトルの部分一致。status: ''（すべて）・published（公開中）・draft（未公開）
+SELECT c.id, c.type, c.section, c.slug, c.updated_at, c.creator_user_id, (c.published_revision_id IS NOT NULL)::boolean AS is_published,
        v.can_edit::boolean AS can_edit,
        (CASE WHEN v.can_edit THEN w.title ELSE p.title END)::text AS title,
        (CASE WHEN v.can_edit THEN w.summary ELSE p.summary END)::text AS summary,
        (CASE WHEN v.can_edit THEN w.revision_no ELSE p.revision_no END)::integer AS revision_no,
+       (CASE WHEN v.can_edit THEN w.id ELSE p.id END)::uuid AS shown_revision_id,
+       (CASE WHEN v.can_edit THEN w.date_label ELSE p.date_label END)::text AS date_label,
+       (CASE WHEN v.can_edit THEN w.sort_date ELSE p.sort_date END)::date AS sort_date,
+       (CASE WHEN v.can_edit THEN cw.id ELSE cp.id END)::uuid AS cover_media_id,
+       COALESCE((CASE WHEN v.can_edit THEN cw.public_id ELSE cp.public_id END), '')::text AS cover_public_id,
+       COALESCE((CASE WHEN v.can_edit THEN w.metadata_json->>'image' ELSE p.metadata_json->>'image' END), '')::text AS legacy_image,
        (CASE WHEN v.can_edit AND c.published_revision_id IS NOT NULL THEN c.working_revision_id <> c.published_revision_id ELSE false END)::boolean AS has_unpublished_changes
 FROM contents c
 JOIN content_revisions w ON w.id = c.working_revision_id
 LEFT JOIN content_revisions p ON p.id = c.published_revision_id
+LEFT JOIN media_assets cw ON cw.id = w.cover_media_id AND cw.redacted_at IS NULL
+LEFT JOIN media_assets cp ON cp.id = p.cover_media_id AND cp.redacted_at IS NULL
 CROSS JOIN LATERAL (
     SELECT (@is_editor::boolean OR c.creator_user_id = @user_id
             OR EXISTS (SELECT 1 FROM content_collaborators cc WHERE cc.content_id = c.id AND cc.user_id = @user_id)) AS can_edit
@@ -92,9 +102,30 @@ WHERE (v.can_edit OR c.published_revision_id IS NOT NULL)
   AND (sqlc.narg('section')::text IS NULL OR c.section = sqlc.narg('section')::text)
   AND (NOT @mine::boolean OR c.creator_user_id = @user_id
        OR EXISTS (SELECT 1 FROM content_collaborators cc WHERE cc.content_id = c.id AND cc.user_id = @user_id))
+  AND (@q::text = '' OR (CASE WHEN v.can_edit THEN w.title ELSE p.title END) ILIKE '%' || @q || '%' ESCAPE '\')
+  AND (@status::text = '' OR (@status::text = 'published' AND c.published_revision_id IS NOT NULL) OR (@status::text = 'draft' AND c.published_revision_id IS NULL))
   AND (sqlc.narg('before_at')::timestamptz IS NULL OR (c.updated_at, c.id) < (sqlc.narg('before_at')::timestamptz, sqlc.narg('before_id')::uuid))
 ORDER BY c.updated_at DESC, c.id DESC
 LIMIT @lim;
+
+-- 作者のアバター（詳細用）
+-- name: GetAvatarMediaID :one
+SELECT avatar_media_id FROM profiles WHERE user_id = $1;
+
+-- 一覧に出す関わるメンバー: 作者と共同編集者（編集できる人にだけ使う）
+-- name: ListContentPeople :many
+SELECT c.id AS content_id, c.creator_user_id AS user_id, 0::int AS ord FROM contents c WHERE c.id = ANY(@ids::uuid[])
+UNION ALL
+SELECT cc.content_id, cc.user_id, 1::int FROM content_collaborators cc WHERE cc.content_id = ANY(@ids::uuid[])
+ORDER BY 1, 3;
+
+-- 一覧に出す関わるメンバー: 表示する版の制作メンバー
+-- name: ListContributorUsers :many
+SELECT revision_id, user_id FROM work_contributors WHERE revision_id = ANY(@rev_ids::uuid[]) ORDER BY revision_id, sort_order;
+
+-- 表示名とアバター（一覧用）。有効なユーザーだけ。
+-- name: ListProfileCards :many
+SELECT p.user_id, p.display_name, p.avatar_media_id FROM profiles p WHERE p.user_id = ANY(@ids::uuid[]);
 
 -- 公開・公開停止。書き込みのTx内でEditor以上かを読み直す（降格との競合を避けるため行を共有ロックする）。
 -- name: ActorRolesForShare :many

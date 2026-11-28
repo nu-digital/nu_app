@@ -10,6 +10,7 @@ const page = <T>(items: T[]) => ({ items, nextCursor: null });
 
 export function createMock(opts: MockOptions = {}) {
   const db = seed();
+  let uploadSeq = 0;
   const isAdmin = (r: Role) => r === "admin" || r === "owner";
   const isEditor = (r: Role) => r !== "member";
 
@@ -28,6 +29,11 @@ export function createMock(opts: MockOptions = {}) {
       if (!role) return err(401, "UNAUTHENTICATED", "ログインしてください。");
       const hue = p.includes("camera") ? 200 : p.includes("vr") ? 280 : 20;
       return { status: 200, contentType: "image/svg+xml", raw: `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue},70%,62%)"/><stop offset="1" stop-color="hsl(${hue + 40},70%,40%)"/></linearGradient></defs><rect width="400" height="300" fill="url(#g)"/></svg>` };
+    }
+
+    // 公式サイトの画像（既存記事の /images/…。プレビューの中継先）。色つきの図で代用する
+    if (p.startsWith("/web/images/") && method === "GET") {
+      return { status: 200, contentType: "image/svg+xml", raw: `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="hsl(150,45%,60%)"/><text x="300" y="210" font-size="28" text-anchor="middle" fill="#fff">site image</text></svg>` };
     }
 
     // 認証
@@ -93,23 +99,81 @@ export function createMock(opts: MockOptions = {}) {
     }
 
     // 物品
+    const countCategories = () => { for (const c of db.categories) c.itemCount = db.items.filter((i) => i.categoryId === c.id && !i.archived).length; };
+    if (p === "/inventory/categories" && method === "GET") { countCategories(); return { status: 200, json: { items: db.categories } }; }
+    if (p.startsWith("/inventory/categories")) {
+      if (!isAdmin(role)) return forbidden();
+      countCategories();
+      if (p === "/inventory/categories" && method === "POST") {
+        const name = String(b.name ?? "").trim();
+        if (!name) return err(422, "INVALID_INPUT", "カテゴリ名は1〜30文字で入力してください");
+        if (db.categories.some((c) => c.name === name)) return err(409, "NAME_TAKEN", "同じ名前のカテゴリが既にあります");
+        const c = { id: `cat-${Date.now()}`, name, sortOrder: Math.max(0, ...db.categories.map((x) => x.sortOrder)) + 10, itemCount: 0 };
+        db.categories.push(c);
+        return { status: 201, json: c };
+      }
+      if (p === "/inventory/categories/order" && method === "PUT") {
+        const ids = (b.ids as string[]) ?? [];
+        ids.forEach((id, i) => { const c = db.categories.find((x) => x.id === id); if (c) c.sortOrder = (i + 1) * 10; });
+        db.categories.sort((x, y) => x.sortOrder - y.sortOrder);
+        return { status: 200, json: { items: db.categories } };
+      }
+      if ((m = p.match(/^\/inventory\/categories\/([^/]+)$/))) {
+        const c = db.categories.find((x) => x.id === m![1]);
+        if (!c) return err(404, "NOT_FOUND", "見つかりません");
+        if (method === "PATCH") {
+          const name = String(b.name ?? "").trim();
+          if (db.categories.some((x) => x.name === name && x.id !== c.id)) return err(409, "NAME_TAKEN", "同じ名前のカテゴリが既にあります");
+          c.name = name;
+          db.items.filter((i) => i.categoryId === c.id).forEach((i) => { i.category = name; });
+          return { status: 200, json: c };
+        }
+        if (method === "DELETE") {
+          if (db.categories.length <= 1) return err(409, "LAST_CATEGORY", "最後のカテゴリは削除できません");
+          const inUse = db.items.filter((i) => i.categoryId === c.id);
+          const to = db.categories.find((x) => x.id === q.get("moveTo") && x.id !== c.id);
+          if (inUse.length && !to) return err(409, "IN_USE", `使われているカテゴリです（${inUse.length}件）。移し先のカテゴリを選んでください`);
+          if (to) inUse.forEach((i) => { i.categoryId = to.id; i.category = to.name; });
+          db.categories.splice(db.categories.indexOf(c), 1);
+          return { status: 204 };
+        }
+      }
+    }
     if (p === "/inventory/items" && method === "GET") {
-      const s = (q.get("q") ?? "").trim(), cat = q.get("category"), avail = q.get("available") === "true";
-      const items = db.items.filter((x) => (!s || [x.name, x.location, x.category].some((v) => v.includes(s))) && (!cat || x.category === cat) && (!avail || x.available > 0));
-      return { status: 200, json: { ...page(list(items)), categories: [...new Set(db.items.map((x) => x.category))] } };
+      const s = (q.get("q") ?? "").trim(), cat = q.get("category"), catId = q.get("categoryId"), avail = q.get("available") === "true", mine = q.get("mine") === "true", sort = q.get("sort");
+      const items = db.items.filter((x) => !x.archived && (!s || [x.name, x.location, x.category, x.description].some((v) => v.includes(s))) && (!cat || x.category === cat) && (!catId || x.categoryId === catId) && (!avail || x.available > 0) && (!mine || x.borrowedByMe > 0));
+      if (sort === "available") items.sort((x, y) => y.available - x.available);
+      countCategories();
+      return { status: 200, json: { ...page(list(items)), categories: [...new Set(db.items.map((x) => x.category))], categoryList: db.categories } };
     }
     if (p === "/inventory/items" && method === "POST") {
       if (!isAdmin(role)) return forbidden();
-      const it = { id: `i-${Date.now()}`, name: String(b.name), description: String(b.description ?? ""), category: String(b.category ?? ""), location: String(b.location ?? ""), mode: b.mode === "individual" ? "individual" as const : "quantity" as const, totalQuantity: Number(b.totalQuantity ?? 0), outstanding: 0, unitCount: 0, available: Number(b.totalQuantity ?? 0), archived: false, photoMediaId: null };
+      const cat = db.categories.find((c) => c.id === b.categoryId) ?? db.categories.find((c) => c.name === b.category) ?? db.categories[db.categories.length - 1];
+      const it = { id: `i-${Date.now()}`, name: String(b.name), description: String(b.description ?? ""), category: cat.name, categoryId: cat.id, location: String(b.location ?? ""), mode: b.mode === "individual" ? "individual" as const : "quantity" as const, totalQuantity: Number(b.totalQuantity ?? 0), outstanding: 0, unitCount: 0, available: Number(b.totalQuantity ?? 0), archived: false, photoMediaId: null, borrowedByMe: 0 };
       db.items.push(it);
       return { status: 201, json: it };
+    }
+    if ((m = p.match(/^\/inventory\/items\/([^/]+)\/images$/)) && method === "PUT") {
+      if (!isAdmin(role)) return forbidden();
+      const ids = ((b.mediaIds as string[]) ?? []).slice(0, 8);
+      db.images[m[1]] = ids;
+      const it = db.items.find((x) => x.id === m![1]);
+      if (it) it.photoMediaId = ids[0] ?? null;
+      return { status: 200, json: { images: ids } };
     }
     if ((m = p.match(/^\/inventory\/items\/([^/]+)$/))) {
       const it = db.items.find((x) => x.id === m![1]);
       if (!it) return err(404, "NOT_FOUND", "物品が見つかりません。");
-      if (method === "PATCH") { if (!isAdmin(role)) return forbidden(); Object.assign(it, b); return { status: 200, json: it }; }
-      const loans = it.mode === "quantity" ? db.loans.filter((l) => l.itemId === it.id).map((l) => ({ id: l.id, borrowerDisplayName: l.borrowerDisplayName, quantity: l.quantity, borrowedAt: l.borrowedAt, elapsedDays: l.elapsedDays })) : [];
-      return { status: 200, json: { ...it, units: db.units[it.id] ?? [], loans } };
+      if (method === "PATCH") {
+        if (!isAdmin(role)) return forbidden();
+        const cat = db.categories.find((c) => c.id === b.categoryId);
+        if (cat) { it.categoryId = cat.id; it.category = cat.name; }
+        const { categoryId, category, ...rest } = b; void categoryId; void category;
+        Object.assign(it, rest);
+        return { status: 200, json: it };
+      }
+      const loans = it.mode === "quantity" ? db.loans.filter((l) => l.itemId === it.id).map((l) => ({ id: l.id, borrowerDisplayName: l.borrowerDisplayName, quantity: l.quantity, borrowedAt: l.borrowedAt, elapsedDays: l.elapsedDays, mine: l.mine })) : [];
+      return { status: 200, json: { ...it, images: db.images[it.id] ?? [], units: db.units[it.id] ?? [], loans } };
     }
     if (p === "/inventory/loans" && method === "GET") {
       const mine = q.get("mine") === "true";
@@ -154,11 +218,12 @@ export function createMock(opts: MockOptions = {}) {
 
     // CMS
     if (p === "/contents" && method === "GET") {
-      const sec = q.get("section"), mine = q.get("mine") === "true";
-      return { status: 200, json: page(list(db.contents.filter((c) => (!sec || c.section === sec) && (!mine || c.canEdit)))) };
+      const sec = q.get("section"), mine = q.get("mine") === "true", s = (q.get("q") ?? "").trim(), st = q.get("status");
+      return { status: 200, json: page(list(db.contents.filter((c) => (!sec || c.section === sec) && (!mine || c.canEdit) && (!s || c.title.includes(s)) && (!st || (st === "published" ? c.isPublished : !c.isPublished))))) };
     }
     if (p === "/contents" && method === "POST") {
-      const c = { id: `c-${Date.now()}`, type: b.type === "project" ? "project" as const : "article" as const, section: (b.section as "blog") ?? "blog", slug: String(b.slug), title: String(b.title), summary: "", revisionNo: 1, isPublished: false, canEdit: true, hasUnpublishedChanges: true, updatedAt: db.now };
+      const c = { id: `c-${Date.now()}`, type: b.type === "project" ? "project" as const : "article" as const, section: (b.section as "blog") ?? "blog", slug: String(b.slug), title: String(b.title), summary: "", revisionNo: 1, isPublished: false, canEdit: true, hasUnpublishedChanges: true, updatedAt: db.now,
+        dateLabel: String((b.date as { label?: string } | undefined)?.label ?? ""), sortDate: ((b.date as { sortDate?: string | null } | undefined)?.sortDate ?? null), coverUrl: null, members: [db.contents[0].members[0]] };
       db.contents.unshift(c);
       return { status: 201, json: db.contentDetail(c) };
     }
@@ -170,10 +235,18 @@ export function createMock(opts: MockOptions = {}) {
       if (action === "publish") { c.isPublished = true; c.hasUnpublishedChanges = false; }
       if (action === "unpublish") c.isPublished = false;
       if (action === "revisions") { c.revisionNo += 1; c.title = String(b.title ?? c.title); c.hasUnpublishedChanges = true; return { status: 201, json: db.contentDetail(c) }; }
-      if (action === "collaborators") return { status: 200, json: { collaborators: db.contentDetail(c).collaborators } };
+      if (action === "collaborators" && method === "PUT") {
+        db.collabs[c.id] = ((b.userIds as string[]) ?? []).map((id) => { const u = db.members.find((x) => x.id === id); return { userId: id, displayName: u?.displayName ?? id, avatarMediaId: u?.avatarMediaId ?? null }; });
+        return { status: 200, json: { collaborators: db.collabs[c.id] } };
+      }
+      if (action === "contributors" && method === "PUT") {
+        db.contribs[c.id] = ((b.contributors as { userId: string; roleLabel: string }[]) ?? []).map((x) => { const u = db.members.find((y) => y.id === x.userId); return { userId: x.userId, displayName: u?.displayName ?? x.userId, avatarMediaId: u?.avatarMediaId ?? null, roleLabel: x.roleLabel }; });
+        c.revisionNo += 1; c.hasUnpublishedChanges = true;
+        return { status: 201, json: db.contentDetail(c) };
+      }
       return { status: 200, json: db.contentDetail(c) };
     }
-    if (p === "/media" && method === "POST") return { status: 201, json: { id: "m-uploaded", publicUrl: "", url: "/api/v1/media/m-uploaded", publicId: "mockpublicid0000000000", width: 400, height: 300, mimeType: "image/webp", byteSize: 1000, purpose: q.get("purpose") ?? "cms" } };
+    if (p === "/media" && method === "POST") { const id = `m-uploaded-${++uploadSeq}`; return { status: 201, json: { id, publicUrl: `/api/v1/public/media/mockpublicid${String(uploadSeq).padStart(10, "0")}`, url: `/api/v1/media/${id}`, publicId: "mockpublicid0000000000", width: 400, height: 300, mimeType: "image/webp", byteSize: 1000, purpose: q.get("purpose") ?? "cms" } }; }
 
     // 既存記事の投稿者・公開版の確認
     if (p === "/admin/legacy-authors") return { status: 200, json: { items: list(db.legacyAuthors) } };
