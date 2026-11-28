@@ -48,7 +48,7 @@ scripts/go-docker.sh services/api sh -c 'test -z "$(gofmt -l .)" && go vet ./...
 
 ## migration
 
-`db/migrations/`のSQLを`db/Dockerfile`のgooseで適用する。`00001_baseline.sql`から`00021`まで（2026-11-28時点）。再実行は「no migrations to run」で安全に終わる。本番では、デプロイ時に`migrate`サービスが`up`を実行する（前進のみ。[OPERATIONS](OPERATIONS.md)「DBの互換性のルール」）。
+`db/migrations/`のSQLを`db/Dockerfile`のgooseで適用する。`00001_baseline.sql`から`00022`まで（2026-11-28時点）。再実行は「no migrations to run」で安全に終わる。本番では、デプロイ時に`migrate`サービスが`up`を実行する（前進のみ。[OPERATIONS](OPERATIONS.md)「DBの互換性のルール」）。
 
 ## CI・GitHub Actions（固定）
 

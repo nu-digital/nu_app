@@ -204,6 +204,7 @@ type InventoryCategory struct {
 	Name      string
 	SortOrder int32
 	CreatedAt pgtype.Timestamptz
+	IsSystem  bool
 }
 
 type InventoryCorrectionEvent struct {
@@ -266,6 +267,7 @@ type InventoryReturn struct {
 	ActorUserID pgtype.UUID
 	Quantity    int32
 	ReturnedAt  pgtype.Timestamptz
+	Location    string
 }
 
 type InventoryReturnsEff struct {

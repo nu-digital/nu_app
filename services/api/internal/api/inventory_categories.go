@@ -17,13 +17,40 @@ import (
 
 // 物品のカテゴリ管理（UI/UX大改善。docs/design/ui-overhaul.md §5.1）。
 // 一覧は全メンバー、追加・名称変更・並び替え・削除は管理者（Admin/Owner）だけ。
-// 使用中のカテゴリは、移し先（moveTo）を指定したときだけ削除でき、物品は消えずに移る。
+// 削除すると、使っていた物品は自動で「その他」（システムカテゴリ。削除・名前変更はできない）へ移る。移し先（moveTo）は任意。
 
 type categoryView struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	SortOrder int32  `json:"sortOrder"`
 	ItemCount int64  `json:"itemCount"` // 使用中（廃止していない）の物品の数
+	System    bool   `json:"system"`    // 「その他」。削除・名前変更できない（削除したカテゴリの物品の移し先）
+}
+
+// otherCategoryName は、削除したカテゴリの物品を自動で移す先の名前。
+const otherCategoryName = "その他"
+
+// ensureOtherCategory は、システムカテゴリ（その他）を返す。無ければ（名前を変えた・消した環境でも）作るか、同名のカテゴリに印を付ける。
+func ensureOtherCategory(ctx context.Context, q *store.Queries) (store.InventoryCategory, error) {
+	c, err := q.GetSystemCategory(ctx)
+	if err == nil {
+		return c, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return c, err
+	}
+	c, err = q.GetCategoryByName(ctx, otherCategoryName)
+	if errors.Is(err, pgx.ErrNoRows) {
+		c, err = q.CreateCategory(ctx, otherCategoryName)
+	}
+	if err != nil {
+		return c, err
+	}
+	if err := q.MarkCategorySystem(ctx, c.ID); err != nil {
+		return c, err
+	}
+	c.IsSystem = true
+	return c, nil
 }
 
 const maxCategories = 50
@@ -35,7 +62,7 @@ func (s *server) categoryViews(ctx context.Context, q *store.Queries) ([]categor
 	}
 	out := make([]categoryView, 0, len(rows))
 	for _, c := range rows {
-		out = append(out, categoryView{ID: c.ID.String(), Name: c.Name, SortOrder: c.SortOrder, ItemCount: c.ItemCount})
+		out = append(out, categoryView{ID: c.ID.String(), Name: c.Name, SortOrder: c.SortOrder, ItemCount: c.ItemCount, System: c.IsSystem})
 	}
 	return out, nil
 }
@@ -136,7 +163,11 @@ func (s *server) renameCategory(w http.ResponseWriter, r *http.Request) {
 	}
 	var out categoryView
 	err = s.inTx(r.Context(), func(q *store.Queries, tx pgx.Tx) error {
-		if _, err := q.GetCategoryForUpdate(r.Context(), id); err != nil {
+		cur, err := q.GetCategoryForUpdate(r.Context(), id)
+		if err == nil && cur.IsSystem {
+			return &errTx{http.StatusConflict, "SYSTEM_CATEGORY", "「" + cur.Name + "」は物品の移し先として使うため、名前を変えられません"}
+		}
+		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return &errTx{http.StatusNotFound, "NOT_FOUND", "見つかりません"}
 			}
@@ -215,8 +246,9 @@ func (s *server) reorderCategories(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]any{"items": cv})
 }
 
-// deleteCategory は DELETE /inventory/categories/{id}?moveTo=<カテゴリID>（Admin）。
-// 物品（廃止したものを含む）が使っているときは、moveTo を指定したときだけ、物品を移してから削除する。最後の1件は削除できない。
+// deleteCategory は DELETE /inventory/categories/{id}（Admin。?moveTo=<カテゴリID> は任意）。
+// 使われていなければそのまま削除する。物品（廃止したものを含む）が使っていれば、自動で「その他」へ移してから削除する（貸出の履歴は物品IDで残る）。
+// 「その他」（システムカテゴリ）は削除できない。
 func (s *server) deleteCategory(w http.ResponseWriter, r *http.Request) {
 	a, ok := s.authorize(w, r, "inventory.categories.delete", authz.Resource{})
 	if !ok {
@@ -227,50 +259,55 @@ func (s *server) deleteCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	moveTo := strings.TrimSpace(r.URL.Query().Get("moveTo"))
+	var movedTo string
 	err := s.inTx(r.Context(), func(q *store.Queries, tx pgx.Tx) error {
 		if err := q.LockCategories(r.Context()); err != nil {
 			return err
 		}
-		if _, err := q.GetCategory(r.Context(), id); err != nil {
+		cur, err := q.GetCategory(r.Context(), id)
+		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return &errTx{http.StatusNotFound, "NOT_FOUND", "見つかりません"}
 			}
 			return err
 		}
-		list, err := q.ListCategories(r.Context())
+		if cur.IsSystem {
+			return &errTx{http.StatusConflict, "SYSTEM_CATEGORY", "「" + cur.Name + "」は物品の移し先として使うため、削除できません"}
+		}
+		active, err := q.CountItemsInCategory(r.Context(), id)
 		if err != nil {
 			return err
 		}
-		if len(list) <= 1 {
-			return &errTx{http.StatusConflict, "LAST_CATEGORY", "最後のカテゴリは削除できません"}
-		}
-		n, err := q.CountItemsInCategory(r.Context(), id)
+		all, err := q.CountAllItemsInCategory(r.Context(), id)
 		if err != nil {
 			return err
 		}
-		if n > 0 {
-			if moveTo == "" {
-				return &errTx{http.StatusConflict, "IN_USE", "使われているカテゴリです（" + itoa(int(n)) + "件）。移し先のカテゴリを選んでください"}
-			}
-			var to pgtype.UUID
-			if err := to.Scan(moveTo); err != nil || !to.Valid || to == id {
-				return invalid("移し先のカテゴリが不正です")
-			}
-			dest, err := q.GetCategory(r.Context(), to)
-			if err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					return invalid("移し先のカテゴリが見つかりません")
+		if all > 0 {
+			var dest store.InventoryCategory
+			if moveTo != "" {
+				var to pgtype.UUID
+				if err := to.Scan(moveTo); err != nil || !to.Valid || to == id {
+					return invalid("移し先のカテゴリが不正です")
 				}
+				dest, err = q.GetCategory(r.Context(), to)
+				if err != nil {
+					if errors.Is(err, pgx.ErrNoRows) {
+						return invalid("移し先のカテゴリが見つかりません")
+					}
+					return err
+				}
+			} else if dest, err = ensureOtherCategory(r.Context(), q); err != nil {
 				return err
 			}
-			if err := q.MoveItemsToCategory(r.Context(), store.MoveItemsToCategoryParams{CategoryID: id, CategoryID_2: to, Category: dest.Name}); err != nil {
+			if err := q.MoveItemsToCategory(r.Context(), store.MoveItemsToCategoryParams{CategoryID: id, CategoryID_2: dest.ID, Category: dest.Name}); err != nil {
 				return err
 			}
+			movedTo = dest.Name
 		}
 		if err := q.DeleteCategory(r.Context(), id); err != nil {
 			return err
 		}
-		return s.auditEvent(r.Context(), q, a.Identity.UserID, a.Identity.UserID, "inventory.category_deleted", map[string]any{"categoryId": id.String(), "moved": n})
+		return s.auditEvent(r.Context(), q, a.Identity.UserID, a.Identity.UserID, "inventory.category_deleted", map[string]any{"categoryId": id.String(), "moved": active, "movedTo": movedTo})
 	})
 	if err != nil {
 		s.writeTxErr(w, r, err)

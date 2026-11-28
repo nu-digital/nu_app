@@ -453,20 +453,26 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] 残り0になると借りるボタンが出ず、案内が出る`, (await pb.getByRole('button', { name: /個借りる$/ }).count()) === 0 && /借りられる数がありません/.test(await pb.locator('main').innerText()));
       const aRow = pb.locator('li.item').filter({ hasText: aName });
       await aRow.waitFor();
-      await aRow.getByLabel(`${aName}さんの分の返却数`, { exact: true }).fill('1');
-      await aRow.getByRole('button', { name: '返却する' }).click();
+      await aRow.getByRole('button', { name: '代わりに返す' }).click();
+      const retDlg = pb.getByRole('dialog');
+      check(`[${label}] 返却ダイアログの返却場所の初期値は現在の保管場所`, (await retDlg.getByLabel('返却場所').inputValue()) !== '');
+      await retDlg.getByLabel('返す数', { exact: true }).fill('1');
+      await retDlg.getByLabel('返却場所').fill(`倉庫B(${label})`);
+      await retDlg.getByRole('button', { name: '返却する' }).click();
       await pb.locator('.ui-toast.success').filter({ hasText: '1個返却しました' }).waitFor();
+      await pb.getByTestId('item-location').filter({ hasText: `倉庫B(${label})` }).waitFor();
+      check(`[${label}] 返却場所を入力すると、物品の保管場所に反映される`, (await pb.getByTestId('item-location').innerText()) === `倉庫B(${label})`);
       check(`[${label}] 他人の貸出を代理で一部返却でき、残りが1になる`, /残り 1/.test(await pb.locator('.stock').innerText()) && /1個/.test(await pb.locator('li.item').filter({ hasText: aName }).innerText()));
 
       // 個体管理: Aが個体1を借りる。同じ個体は他の人に借りるボタンが出ない
       await pa.goto(`${adminUrl}/inventory/${pi.json.id}`);
       const unit1 = pa.locator(`li.item[data-tag="PICO-${label}-01"]`);
-      await unit1.getByRole('button', { name: 'この個体を借りる' }).click();
+      await unit1.getByRole('button', { name: '借りる', exact: true }).click();
       await pa.locator('.ui-toast.success').filter({ hasText: `PICO-${label}-01 を借りました` }).waitFor();
       await pb.goto(`${adminUrl}/inventory/${pi.json.id}`);
       const u1b = pb.locator(`li.item[data-tag="PICO-${label}-01"]`);
       await u1b.waitFor();
-      check(`[${label}] 貸出中の個体は借りた人が見え、借りるボタンが出ない`, (await u1b.getByRole('button').count()) === 0 && (await u1b.innerText()).includes(aName) && (await pb.locator(`li.item[data-tag="PICO-${label}-02"]`).getByRole('button', { name: 'この個体を借りる' }).count()) === 1);
+      check(`[${label}] 貸出中の個体は借りた人が見え、借りるボタンが出ない`, (await u1b.getByRole('button').count()) === 0 && (await u1b.innerText()).includes(aName) && (await pb.locator(`li.item[data-tag="PICO-${label}-02"]`).getByRole('button', { name: '借りる', exact: true }).count()) === 1);
 
       // 貸出中の一覧: 「自分だけ」と返却
       await pa.goto(`${adminUrl}/inventory/loans`);
@@ -484,6 +490,30 @@ export async function runAdminUiE2E(o) {
       await pa.locator('.notice.success').filter({ hasText: '返却しました' }).waitFor();
       await pa.locator('li.item[data-loan]').filter({ hasText: `PICO-${label}-01` }).first().waitFor({ state: 'detached' });
       check(`[${label}] 貸出中の一覧から個体を返却すると一覧から消える`, (await pa.locator('li.item[data-loan]').filter({ hasText: `PICO-${label}-01` }).count()) === 0);
+
+      // 個体管理の返却も、詳細画面からできる（別の画面へ移動しない）
+      await pa.goto(`${adminUrl}/inventory/${pi.json.id}`);
+      const unit2 = pa.locator(`li.item[data-tag="PICO-${label}-02"]`);
+      await unit2.getByRole('button', { name: '借りる', exact: true }).click();
+      await pa.locator('.ui-toast.success').filter({ hasText: `PICO-${label}-02 を借りました` }).waitFor();
+      await unit2.getByRole('button', { name: '返す', exact: true }).click();
+      await pa.getByRole('dialog').getByLabel('返却場所').fill(`棚Z(${label})`);
+      await pa.getByRole('dialog').getByRole('button', { name: '返却する' }).click();
+      await pa.locator('.ui-toast.success').filter({ hasText: '返却しました' }).waitFor();
+      await unit2.getByRole('button', { name: '借りる', exact: true }).waitFor();
+      check(`[${label}] 個体も詳細画面から返却でき、返却場所が保管場所になる`, (await pa.getByTestId('item-location').innerText()) === `棚Z(${label})`);
+
+      // 状態の絞り込み（貸出可能／貸出中／自分が借りている）。解除で全件
+      await pa.goto(`${adminUrl}/inventory`);
+      await pa.locator('.item-card').first().waitFor();
+      const allCards = await pa.locator('.item-card').count();
+      await pa.getByRole('button', { name: '貸出中', exact: true }).click();
+      await pa.waitForFunction((n) => document.querySelectorAll('.item-card').length < n, allCards);
+      const loanedNames = await pa.locator('.item-card').allInnerTexts();
+      check(`[${label}] 「貸出中」で絞り込める`, loanedNames.length >= 1 && loanedNames.every((t) => /貸出中/.test(t)), JSON.stringify(loanedNames));
+      await pa.getByRole('button', { name: '貸出中', exact: true }).click();
+      await pa.waitForFunction((n) => document.querySelectorAll('.item-card').length === n, allCards);
+      check(`[${label}] 絞り込みを解除すると全件に戻る`, (await pa.locator('.item-card').count()) === allCards);
 
       // 履歴
       await pa.goto(`${adminUrl}/inventory/history`);
@@ -612,8 +642,9 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] カテゴリの管理に横溢れがない・操作対象が44px以上`, (await overflowOf(page)) <= 0 && (await smallOf(page)) === 0, `overflow=${await overflowOf(page)} small=${await smallOf(page)}`);
       if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-inventory-categories.png`), fullPage: true });
       await page.locator('li.item', { hasText: '機材' }).first().getByRole('button', { name: '削除' }).click();
-      check(`[${label}] 使用中のカテゴリの削除では、移し先の選択が出る`, (await page.getByLabel('移し先のカテゴリ').count()) === 1);
+      check(`[${label}] 使用中のカテゴリの削除では、移し先を選ばせず「その他」へ移る案内が出る`, (await page.getByLabel('移し先のカテゴリ').count()) === 0 && /「その他」へ移ります/.test(await page.getByRole('dialog').innerText()));
       await page.getByRole('dialog').getByRole('button', { name: 'キャンセル' }).click();
+      check(`[${label}] 「その他」は削除も名前変更もできない`, (await page.locator('li.item[data-name="その他"]').getByRole('button', { name: '削除' }).isDisabled()) && (await page.locator('li.item[data-name="その他"]').getByRole('button', { name: '名前を変える' }).isDisabled()));
       await page.locator(`li.item[data-name="${cn}改"]`).getByRole('button', { name: '削除' }).click();
       await page.getByRole('dialog').getByRole('button', { name: '削除する' }).click();
       await page.locator(`li.item[data-name="${cn}改"]`).waitFor({ state: 'detached' });
@@ -657,14 +688,14 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] 一般メンバーの履歴に訂正の導線と訂正の理由が出ない`, (await mp2.getByRole('button', { name: 'この記録を訂正する' }).count()) === 0 && !mtext.includes('誤って登録されたため'));
       await mctx2.close();
 
-      // 廃止: 貸出が無ければ廃止でき、一覧から消える
+      // 削除（廃止）: 貸出が無ければ削除でき、一覧から消える
       await page.goto(`${adminUrl}/admin/inventory/${qid}`);
       await page.getByRole('heading', { level: 1, name: qn }).waitFor();
       page.once('dialog', (d) => d.accept());
-      await page.getByRole('button', { name: '廃止する' }).click();
+      await page.getByRole('button', { name: '削除する' }).click();
       await page.waitForURL('**/admin/inventory');
       await page.locator(`li.item[data-name="${inn}"]`).waitFor();
-      check(`[${label}] 廃止した物品は管理の一覧から消える`, (await page.locator(`li.item[data-name="${qn}"]`).count()) === 0);
+      check(`[${label}] 削除した物品は管理の一覧から消える`, (await page.locator(`li.item[data-name="${qn}"]`).count()) === 0);
       await ctx.close();
     }
     // 通知の設定（Admin/Owner。PC・スマホ・320px）

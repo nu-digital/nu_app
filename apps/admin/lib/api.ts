@@ -202,23 +202,25 @@ export type Item = {
   /** 自分が借りている未返却の数（0なら借りていない） */
   borrowedByMe: number;
 };
-export type Category = { id: string; name: string; sortOrder: number; itemCount: number };
-export type ItemUnit = { id: string; assetTag: string; serialNumber: string | null; state: string; mine: boolean; loaned: { borrowerDisplayName: string; since: string; elapsedDays: number } | null };
+/** system: 「その他」。削除・名前変更できない（削除したカテゴリの物品の移し先） */
+export type Category = { id: string; name: string; sortOrder: number; itemCount: number; system?: boolean };
+export type ItemUnit = { id: string; assetTag: string; serialNumber: string | null; state: string; mine: boolean; loanId?: string; loaned: { borrowerDisplayName: string; since: string; elapsedDays: number } | null };
 export type ItemLoan = { id: string; borrowerDisplayName: string; quantity: number; borrowedAt: string; elapsedDays: number; mine: boolean };
 export type ItemDetail = Item & { images: string[]; units: ItemUnit[]; loans: ItemLoan[] };
 export type OutstandingLoan = { id: string; itemId: string; itemName: string; assetTag: string; borrowerDisplayName: string; quantity: number; borrowedAt: string; elapsedDays: number; mine: boolean };
 export type HistoryEvent = {
   id: string; kind: "loan" | "return" | "correction"; itemId: string; itemName: string; assetTag: string; borrowerDisplayName: string; actorDisplayName: string;
-  quantity: number; at: string; correctionKind?: string; targetType?: string; reason?: string;
+  quantity: number; at: string; correctionKind?: string; targetType?: string; reason?: string; location?: string;
 };
 
 export type ItemSort = "name" | "newest" | "available";
-export async function listItems(p: { q?: string; category?: string; categoryId?: string; available?: boolean; mine?: boolean; sort?: ItemSort; cursor?: string }) {
+export async function listItems(p: { q?: string; category?: string; categoryId?: string; available?: boolean; loaned?: boolean; mine?: boolean; sort?: ItemSort; cursor?: string }) {
   const params = new URLSearchParams({ limit: "50" });
   if (p.q) params.set("q", p.q);
   if (p.category) params.set("category", p.category);
   if (p.categoryId) params.set("categoryId", p.categoryId);
   if (p.available) params.set("available", "true");
+  if (p.loaned) params.set("loaned", "true");
   if (p.mine) params.set("mine", "true");
   if (p.sort && p.sort !== "name") params.set("sort", p.sort);
   if (p.cursor) params.set("cursor", p.cursor);
@@ -227,8 +229,9 @@ export async function listItems(p: { q?: string; category?: string; categoryId?:
 export const getItem = async (id: string) => ok<ItemDetail>(await call("GET", `/inventory/items/${id}`), 200);
 export const createLoan = async (body: { itemId: string; quantity?: number; unitId?: string }) =>
   ok<{ id: string; quantity: number; remaining: number }>(await call("POST", "/inventory/loans", body), 201);
-export const returnLoan = async (loanId: string, quantity?: number) =>
-  ok<{ returned: number; outstanding: number }>(await call("POST", `/inventory/loans/${loanId}/returns`, quantity === undefined ? undefined : { quantity }), 200);
+/** 返却する。location は返却した場所（任意。入力すると物品の保管場所にも反映される）。 */
+export const returnLoan = async (loanId: string, quantity?: number, location?: string) =>
+  ok<{ returned: number; outstanding: number }>(await call("POST", `/inventory/loans/${loanId}/returns`, quantity === undefined && !location ? undefined : { ...(quantity === undefined ? {} : { quantity }), ...(location ? { location } : {}) }), 200);
 export async function listLoans(p: { mine?: boolean; q?: string; cursor?: string }) {
   const params = new URLSearchParams({ limit: "50" });
   if (p.mine) params.set("mine", "true");

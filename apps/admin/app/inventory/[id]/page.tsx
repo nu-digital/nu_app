@@ -10,6 +10,7 @@ import MediaImg from "@/components/MediaImg";
 import Notice from "@/components/Notice";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import Dialog from "@/components/ui/Dialog";
 import { Loading } from "@/components/ui/States";
 import { useToast } from "@/components/ui/Toast";
 import { createLoan, describe, getItem, returnLoan, type ItemDetail } from "@/lib/api";
@@ -57,7 +58,8 @@ function Detail() {
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [qty, setQty] = useState(1);
-  const [retQty, setRetQty] = useState<Record<string, number>>({});
+  // 返却ダイアログ（借りた人でなくても返せる。返却場所の初期値は現在の保管場所）
+  const [ret, setRet] = useState<{ loanId: string; label: string; max: number; qty: number; location: string; proxy: boolean } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -94,6 +96,19 @@ function Detail() {
   const myLoans = it.loans.filter((l) => l.mine);
   const otherLoans = it.loans.filter((l) => !l.mine);
   const qtyNow = Math.min(qty, Math.max(1, max));
+  const openReturn = (loanId: string, label: string, maxQty: number, proxy: boolean) => setRet({ loanId, label, max: maxQty, qty: maxQty, location: it.location, proxy });
+  const submitReturn = () => {
+    if (!ret) return;
+    const r = ret;
+    const place = r.location.trim();
+    setRet(null);
+    void act(async () => {
+      const res = await returnLoan(r.loanId, r.max > 1 ? r.qty : undefined, place || undefined);
+      const n = r.max > 1 ? `${r.qty}個` : "";
+      return `${n}返却しました${place ? `（返却場所: ${place}）` : ""}${res.outstanding > 0 ? `。未返却は${res.outstanding}個です` : ""}。`;
+    });
+  };
+  const mineTotal = s.mine;
 
   return (
     <main className="page wide item-detail">
@@ -101,28 +116,38 @@ function Detail() {
       <div className="detail-grid">
         <Gallery name={it.name} images={it.images} />
         <div className="detail-main">
-          <p className="meta">{[it.category, it.location].filter(Boolean).join(" ・ ")}</p>
+          <p className="meta">{it.category}</p>
           <h1>{it.name}</h1>
           <ItemStatusBadges item={it} />
+          <p className="location-line"><span className="label">保管場所</span> <strong data-testid="item-location">{it.location || "未設定"}</strong></p>
           {it.description && <p className="bio">{it.description}</p>}
           {msg && <Notice kind="error">{msg}</Notice>}
 
           <section className="borrow-box" aria-labelledby="stock-title">
-            <h2 id="stock-title">{it.mode === "quantity" ? "借りる" : "個体を選んで借りる"}</h2>
             {it.mode === "quantity" ? (
               <>
+                <h2 id="stock-title">{mineTotal > 0 ? (s.available > 0 ? "借りる・返す" : "返す") : s.available > 0 ? "借りる" : "貸出中"}</h2>
                 <p className="stock"><strong>残り {s.available}個</strong> / 全{s.total}個{it.outstanding > 0 ? `（貸出中 ${it.outstanding}個）` : ""}</p>
                 {s.available > 0 ? (
                   <form className="borrow-form" onSubmit={(e) => { e.preventDefault(); void act(async () => { const r = await createLoan({ itemId: it.id, quantity: qtyNow }); setQty(1); return `${qtyNow}個借りました。残りは${r.remaining}個です。`; }); }}>
                     {max > 1 && <Stepper id="qty" label="借りる数" value={qtyNow} min={1} max={max} onChange={setQty} />}
-                    <Button fullWidth={false} type="submit" disabled={busy}>{qtyNow}個借りる</Button>
+                    <Button fullWidth={false} type="submit" disabled={busy}>{mineTotal > 0 ? "追加で" : ""}{qtyNow}個借りる</Button>
                   </form>
-                ) : (
-                  <p className="hint">いま借りられる数がありません。返却されるまでお待ちください。</p>
+                ) : mineTotal === 0 && <p className="hint">いま借りられる数がありません。返却されるまでお待ちください。</p>}
+                {myLoans.length > 0 && (
+                  <ul className="items my-loans" aria-label="あなたが借りている分">
+                    {myLoans.map((l) => (
+                      <li key={l.id} className="item" data-loan={l.id}>
+                        <div><strong>あなたが借りている: {l.quantity}個</strong><div className="user-id">{l.elapsedDays}日目</div></div>
+                        <Button variant="primary" fullWidth={false} disabled={busy} onClick={() => openReturn(l.id, `${l.quantity}個`, l.quantity, false)}>返す</Button>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </>
             ) : (
               <>
+                <h2 id="stock-title">{it.units.some((u) => u.mine) ? "借りる・返す" : s.available > 0 ? "個体を選んで借りる" : "貸出中"}</h2>
                 {it.units.length === 0 && <p className="hint">個体がまだ登録されていません。</p>}
                 <ul className="items">
                   {it.units.filter((u) => u.state === "active").map((u) => (
@@ -132,7 +157,8 @@ function Detail() {
                         {u.mine ? <Badge tone="info">あなたが借りています</Badge> : u.loaned ? <Badge tone="danger">貸出中</Badge> : <Badge tone="success">借りられます</Badge>}
                         {u.loaned && !u.mine && <div className="user-id">{u.loaned.borrowerDisplayName}さん（{u.loaned.elapsedDays}日目）</div>}
                       </div>
-                      {!u.loaned && <Button fullWidth={false} type="submit" disabled={busy} onClick={() => act(async () => { await createLoan({ itemId: it.id, unitId: u.id }); return `${u.assetTag} を借りました。`; })}>この個体を借りる</Button>}
+                      {!u.loaned && <Button fullWidth={false} type="submit" disabled={busy} onClick={() => act(async () => { await createLoan({ itemId: it.id, unitId: u.id }); return `${u.assetTag} を借りました。`; })}>借りる</Button>}
+                      {u.loaned && u.mine && u.loanId && <Button variant="primary" fullWidth={false} disabled={busy} onClick={() => openReturn(u.loanId!, u.assetTag, 1, false)}>返す</Button>}
                     </li>
                   ))}
                 </ul>
@@ -142,29 +168,45 @@ function Detail() {
         </div>
       </div>
 
-      {it.mode === "quantity" && it.loans.length > 0 && (
+      {(otherLoans.length > 0 || it.units.some((u) => u.loaned && !u.mine && u.loanId)) && (
         <section className="panel" aria-labelledby="loans-title">
-          <h2 id="loans-title">貸出中</h2>
-          <p className="hint">返却は、借りた本人でなくても登録できます。</p>
+          <h2 id="loans-title">ほかのメンバーが借りています</h2>
+          <p className="hint">借りた人に代わって返却を登録することもできます。</p>
           <ul className="items">
-            {[...myLoans, ...otherLoans].map((l) => (
+            {otherLoans.map((l) => (
               <li key={l.id} className="item" data-loan={l.id}>
-                <div><strong>{l.borrowerDisplayName}さん</strong> {l.quantity}個 {l.mine && <Badge tone="info">あなた</Badge>}<div className="user-id">{l.elapsedDays}日目</div></div>
-                <div className="actions">
-                  {l.quantity > 1 && <Stepper id={`rq-${l.id}`} label={`${l.borrowerDisplayName}さんの分の返却数`} value={retQty[l.id] ?? l.quantity} min={1} max={l.quantity} onChange={(n) => setRetQty({ ...retQty, [l.id]: n })} />}
-                  <Button variant={l.mine ? "primary" : "default"} fullWidth={false} type="submit" disabled={busy} onClick={() => act(async () => { const n = retQty[l.id] ?? l.quantity; const r = await returnLoan(l.id, n); return `${n}個返却しました（未返却は${r.outstanding}個）。`; })}>返却する</Button>
-                </div>
+                <div><strong>{l.borrowerDisplayName}さん</strong> {l.quantity}個<div className="user-id">{l.elapsedDays}日目</div></div>
+                <Button variant="default" fullWidth={false} disabled={busy} onClick={() => openReturn(l.id, `${l.borrowerDisplayName}さんの${l.quantity}個`, l.quantity, true)}>代わりに返す</Button>
+              </li>
+            ))}
+            {it.units.filter((u) => u.loaned && !u.mine && u.loanId).map((u) => (
+              <li key={u.id} className="item" data-tag={u.assetTag}>
+                <div><strong>{u.assetTag}</strong> {u.loaned!.borrowerDisplayName}さん<div className="user-id">{u.loaned!.elapsedDays}日目</div></div>
+                <Button variant="default" fullWidth={false} disabled={busy} onClick={() => openReturn(u.loanId!, `${u.assetTag}（${u.loaned!.borrowerDisplayName}さん）`, 1, true)}>代わりに返す</Button>
               </li>
             ))}
           </ul>
         </section>
       )}
-      {it.mode === "individual" && it.units.some((u) => u.loaned) && (
-        <section className="panel">
-          <h2>返却するには</h2>
-          <p>貸出中の個体は、<Link href="/inventory/loans">貸出中の一覧</Link>から返却を登録できます（借りた本人でなくても登録できます）。</p>
-        </section>
-      )}
+
+      <Dialog
+        open={ret !== null}
+        title={ret?.proxy ? "代わりに返す" : "返す"}
+        onClose={() => setRet(null)}
+        actions={<Button fullWidth={false} disabled={busy} onClick={submitReturn}>返却する</Button>}
+      >
+        {ret && (
+          <form className="return-form" onSubmit={(e) => { e.preventDefault(); submitReturn(); }}>
+            <p><strong>{it.name}</strong>（{ret.label}）を返します。</p>
+            {ret.max > 1 && <Stepper id="ret-qty" label="返す数" value={ret.qty} min={1} max={ret.max} onChange={(n) => setRet({ ...ret, qty: n })} />}
+            <div className="field">
+              <label htmlFor="ret-location">返却場所</label>
+              <input id="ret-location" className="input" maxLength={50} value={ret.location} placeholder="例: 部室 棚A" onChange={(e) => setRet({ ...ret, location: e.target.value })} />
+              <p className="hint">元の保管場所が入っています。別の場所に返すときは書き換えてください（物品の保管場所も更新されます）。</p>
+            </div>
+          </form>
+        )}
+      </Dialog>
     </main>
   );
 }

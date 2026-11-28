@@ -20,6 +20,7 @@ type payload struct {
 	Kind      string `json:"kind"`
 	Target    string `json:"target"`
 	Delta     int    `json:"delta"`
+	Location  string `json:"location"` // 返却: 返却した場所（任意）
 }
 
 // clean は利用者が入力した文字列（表示名・物品名）を1行の表示用に整える。
@@ -68,6 +69,9 @@ func Format(eventType, id string, payloadJSON []byte) (string, error) {
 		msg = fmt.Sprintf("【返却】%sさんが%sを%s返却しました", clean(p.Actor, 64), item, count(p))
 		if p.Proxy {
 			msg += fmt.Sprintf("（借りた人: %sさん）", clean(p.Borrower, 64))
+		}
+		if p.Location != "" {
+			msg += fmt.Sprintf("（返却場所: %s）", clean(p.Location, 50))
 		}
 	case "inventory.correction_created":
 		target := "貸出"

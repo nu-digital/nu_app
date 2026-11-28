@@ -3,6 +3,7 @@
 package api_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -12,6 +13,7 @@ type catOut struct {
 	ID, Name  string
 	SortOrder int
 	ItemCount int
+	System    bool
 }
 
 func (e *env) categories(a actor) []catOut {
@@ -123,41 +125,75 @@ func TestInventoryCategoriesCRUD(t *testing.T) {
 	}
 }
 
-// 使用中のカテゴリは、移し先を指定したときだけ削除でき、物品は消えずに移る。最後の1件は消せない。
+// カテゴリの削除: 未使用はそのまま、使用中は自動で「その他」へ移す。廃止した物品は削除を妨げない。「その他」は削除・名前変更できない。
 func TestInventoryCategoryDelete(t *testing.T) {
 	e, admin, _ := invSetup(t)
 	cs := e.categories(admin)
 	gear, _ := catByName(cs, "機材")
 	books, _ := catByName(cs, "書籍")
-	_, it := e.newItem(admin, fmt.Sprintf(`{"name":"カメラ","mode":"individual","categoryId":%q}`, gear.ID))
-	if rec := e.as(admin, "DELETE", "/inventory/categories/"+gear.ID, ""); rec.Code != 409 {
-		t.Fatalf("使用中の削除は拒否: %d %s", rec.Code, rec.Body)
+	other, _ := catByName(cs, "その他")
+	if !other.System {
+		t.Fatal("「その他」はシステムカテゴリのはず")
 	}
+	_, it := e.newItem(admin, fmt.Sprintf(`{"name":"カメラ","mode":"individual","categoryId":%q}`, gear.ID))
 	if rec := e.as(admin, "DELETE", "/inventory/categories/"+gear.ID+"?moveTo="+gear.ID, ""); rec.Code != 422 {
 		t.Errorf("自分自身への移動: %d", rec.Code)
 	}
 	if rec := e.as(admin, "DELETE", "/inventory/categories/"+gear.ID+"?moveTo=00000000-0000-0000-0000-000000000000", ""); rec.Code != 422 {
 		t.Errorf("存在しない移し先: %d", rec.Code)
 	}
-	// 廃止した物品も移す（外部キーで削除できなくなるため）
-	e.exec(`UPDATE inventory_items SET archived_at=now() WHERE id=$1::uuid`, it.ID)
-	if rec := e.as(admin, "DELETE", "/inventory/categories/"+gear.ID+"?moveTo="+books.ID, ""); rec.Code != 204 {
-		t.Fatalf("移して削除: %d %s", rec.Code, rec.Body)
+	// 使用中でも、移し先を選ばずに削除できる。物品は「その他」へ移る
+	if rec := e.as(admin, "DELETE", "/inventory/categories/"+gear.ID, ""); rec.Code != 204 {
+		t.Fatalf("使用中の削除: %d %s", rec.Code, rec.Body)
 	}
-	e.exec(`UPDATE inventory_items SET archived_at=NULL WHERE id=$1::uuid`, it.ID)
-	if got := e.item(admin, it.ID); got.Category != "書籍" {
-		t.Errorf("物品が移っていない: %q", got.Category)
+	if got := e.item(admin, it.ID); got.Category != "その他" {
+		t.Errorf("物品が「その他」へ移っていない: %q", got.Category)
 	}
 	if _, ok := catByName(e.categories(admin), "機材"); ok {
 		t.Error("削除されていない")
 	}
-	// 未使用は移し先なしで削除できる。最後の1件は削除できない
-	other, _ := catByName(e.categories(admin), "その他")
-	if rec := e.as(admin, "DELETE", "/inventory/categories/"+other.ID, ""); rec.Code != 204 {
+	// 廃止した物品だけが使っているカテゴリも、そのまま削除できる（物品は「その他」へ移り、貸出の履歴は壊れない）
+	rec := e.as(admin, "POST", "/inventory/categories", `{"name":"テスト用"}`)
+	var tmp catOut
+	decode(t, rec, &tmp)
+	_, old := e.newItem(admin, fmt.Sprintf(`{"name":"廃止する物品","mode":"quantity","totalQuantity":1,"categoryId":%q}`, tmp.ID))
+	if rec := e.as(admin, "PATCH", "/inventory/items/"+old.ID, `{"archived":true}`); rec.Code != 200 {
+		t.Fatalf("廃止: %d %s", rec.Code, rec.Body)
+	}
+	if rec := e.as(admin, "DELETE", "/inventory/categories/"+tmp.ID, ""); rec.Code != 204 {
+		t.Fatalf("廃止済みの物品だけが使うカテゴリの削除: %d %s", rec.Code, rec.Body)
+	}
+	var cat string
+	if err := e.pool.QueryRow(context.Background(), `SELECT category FROM inventory_items WHERE id=$1::uuid`, old.ID).Scan(&cat); err != nil {
+		t.Fatal(err)
+	}
+	if cat != "その他" {
+		t.Errorf("廃止済みの物品が移っていない: %q", cat)
+	}
+	// 移し先を指定することもできる（旧クライアント向け）。未使用は何もせず削除できる
+	_, it2 := e.newItem(admin, fmt.Sprintf(`{"name":"本","mode":"quantity","totalQuantity":1,"categoryId":%q}`, other.ID))
+	rec = e.as(admin, "POST", "/inventory/categories", `{"name":"一時"}`)
+	var t2 catOut
+	decode(t, rec, &t2)
+	e.exec(`UPDATE inventory_items SET category_id=$2::uuid, category='一時' WHERE id=$1::uuid`, it2.ID, t2.ID)
+	if rec := e.as(admin, "DELETE", "/inventory/categories/"+t2.ID+"?moveTo="+books.ID, ""); rec.Code != 204 {
+		t.Fatalf("移し先を指定した削除: %d %s", rec.Code, rec.Body)
+	}
+	if got := e.item(admin, it2.ID); got.Category != "書籍" {
+		t.Errorf("指定した移し先に移っていない: %q", got.Category)
+	}
+	rec = e.as(admin, "POST", "/inventory/categories", `{"name":"空"}`)
+	var empty catOut
+	decode(t, rec, &empty)
+	if rec := e.as(admin, "DELETE", "/inventory/categories/"+empty.ID, ""); rec.Code != 204 {
 		t.Errorf("未使用の削除: %d", rec.Code)
 	}
-	if rec := e.as(admin, "DELETE", "/inventory/categories/"+books.ID+"?moveTo="+books.ID, ""); rec.Code != 409 {
-		t.Errorf("最後のカテゴリ: %d", rec.Code)
+	// 「その他」は削除も名前変更もできない
+	if rec := e.as(admin, "DELETE", "/inventory/categories/"+other.ID, ""); rec.Code != 409 {
+		t.Errorf("システムカテゴリの削除: %d", rec.Code)
+	}
+	if rec := e.as(admin, "PATCH", "/inventory/categories/"+other.ID, `{"name":"雑貨"}`); rec.Code != 409 {
+		t.Errorf("システムカテゴリの名前変更: %d", rec.Code)
 	}
 }
 
