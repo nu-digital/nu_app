@@ -11,6 +11,8 @@
 
 | 区分 | 項目 | 状態・次の一手 |
 |---|---|---|
+| 第3フェーズ | **P0 ぬるの安全性（#199）**: DM廃止・人格・プロンプト簡略化・リマインダー/ツール上限（実装済み）。残り: ツール実行の監査ログ・異常検知通知・文脈トークン上限・Botの最小権限化（運用責任者の承認）・既存DMデータの扱い（承認） | [design/phase3-nul-safety.md](design/phase3-nul-safety.md) |
+| 第3フェーズ | **会計機能 P1〜P7**（予算・支出・AI購入申請・Sheets/Drive連携）。調査・設計済み、実装は未着手 | [design/phase3-accounting.md](design/phase3-accounting.md)（要確認事項と運用責任者の作業あり） |
 | ぬる | **管理画面**（稼働状況・API使用額・エラー・記憶量をnu_appで確認・停止） | 設計済み（[design/nul-admin-dashboard.md](design/nul-admin-dashboard.md)）。**運用責任者の確認事項5点（§9）**のあと N-1（agent: 心拍・イベント・モードの定期読み直し・集計ビュー）→N-2（API）→N-3（UI）→N-4（通知） |
 | ぬる | GitHubの読み取り（NUL-P3の残り） | **GitHub Appの作成が必要**（運用責任者）。読み取り専用・ポーリング |
 | ぬる | nu_app連携（NUL-P4） | [DECISIONS NUL-1](DECISIONS.md)（サービストークン・アカウント紐づけ・本人の権限で代理実行・確認の強制）の設計の確認が先 |

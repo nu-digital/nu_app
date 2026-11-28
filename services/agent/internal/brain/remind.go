@@ -62,6 +62,10 @@ func (b *Brain) runReminderTool(ctx context.Context, in Input, tu llm.ToolUse) l
 		if at.After(now.Add(maxRemindAhead)) {
 			return fail("1年より先のリマインダーは受け付けない")
 		}
+		// 1日の作成回数の上限（登録の成否にかかわらず数える。大量作成の対策）
+		if ok, err := b.Budget.AllowUser(ctx, in.UserID, "remind"); err != nil || !ok {
+			return fail("今日はリマインダーを作りすぎ。明日また頼んでもらう")
+		}
 		target := in.TargetID
 		if target == 0 {
 			target = in.ChannelID

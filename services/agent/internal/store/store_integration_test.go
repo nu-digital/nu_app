@@ -709,3 +709,56 @@ func TestRecentPublicMessagesExcludesPrivateDMBotAndShort(t *testing.T) {
 		t.Errorf("%+v %v", got, err)
 	}
 }
+
+// DM由来のデータだけが消え、サーバーの通常のデータは残る。2回目は何も消さない（冪等）。
+func TestPurgeDMDataRemovesOnlyDMOrigin(t *testing.T) {
+	s, pool := newStore(t)
+	ctx := context.Background()
+	exec := func(q string, a ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, q, a...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec(`INSERT INTO messages (message_id, channel_id, kind, author_id, content, created_at) VALUES (1,10,'guild',7,'公開',now()),(2,99,'dm',7,'DM',now()),(3,99,'dm',0,'DM返信',now())`)
+	exec(`INSERT INTO notes (subject_user_id, content, private, source_channel_id) VALUES (7,'サーバーのメモ',false,10),(7,'DMのメモ',true,99),(7,'DMチャンネル由来',false,99)`)
+	exec(`INSERT INTO reminders (user_id, channel_id, message, remind_at, private) VALUES (7,10,'公開',now()+interval '1 day',false),(7,99,'私事',now()+interval '1 day',true)`)
+	exec(`INSERT INTO summaries (channel_id, day, content, msg_count) VALUES (10,'2026-01-01','x',3),(99,'2026-01-01','y',3)`)
+	r, err := s.PurgeDMData(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Messages != 2 || r.Notes != 2 || r.Reminders != 1 || r.Summaries != 1 {
+		t.Errorf("削除件数: %+v", r)
+	}
+	count := func(q string) int {
+		var n int
+		if err := pool.QueryRow(ctx, q).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if count(`SELECT count(*) FROM messages`) != 1 || count(`SELECT count(*) FROM notes`) != 1 || count(`SELECT count(*) FROM reminders`) != 1 || count(`SELECT count(*) FROM summaries`) != 1 {
+		t.Error("サーバーのデータまで消えた、または残った")
+	}
+	if r2, _ := s.PurgeDMData(ctx); (r2 != store.PurgeResult{}) {
+		t.Errorf("冪等でない: %+v", r2)
+	}
+}
+
+func TestToolAuditAndDenials(t *testing.T) {
+	s, _ := newStore(t)
+	ctx := context.Background()
+	s.AuditTool(ctx, 7, 10, "remind", true)
+	s.AuditTool(ctx, 7, 10, "remind", false)
+	n, err := s.ToolDenials(ctx, time.Now().Add(-time.Minute))
+	if err != nil || n != 1 {
+		t.Errorf("%d %v", n, err)
+	}
+	if err := s.Maintain(ctx, time.Now().Add(200*24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := s.ToolDenials(ctx, time.Now().Add(-time.Minute)); n != 0 {
+		t.Error("保持期間を過ぎた監査ログが残った")
+	}
+}

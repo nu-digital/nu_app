@@ -543,3 +543,79 @@ func TestIntroUsesOpusWhenAllowedAndWrapsMaterialAsData(t *testing.T) {
 		t.Errorf("停止中はAPIを呼ばない: %v", err)
 	}
 }
+
+// 第3フェーズ P0: リマインダーの作成は1日の回数に上限があり、超えたら登録しない。
+func TestRemindDailyCreationLimit(t *testing.T) {
+	r := &fakeRem{}
+	at := map[string]any{"at": "2026-11-28 10:00", "message": "x"}
+	fake := &llm.Fake{Responses: []llm.Response{toolCall("remind", at), toolCall("remind", at), toolCall("remind", at), text("ok")}}
+	b, _ := newBrain(fake, newLedger(), budget.Config{RemindPerUserDay: 2})
+	b.Reminders = r
+	_, _ = b.Reply(context.Background(), input())
+	if len(r.added) != 2 {
+		t.Errorf("上限(2)を超えて登録した: %d", len(r.added))
+	}
+}
+
+// 1回の返答で実行するツール呼び出しの総数に上限がある（超えた分は実行しない）。
+func TestToolCallsPerReplyAreCapped(t *testing.T) {
+	r := &fakeRem{}
+	var uses []llm.ToolUse
+	for i := 0; i < 9; i++ {
+		uses = append(uses, llm.ToolUse{ID: "t" + string(rune('a'+i)), Name: "list_reminders", Input: json.RawMessage(`{}`)})
+	}
+	resp := llm.Response{StopReason: "tool_use", ToolUses: uses, Usage: llm.Usage{InputTokens: 10, OutputTokens: 10},
+		Assistant: llm.Message{Role: llm.Assistant, Blocks: []llm.Block{{Type: llm.Text}}}}
+	fake := &llm.Fake{Responses: []llm.Response{resp, text("ok")}}
+	_, _ = remBrain(fake, r).Reply(context.Background(), input())
+	last := fake.Calls[1].Messages[len(fake.Calls[1].Messages)-1].Blocks
+	if len(last) != 9 {
+		t.Fatalf("結果の数: %d", len(last))
+	}
+	for i, bl := range last {
+		if capped := bl.IsError && strings.Contains(bl.Text, "上限"); capped != (i >= maxToolCallsPerReply) {
+			t.Errorf("%d番目: IsError=%v %q", i, bl.IsError, bl.Text)
+		}
+	}
+}
+
+func TestCapHistoryKeepsNewestWithinLimit(t *testing.T) {
+	var h []Turn
+	for i := 0; i < 10; i++ {
+		h = append(h, Turn{AuthorName: "a", Text: strings.Repeat("あ", 1000) + string(rune('0'+i))})
+	}
+	got := capHistory(h)
+	total := 0
+	for _, x := range got {
+		n := len([]rune(x.Text))
+		if n > maxHistoryTurnRune+20 {
+			t.Errorf("1発言が長い: %d", n)
+		}
+		total += n
+	}
+	if total > maxHistoryRunes+20*len(got) || len(got) == 0 || len(got) >= len(h) {
+		t.Errorf("合計 %d・件数 %d", total, len(got))
+	}
+	if !strings.HasSuffix(h[len(h)-1].Text, "9") || got[len(got)-1].Text != truncRunes(h[len(h)-1].Text, maxHistoryTurnRune) {
+		t.Error("新しい発言が残っていない")
+	}
+	if l := truncRunes(strings.Repeat("い", 5000), maxLatestRunes); len([]rune(l)) > maxLatestRunes+20 {
+		t.Error("いまの発言が切られていない")
+	}
+}
+
+// LLMに渡すツールの許可リスト。ここに無いツール（管理者操作・シェル・DB・会計・Drive・Sheets等）を足すときは、
+// このテストと docs/design/phase3-nul-safety.md を同時に更新して、レビューを通す（足し忘れ・紛れ込みの検知）。
+func TestToolAllowlistIsPinned(t *testing.T) {
+	want := map[string]bool{"search_log": true, "digest": true, "remember": true, "recall": true, "forget": true,
+		"remind": true, "list_reminders": true, "cancel_reminder": true, "web_research": true, "think_hard": true}
+	got := tools()
+	if len(got) != len(want) {
+		t.Fatalf("ツールの数が変わった: %d", len(got))
+	}
+	for _, x := range got {
+		if !want[x.Name] {
+			t.Errorf("許可リストに無いツール: %s", x.Name)
+		}
+	}
+}

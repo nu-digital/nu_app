@@ -366,3 +366,17 @@ func TestViewableByEveryone(t *testing.T) {
 		}
 	}
 }
+
+// 第3フェーズ P0: DM・ほかのサーバーのメッセージは、記録も応答もしない（convertの段階で捨てる）。
+func TestGatewayDropsDMAndForeignGuild(t *testing.T) {
+	g := &Gateway{guildID: "1"}
+	author := &discordgo.User{ID: "3", Username: "u"}
+	for name, m := range map[string]*discordgo.Message{
+		"DM":    {ID: "1", ChannelID: "2", Author: author},
+		"別サーバー": {ID: "1", ChannelID: "2", GuildID: "9", Author: author},
+	} {
+		if _, ok := g.convert(m); ok {
+			t.Errorf("%s を受け付けた", name)
+		}
+	}
+}
