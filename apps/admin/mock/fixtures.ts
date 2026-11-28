@@ -90,11 +90,11 @@ export function seed() {
   const jiro = { userId: "u-editor", displayName: "仮名 次郎", avatarMediaId: null };
   const saburo = { userId: "u-member", displayName: "例示 三郎", avatarMediaId: null };
   const contents: ContentListItem[] = [
-    { id: "c-1", type: "article", section: "blog", slug: "sample-blog", title: "学園祭の展示レポート", summary: "展示の様子をまとめました。", revisionNo: 3, isPublished: true, canEdit: true, hasUnpublishedChanges: true, updatedAt: T,
+    { id: "c-1", type: "article", section: "blog", slug: "sample-blog", title: "学園祭の展示レポート", summary: "展示の様子をまとめました。", revisionNo: 3, isPublished: true, canEdit: true, hasUnpublishedChanges: true, canDelete: true, updatedAt: T,
       dateLabel: "2026年11月3日", sortDate: "2026-11-03", coverUrl: "/api/v1/media/m-camera", members: [owner, hanako, jiro, saburo] },
-    { id: "c-2", type: "project", section: "project", slug: "sample-work", title: "見本の作品（長いタイトルの例：夜の街を駆ける少女と猫の短編アニメーション）", summary: "短編アニメーション。", revisionNo: 1, isPublished: false, canEdit: true, hasUnpublishedChanges: true, updatedAt: T,
+    { id: "c-2", type: "project", section: "project", slug: "sample-work", title: "見本の作品（長いタイトルの例：夜の街を駆ける少女と猫の短編アニメーション）", summary: "短編アニメーション。", revisionNo: 1, isPublished: false, canEdit: true, hasUnpublishedChanges: true, canDelete: true, updatedAt: T,
       dateLabel: "", sortDate: null, coverUrl: null, members: [owner, hanako] },
-    { id: "c-3", type: "article", section: "news", slug: "sample-news", title: "新歓のお知らせ", summary: "", revisionNo: 2, isPublished: true, canEdit: false, hasUnpublishedChanges: false, updatedAt: T,
+    { id: "c-3", type: "article", section: "news", slug: "sample-news", title: "新歓のお知らせ", summary: "", revisionNo: 2, isPublished: true, canEdit: false, hasUnpublishedChanges: false, canDelete: false, updatedAt: T,
       dateLabel: "2026年4月", sortDate: "2026-04-01", coverUrl: "/api/v1/public/media/mockpublicid0000000009", members: [owner] },
   ];
 
@@ -115,7 +115,7 @@ export function seed() {
     publishedRevisionNo: c.isPublished ? Math.max(1, c.revisionNo - 1) : null,
     collaborators: collabs[c.id] ?? [],
     revisions: [{ revisionNo: c.revisionNo, title: c.title, editedBy: "見本 太郎", createdAt: T }],
-    canManageCollaborators: c.canEdit, canPublish: c.canEdit, createdAt: T, updatedAt: T,
+    canManageCollaborators: c.canEdit, canPublish: c.canEdit, canDelete: c.canDelete, createdAt: T, updatedAt: T,
   });
 
   const notificationSettings: NotificationSetting[] = [

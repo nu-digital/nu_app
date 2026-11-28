@@ -179,6 +179,10 @@ sudo env POSTGRES_IMAGE='postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc44
 | バックアップの復元検証 | 四半期に1回 | §9.3 |
 | ディスク使用量 | 月1回 | `df -h /`・`du -sh /srv/nu_app/{media,backups}`・`sudo docker system df`。不足しそうなら古いイメージ・世代を整理（**バックアップの世代数は黙って減らさず、運用責任者が判断**） |
 
+### 10.1 削除した記事・作品を元に戻す
+
+記事・作品の削除は論理削除（`contents.archived_at`）。版・画像・公開の履歴は残っている。誰がいつ消したかは`audit_logs`（`content.deleted`）で分かる。戻すときは、運用者がVPSでDBに入り、**対象を確認してから**1件ずつ戻す（`UPDATE contents SET archived_at = NULL WHERE id = '…'`）。公開中だった記事は、戻すと公式サイトにもそのまま再び表示される（公開ポインタを残しているため）。slugは削除後も予約されたまま。
+
 ## 11. 障害対応
 
 まず、**何が壊れているか**を切り分ける。サーバーに入る: `ssh ubuntu@133.125.46.174`。状態確認: `sudo docker ps`、`curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/readyz`（api）・`:8081/healthz/`（web）・`:3000/healthz`（admin）、`sudo systemctl status nginx`、`df -h /`、`free -m`。

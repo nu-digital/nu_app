@@ -199,3 +199,73 @@ details.more > summary { cursor: pointer; min-height: var(--tap); display: flex;
 .location-line .label { font-size: 13px; color: var(--color-muted); margin-right: var(--space-2); }
 .my-loans { margin-top: var(--space-4); }
 .return-form .stepper { margin-bottom: var(--space-3); }
+
+/* 三点メニュー（第2フェーズ） */
+.ui-menu { position: relative; display: inline-block; }
+.ui-menu-list { position: absolute; z-index: 30; top: calc(100% + 4px); min-width: 180px; margin: 0; padding: var(--space-2); list-style: none; background: var(--color-bg); border-radius: var(--radius); box-shadow: 0 0 0 1px var(--color-border), 0 4px 20px rgba(0,0,0,.18); }
+.ui-menu-list.align-right { right: 0; }
+.ui-menu-list.align-left { left: 0; }
+.ui-menu-list button { display: flex; width: 100%; align-items: center; gap: var(--space-2); min-height: var(--tap); padding: 0 var(--space-3); border: none; border-radius: var(--radius); background: transparent; color: var(--color-ink); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.ui-menu-list button:hover:not(:disabled), .ui-menu-list button:focus-visible { background: var(--color-surface); }
+.ui-menu-list button.danger { color: var(--color-error); }
+.ui-menu-list button:disabled { opacity: .5; cursor: default; }
+
+/* ---- 記事・作品の編集画面（第2フェーズ）: 上にメタ情報、下に本文（左）とプレビュー（右） ---- */
+.editor-page { max-width: 1680px; margin: 0 auto; padding: 0 var(--space-4) var(--space-6); }
+.editor-bar { position: sticky; top: 0; z-index: 12; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; background: var(--color-bg); border-bottom: 1px solid var(--color-border); margin-bottom: var(--space-3); }
+.editor-bar .back-link { font-size: 14px; }
+.editor-state { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.editor-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.editor-note { margin: 0 0 var(--space-3); }
+
+.editor-meta { background: var(--color-surface); border-radius: var(--radius-l); padding: var(--space-4); margin-bottom: var(--space-3); }
+.editor-meta .input, .editor-meta .charcoal-text-field-container, .editor-meta .charcoal-text-area-container { background: var(--color-bg); }
+.editor-meta .meta-head { display: flex; gap: var(--space-3); align-items: flex-end; }
+.editor-meta .meta-title { margin: 0; }
+.editor-meta .meta-title input { font-size: 1.25rem; font-weight: 700; }
+.editor-meta .meta-body { display: grid; gap: var(--space-4); margin-top: var(--space-4); grid-template-columns: 1fr; }
+.editor-meta .meta-summary { margin: var(--space-2) 0 0; }
+.editor-meta .meta-members { grid-column: 1 / -1; }
+.editor-meta .meta-members > summary { cursor: pointer; display: flex; align-items: center; gap: var(--space-3); min-height: var(--tap); font-weight: 700; }
+.editor-meta .meta-members .panel { background: var(--color-bg); margin-top: var(--space-2); }
+.cover-drop { position: relative; aspect-ratio: 16 / 9; border: 2px dashed var(--color-border); border-radius: var(--radius-l); overflow: hidden; background: var(--color-bg); display: flex; align-items: center; justify-content: center; transition: border-color var(--motion-fast, .12s), background-color var(--motion-fast, .12s); }
+.cover-drop:hover, .cover-drop:focus-within { border-color: var(--color-brand); }
+.cover-drop img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cover-drop .cover-empty { color: var(--color-muted); font-size: 14px; }
+.cover-drop .cover-pick { position: absolute; left: 0; right: 0; bottom: 0; min-height: var(--tap); border: none; background: rgba(0, 0, 0, .55); color: #fff; font: inherit; font-size: 13px; cursor: pointer; }
+.cover-drop.busy { border-style: solid; }
+.meta-cover > .charcoal-button, .meta-cover > .hint { margin-top: var(--space-2); }
+
+.editor-work { display: grid; gap: var(--space-4); grid-template-columns: 1fr; }
+.editor-write, .editor-preview { min-width: 0; display: flex; flex-direction: column; }
+.editor-work.tab-edit .editor-preview, .editor-work.tab-preview .editor-write { display: none; }
+.write-bar { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-2); }
+.write-bar .write-title { font-weight: 700; margin-right: auto; }
+.md-input { flex: 1; width: 100%; min-height: 60vh; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Noto Sans Mono CJK JP", monospace; font-size: 15px; line-height: 1.7; resize: vertical; padding: var(--space-3) var(--space-4); }
+.md-input.dragging { outline: 3px dashed var(--color-brand); outline-offset: -3px; background: var(--color-info-bg); }
+.upload-list { list-style: none; margin: var(--space-2) 0; padding: 0; display: grid; gap: var(--space-2); }
+.upload-item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius); background: var(--color-surface); font-size: 14px; }
+.upload-item .upload-name { font-weight: 700; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upload-item progress { flex: 1; min-width: 80px; max-width: 240px; accent-color: var(--color-brand); }
+.upload-item.error { background: var(--color-error-bg); }
+.upload-item .upload-error { color: var(--color-error); }
+.editor-preview .preview-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-2); }
+.editor-preview .preview-head h2 { font-size: 1rem; margin: 0; }
+.preview-scroll { flex: 1; min-height: 40vh; overflow: auto; border-radius: var(--radius-l); background: var(--color-surface); padding: var(--space-3); }
+.editor-history { margin-top: var(--space-4); }
+.editor-history > summary { cursor: pointer; font-weight: 700; min-height: var(--tap); display: flex; align-items: center; }
+
+@media (min-width: 900px) {
+  .editor-meta .meta-body { grid-template-columns: minmax(220px, 300px) 1fr; }
+  .editor-work, .editor-work.tab-edit, .editor-work.tab-preview { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); height: max(520px, calc(100dvh - 150px)); }
+  .editor-work.tab-edit .editor-preview, .editor-work.tab-preview .editor-write { display: flex; }
+  .md-input { min-height: 0; resize: none; height: 100%; }
+  .preview-scroll { min-height: 0; }
+  .editor-tabs { display: none; }
+}
+
+/* 記事・作品の一覧: 種類の札・三点メニュー（第2フェーズ） */
+.content-grid > li { position: relative; }
+.content-grid .card-menu { position: absolute; top: var(--space-2); right: var(--space-2); z-index: 3; }
+.content-grid .card-menu .charcoal-icon-button { background: rgba(255, 255, 255, .92); border-radius: 50%; }
+.kind-tag.kind-project { background: var(--color-brand); color: #fff; }

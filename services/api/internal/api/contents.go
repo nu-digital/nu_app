@@ -137,6 +137,7 @@ type contentView struct {
 	Revisions           []revisionSummary `json:"revisions,omitempty"`
 	CanManageCollab     bool              `json:"canManageCollaborators"`
 	CanPublish          bool              `json:"canPublish"`
+	CanDelete           bool              `json:"canDelete"` // 削除できるか（下書きは作者・Editor以上、公開中はEditor以上）
 	CreatedAt           time.Time         `json:"createdAt"`
 	UpdatedAt           time.Time         `json:"updatedAt"`
 }
@@ -417,6 +418,9 @@ func (s *server) lockContent(r *http.Request, q *store.Queries, a authCtx, id pg
 		}
 		return c, err
 	}
+	if c.ArchivedAt.Valid { // 削除済みは存在しないのと同じ
+		return c, errNotFound
+	}
 	res, err := contentResource(r, q, a, c)
 	if err != nil {
 		return c, err
@@ -500,6 +504,7 @@ func (s *server) loadContentView(r *http.Request, q *store.Queries, a authCtx, c
 	subject := a.Identity.Subject()
 	v.CanManageCollab = authz.Decide(subject, "contents.collaborators.update", res).Allowed
 	v.CanPublish = authz.Decide(subject, "contents.publish", res).Allowed
+	v.CanDelete = authz.Decide(subject, "contents.delete", res).Allowed && (!c.PublishedRevisionID.Valid || subject.IsEditorPlus())
 	if c.PublishedRevisionID.Valid {
 		p, err := q.GetContentRevision(ctx, c.PublishedRevisionID)
 		if err != nil {
@@ -637,7 +642,7 @@ func (s *server) getContent(w http.ResponseWriter, r *http.Request) {
 	}
 	q := store.New(s.Pool)
 	c, err := q.GetContent(r.Context(), id)
-	if err != nil {
+	if err != nil || c.ArchivedAt.Valid { // 削除済みは存在しないのと同じ
 		httpx.Error(w, r, http.StatusNotFound, "NOT_FOUND", "見つかりません")
 		return
 	}
@@ -683,6 +688,7 @@ type contentListItem struct {
 	IsPublished           bool      `json:"isPublished"`
 	CanEdit               bool      `json:"canEdit"`
 	HasUnpublishedChanges bool      `json:"hasUnpublishedChanges"`
+	CanDelete             bool      `json:"canDelete"` // 削除できるか（下書きは作者・Editor以上、公開中はEditor以上）
 	UpdatedAt             time.Time `json:"updatedAt"`
 	// DateLabel は利用者が設定した日付の表示（空なら未設定）。SortDate は並び順の日付（YYYY-MM-DD）。
 	DateLabel string  `json:"dateLabel"`
@@ -734,14 +740,23 @@ func (s *server) listContents(w http.ResponseWriter, r *http.Request) {
 		}
 		p.Section = pgtype.Text{String: v, Valid: true}
 	}
+	if v := qp.Get("type"); v != "" { // 記事（article）か作品（project）。指定なしは混在
+		if v != "article" && v != "project" {
+			httpx.Error(w, r, http.StatusBadRequest, "INVALID_REQUEST", "type は article か project を指定してください")
+			return
+		}
+		p.ContentType = pgtype.Text{String: v, Valid: true}
+	}
+	offset := 0
 	if c := qp.Get("cursor"); c != "" {
-		t, id, ok := decodeTimeCursor(c)
-		if !ok {
+		n, err := strconv.Atoi(c)
+		if err != nil || n < 0 || n > 100000 {
 			httpx.Error(w, r, http.StatusBadRequest, "INVALID_REQUEST", "cursor が正しくありません")
 			return
 		}
-		p.BeforeAt, p.BeforeID = pgtype.Timestamptz{Time: t, Valid: true}, id
+		offset = n
 	}
+	p.RowOffset = int32(offset)
 	rows, err := store.New(s.Pool).ListContents(r.Context(), p)
 	if err != nil {
 		s.internal(w, r)
@@ -749,8 +764,7 @@ func (s *server) listContents(w http.ResponseWriter, r *http.Request) {
 	}
 	var next *string
 	if len(rows) > limit {
-		last := rows[limit-1]
-		c := encodeTimeCursor(last.UpdatedAt.Time, last.ID)
+		c := strconv.Itoa(offset + limit)
 		next = &c
 		rows = rows[:limit]
 	}
@@ -762,7 +776,8 @@ func (s *server) listContents(w http.ResponseWriter, r *http.Request) {
 	items := make([]contentListItem, 0, len(rows))
 	for _, x := range rows {
 		it := contentListItem{ID: x.ID.String(), Type: x.Type, Section: x.Section, Slug: x.Slug, Title: x.Title, Summary: x.Summary, RevisionNo: int(x.RevisionNo),
-			IsPublished: x.IsPublished, CanEdit: x.CanEdit, HasUnpublishedChanges: x.HasUnpublishedChanges, UpdatedAt: x.UpdatedAt.Time, DateLabel: x.DateLabel,
+			IsPublished: x.IsPublished, CanEdit: x.CanEdit, HasUnpublishedChanges: x.HasUnpublishedChanges,
+			CanDelete: x.CanEdit && (p.IsEditor || x.CreatorUserID == a.Identity.UserID) && (!x.IsPublished || p.IsEditor), UpdatedAt: x.UpdatedAt.Time, DateLabel: x.DateLabel,
 			Members: people[x.ID.String()]}
 		if it.Members == nil {
 			it.Members = []listMember{}

@@ -171,6 +171,7 @@ actor/borrower はクライアント入力を信用せず、セッションの�
 | PUT | `/contents/{id}/contributors` | 作者 / 共同編集者 / Editor/Admin/Owner | 作品の制作メンバーと担当役割の登録（公開クレジット同意は変更不可・別API） |
 | POST | `/contents/{id}/publish` | Editor/Admin/Owner | working revisionを公開版にする |
 | POST | `/contents/{id}/unpublish` | Editor/Admin/Owner | 公開停止 |
+| DELETE | `/contents/{id}` | 作者/Editor/Admin/Owner（公開中はEditor以上） | 記事・作品の削除（論理削除）。一覧・取得・公開API・画像の公開配信から消える。データ・版・画像は残り、slugは予約されたまま |
 | GET | `/public/contents` | Public | 公開記事・作品一覧（下書きは除外） |
 | GET | `/public/contents/{section}/{slug}` | Public | 公開済みの版だけ返す |
 
@@ -188,6 +189,8 @@ actor/borrower はクライアント入力を信用せず、セッションの�
 **P3-01bで実装した契約（暫定採用 DECISIONS P3-01-3）**
 
 - `POST /contents/{id}/publish`: `{revisionNo}`必須（Editor以上。**存在確認の前に403**）。作業版と違えば409 `REVISION_CONFLICT`。公開の直前にMarkdownを再検査（422）。同じ版の再公開は200で何もしない。通知`content.published`をoutboxへ。
+- `DELETE /contents/{id}`: 204。論理削除（`contents.archived_at`）。下書きだけなら作者・Editor以上、公開中ならEditor以上（403）。共同編集者は不可。削除済みは取得・保存・公開・公開APIとも404。復旧は運用者がDBで`archived_at`をNULLに戻す（[RUNBOOK](RUNBOOK.md)）。
+- `GET /contents`: `type`（`article`|`project`。省略=混在）・`section`・`status`・`mine`・`q`、並びは**利用者に見せる日付の新しい順**（日付が無ければ更新日）、`cursor`は件数のoffset。
 - `POST /contents/{id}/unpublish`: Editor以上。公開中でなければ200で何もしない。作業版・履歴は残る。
 - `GET /public/contents`（`section`・`limit`≤100・`cursor`）: 匿名。**公開版だけ**。日付の新しい順（日付不明は最後）。`{items:[{type,section,slug,title,summary,author,metadata{category,excerpt,image},date{label,kind,sortDate,sortDateIsEstimated},coverUrl?}],nextCursor}`。投稿者名 `author` は配信時に公開許可から解決する（D14）。
 - `GET /public/contents/{section}/{slug}`: 匿名。上記＋`markdown`と`contributors:[{displayName,roleLabel}]`。未公開・存在しないものは同じ404。制作メンバーの`displayName`は、公開クレジットに同意中のメンバーだけ表示名、それ以外は「匿名のメンバー」（ID・氏名は出さない。名前は版に保存せず配信ごとに解決）。強いETagと`Cache-Control: no-cache`（If-None-Matchで304）。認証情報で応答は変わらない。

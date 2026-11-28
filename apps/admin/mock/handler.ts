@@ -1,5 +1,6 @@
 // 開発用モックAPIの応答（HTTPに依存しない部分）。server.ts と、実APIとの契約比較（scripts/compose-smoke.mjs）が使う。
 // 権限の出し分けは実API（docs/AUTHZ.md）に合わせた簡易版。本物の認可の検査には使わない。
+import type { ContentListItem } from "../lib/api.ts";
 import { ROLE_USERS, seed, type Role } from "./fixtures.ts";
 
 export type MockOptions = { empty?: boolean; failPrefix?: string };
@@ -224,11 +225,14 @@ export function createMock(opts: MockOptions = {}) {
 
     // CMS
     if (p === "/contents" && method === "GET") {
-      const sec = q.get("section"), mine = q.get("mine") === "true", s = (q.get("q") ?? "").trim(), st = q.get("status");
-      return { status: 200, json: page(list(db.contents.filter((c) => (!sec || c.section === sec) && (!mine || c.canEdit) && (!s || c.title.includes(s)) && (!st || (st === "published" ? c.isPublished : !c.isPublished))))) };
+      const sec = q.get("section"), type = q.get("type"), mine = q.get("mine") === "true", s = (q.get("q") ?? "").trim(), st = q.get("status");
+      // 混在・利用者に見せる日付の新しい順（日付が無ければ更新日）。本物のAPIと同じ
+      const day = (c: ContentListItem) => c.sortDate ?? c.updatedAt.slice(0, 10);
+      const rows = db.contents.filter((c) => (!sec || c.section === sec) && (!type || c.type === type) && (!mine || c.canEdit) && (!s || c.title.includes(s)) && (!st || (st === "published" ? c.isPublished : !c.isPublished)));
+      return { status: 200, json: page(list([...rows].sort((a, b) => day(b).localeCompare(day(a))))) };
     }
     if (p === "/contents" && method === "POST") {
-      const c = { id: `c-${Date.now()}`, type: b.type === "project" ? "project" as const : "article" as const, section: (b.section as "blog") ?? "blog", slug: String(b.slug), title: String(b.title), summary: "", revisionNo: 1, isPublished: false, canEdit: true, hasUnpublishedChanges: true, updatedAt: db.now,
+      const c = { id: `c-${Date.now()}`, type: b.type === "project" ? "project" as const : "article" as const, section: (b.section as "blog") ?? "blog", slug: String(b.slug), title: String(b.title), summary: "", revisionNo: 1, isPublished: false, canEdit: true, hasUnpublishedChanges: true, canDelete: true, updatedAt: db.now,
         dateLabel: String((b.date as { label?: string } | undefined)?.label ?? ""), sortDate: ((b.date as { sortDate?: string | null } | undefined)?.sortDate ?? null), coverUrl: null, members: [db.contents[0].members[0]] };
       db.contents.unshift(c);
       return { status: 201, json: db.contentDetail(c) };
@@ -237,6 +241,11 @@ export function createMock(opts: MockOptions = {}) {
       const c = db.contents.find((x) => x.id === m![1]);
       if (!c) return err(404, "NOT_FOUND", "記事が見つかりません。");
       const action = m[2];
+      if (!action && method === "DELETE") {
+        if (!c.canDelete || (c.isPublished && !isEditor(role))) return forbidden();
+        db.contents.splice(db.contents.indexOf(c), 1);
+        return { status: 204 };
+      }
       if ((action === "publish" || action === "unpublish") && !isEditor(role)) return forbidden();
       if (action === "publish") { c.isPublished = true; c.hasUnpublishedChanges = false; }
       if (action === "unpublish") c.isPublished = false;

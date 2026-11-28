@@ -85,6 +85,7 @@
 | `contents.collaborators.update` | PUT | `/contents/{id}/collaborators` | 作者 / Editor / Admin / Owner（共同編集者は不可） |
 | `contents.contributors.update` | PUT | `/contents/{id}/contributors` | 作者 / 共同編集者 / Editor / Admin / Owner（公開クレジット同意は別API・本人のみ） |
 | `contents.publish` | POST | `/contents/{id}/publish` | Editor / Admin / Owner（作者・共同編集者でも不可） |
+| `contents.delete` | DELETE | `/contents/{id}` | 作者 / Editor / Admin / Owner（共同編集者は不可）。**公開中の記事・作品はEditor以上だけ**（ハンドラーで検査。公式サイトから消えるため） |
 | `contents.unpublish` | POST | `/contents/{id}/unpublish` | Editor / Admin / Owner（作者・共同編集者でも不可） |
 | `public.contents.list` | GET | `/public/contents` | 誰でも（匿名可）。トークン検証はハンドラー側 |
 | `public.contents.get` | GET | `/public/contents/{section}/{slug}` | 誰でも（匿名可）。トークン検証はハンドラー側 |

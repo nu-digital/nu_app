@@ -11,6 +11,7 @@ type listRow struct {
 	ID, Title, Slug, DateLabel string
 	SortDate, CoverURL         *string
 	IsPublished, CanEdit       bool
+	CanDelete                  bool
 	Members                    []struct {
 		UserID, DisplayName string
 		AvatarMediaID       *string

@@ -56,7 +56,9 @@ func TestReturnLocation(t *testing.T) {
 		t.Errorf("返却の記録に場所が無い: %q", got)
 	}
 	rec := e.as(admin, "GET", "/inventory/history?itemId="+it.ID, "")
-	var h struct{ Items []struct{ Kind, Location string } }
+	var h struct {
+		Items []struct{ Kind, Location string }
+	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &h)
 	found := false
 	for _, ev := range h.Items {
