@@ -7,8 +7,8 @@ export const metadata: Metadata = {
     "nu_digitalが取り扱う個人情報・Discord Bot「ぬる」・Google APIの利用・会計情報についての方針です。",
 };
 
-// 運用責任者の確認が済むまで true。確認後に false にすると、冒頭の「確認中」の表示が消える。
-const isDraft = true;
+// 内容を確認中のあいだは true にする（冒頭に「確認中」と表示される）。2026-11-29に運用責任者の確認が済み false にした。
+const isDraft = false;
 const lastUpdated = "2026.11.29";
 
 export default function PrivacyPage() {
