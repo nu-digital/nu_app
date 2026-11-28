@@ -126,6 +126,11 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 |---|---|---|---|
 | GET | `/inventory/items` | Member | 一覧・検索・カテゴリ・利用可否 |
 | GET | `/inventory/items/{id}` | Member | 詳細、個体状況、残数、現在の貸出状況 |
+| GET | `/inventory/categories` | Member | カテゴリの一覧（並び順・使用中の物品数） |
+| POST | `/inventory/categories` | Admin | カテゴリの追加 |
+| PATCH | `/inventory/categories/{id}` | Admin | カテゴリの名称変更 |
+| PUT | `/inventory/categories/order` | Admin | カテゴリの並び替え |
+| DELETE | `/inventory/categories/{id}` | Admin | カテゴリの削除（使用中は`moveTo`で物品を移す） |
 | POST | `/inventory/items` | Admin | 物品追加（mode/総数/写真/保管場所等） |
 | PATCH | `/inventory/items/{id}` | Admin | 物品編集・数量調整（履歴保存） |
 | POST | `/inventory/items/{id}/units` | Admin | 個体登録 |
