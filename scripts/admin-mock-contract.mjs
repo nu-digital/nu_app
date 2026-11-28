@@ -12,8 +12,12 @@ export const CONTRACT_PATHS = [
 
 const kind = (v) => (v === null || v === undefined ? 'null' : Array.isArray(v) ? 'array' : typeof v === 'object' ? 'object' : 'scalar');
 
+/** 中身のキーが記事ごとに自由な入れ物（Record<string, string>）。オブジェクトであることだけを比べ、中のキーは比べない */
+export const FREEFORM_KEYS = ['metadata'];
+
 /** 形の違いを文字列の配列で返す（空なら一致）。optional に挙げたキーは片方に無くてもよい。 */
 export function compareShapes(mock, real, optional = [], path = '$') {
+  if (FREEFORM_KEYS.some((k) => path.endsWith(`.${k}`))) return kind(mock) === kind(real) || kind(mock) === 'null' || kind(real) === 'null' ? [] : [`${path}: モック=${kind(mock)} 実API=${kind(real)}`];
   const diffs = [];
   const km = kind(mock), kr = kind(real);
   if (km === 'null' || kr === 'null') return diffs; // nullを許す項目（未設定など）は形を比べられない
