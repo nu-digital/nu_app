@@ -6,6 +6,9 @@ export const siteConfig = {
   ogImage: "/images/ogp/member.webp",
 };
 
+// プライバシーポリシーの問い合わせ先（団体公式Gmail）。**公開前に運用責任者が設定する**（空の間は、ページに「設定前」と表示される）。
+export const contactEmail = "";
+
 export const navItems = [
   { name: "Home", href: "/" },
   { name: "Blog", href: "/blog" },
