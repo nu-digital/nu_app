@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import Notice from "@/components/Notice";
 import MediaImg from "@/components/MediaImg";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
 import { describe, listItems, type Item } from "@/lib/api";
 
 export default function InventoryPage() {
@@ -56,15 +58,14 @@ function Inventory({ canManage }: { canManage: boolean }) {
     <main className="page wide">
       <h1>物品</h1>
       <nav className="subnav" aria-label="物品のメニュー">
-        <Link className="btn secondary inline" href="/inventory/loans">貸出中の一覧</Link>
-        <Link className="btn secondary inline" href="/inventory/history">履歴</Link>
-        {canManage && <Link className="btn secondary inline" href="/admin/inventory">物品の管理</Link>}
+        <Button variant="default" fullWidth={false} href="/inventory/loans">貸出中の一覧</Button>
+        <Button variant="default" fullWidth={false} href="/inventory/history">履歴</Button>
+        {canManage && <Button variant="default" fullWidth={false} href="/admin/inventory">物品の管理</Button>}
       </nav>
       {error && <Notice kind="error">{error}</Notice>}
       <form className="filters" role="search" onSubmit={(e) => { e.preventDefault(); setLoading(true); setApplied({ q: q.trim(), category, onlyAvailable }); }}>
         <div className="field">
-          <label htmlFor="iq">物品を探す</label>
-          <input id="iq" className="input" type="search" placeholder="名前・場所・カテゴリ" value={q} onChange={(e) => setQ(e.target.value)} />
+          <TextField id="iq" label="物品を探す" type="search" placeholder="名前・場所・カテゴリ" value={q} onChange={setQ} />
         </div>
         <div className="field">
           <label htmlFor="icat">カテゴリ</label>
@@ -76,7 +77,7 @@ function Inventory({ canManage }: { canManage: boolean }) {
         <div className="field">
           <label><input type="checkbox" checked={onlyAvailable} onChange={(e) => setOnlyAvailable(e.target.checked)} /> 借りられるものだけ</label>
         </div>
-        <button className="btn inline" type="submit">絞り込む</button>
+        <Button fullWidth={false} type="submit">絞り込む</Button>
       </form>
       {loading ? <p aria-busy="true">読み込んでいます…</p> : items.length === 0 ? <p>該当する物品はありません。</p> : (
         <ul className="grid">
@@ -97,7 +98,7 @@ function Inventory({ canManage }: { canManage: boolean }) {
           })}
         </ul>
       )}
-      {next && <button className="btn secondary inline" onClick={async () => { try { const r = await listItems({ ...applied, available: applied.onlyAvailable, cursor: next }); setItems((c) => [...c, ...r.items]); setNext(r.nextCursor); } catch (e) { setError(describe(e)); } }}>さらに表示</button>}
+      {next && <Button variant="default" fullWidth={false} type="submit" onClick={async () => { try { const r = await listItems({ ...applied, available: applied.onlyAvailable, cursor: next }); setItems((c) => [...c, ...r.items]); setNext(r.nextCursor); } catch (e) { setError(describe(e)); } }}>さらに表示</Button>}
     </main>
   );
 }

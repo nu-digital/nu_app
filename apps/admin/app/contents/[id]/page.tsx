@@ -9,6 +9,8 @@ import CollaboratorsPanel from "@/components/CollaboratorsPanel";
 import ContributorsPanel from "@/components/ContributorsPanel";
 import MarkdownPreview from "@/components/MarkdownPreview";
 import Notice from "@/components/Notice";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
 import {
   conflictRevision, describe, getContent, publishContent, saveRevision, unpublishContent, uploadMedia,
   type ContentDetail, type ContentRevision, type MediaInfo,
@@ -195,22 +197,21 @@ function Editor() {
         <section className="panel" aria-label="保存の競合">
           <p>あなたの編集（版{baseRevision}から）と、{conflict.editedBy}さんが保存した最新の版{conflict.revisionNo}が食い違っています。</p>
           <div className="actions">
-            <button className="btn secondary inline" onClick={() => { setConflict(null); setMsg(null); setVersion((v) => v + 1); }}>自分の編集を捨てて、最新を読み込む</button>
-            <button className="btn inline" onClick={() => { setBaseRevision(conflict.revisionNo); setConflict(null); notify({ kind: "success", text: `最新の版${conflict.revisionNo}を元に、あなたの編集を保存できるようにしました。内容を確認して「保存する」を押してください（${conflict.editedBy}さんの変更は、あなたの内容で置き換わります）。` }); }}>自分の編集を残して、最新の上に保存し直す</button>
+            <Button variant="default" fullWidth={false} type="submit" onClick={() => { setConflict(null); setMsg(null); setVersion((v) => v + 1); }}>自分の編集を捨てて、最新を読み込む</Button>
+            <Button fullWidth={false} type="submit" onClick={() => { setBaseRevision(conflict.revisionNo); setConflict(null); notify({ kind: "success", text: `最新の版${conflict.revisionNo}を元に、あなたの編集を保存できるようにしました。内容を確認して「保存する」を押してください（${conflict.editedBy}さんの変更は、あなたの内容で置き換わります）。` }); }}>自分の編集を残して、最新の上に保存し直す</Button>
           </div>
         </section>
       )}
 
       <div className="tabs" role="tablist" aria-label="表示の切り替え">
-        <button role="tab" aria-selected={tab === "edit"} className={`btn inline ${tab === "edit" ? "" : "secondary"}`} onClick={() => setTab("edit")}>編集</button>
-        <button role="tab" aria-selected={tab === "preview"} className={`btn inline ${tab === "preview" ? "" : "secondary"}`} onClick={() => setTab("preview")}>プレビュー</button>
+        <Button role="tab" aria-selected={tab === "edit"} variant={tab === "edit" ? "primary" : "default"} fullWidth={false} onClick={() => setTab("edit")}>編集</Button>
+        <Button role="tab" aria-selected={tab === "preview"} variant={tab === "preview" ? "primary" : "default"} fullWidth={false} onClick={() => setTab("preview")}>プレビュー</Button>
       </div>
 
       <div className={`editor-grid tab-${tab}`}>
         <section className="editor-edit" aria-label="編集">
           <div className="field">
-            <label htmlFor="e-title">タイトル（必須）</label>
-            <input id="e-title" className="input" maxLength={200} value={form.title} onChange={(e) => set({ title: e.target.value })} />
+            <TextField id="e-title" label="タイトル（必須）" maxLength={200} value={form.title} onChange={(value) => set({ title: value })} />
           </div>
           <div className="field">
             <label htmlFor="e-summary">要約</label>
@@ -230,7 +231,7 @@ function Editor() {
               <div className="cover" data-testid="cover">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={form.cover.url} alt="カバー画像" width={form.cover.width} height={form.cover.height} />
-                <button type="button" className="btn secondary inline" onClick={() => set({ cover: null })}>カバー画像を外す</button>
+                <Button variant="default" fullWidth={false} type="button" onClick={() => set({ cover: null })}>カバー画像を外す</Button>
               </div>
             )}
             {uploads.length > 0 && (
@@ -240,8 +241,8 @@ function Editor() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="thumb-sm" src={m.url} alt="アップロードした画像" width={64} height={64} />
                     <div className="actions">
-                      <button type="button" className="btn secondary inline" onClick={() => insertImage(m)}>本文に挿入</button>
-                      <button type="button" className="btn secondary inline" onClick={() => set({ cover: m })}>カバーにする</button>
+                      <Button variant="default" fullWidth={false} type="button" onClick={() => insertImage(m)}>本文に挿入</Button>
+                      <Button variant="default" fullWidth={false} type="button" onClick={() => set({ cover: m })}>カバーにする</Button>
                     </div>
                   </li>
                 ))}
@@ -249,8 +250,7 @@ function Editor() {
             )}
           </fieldset>
           <div className="field">
-            <label htmlFor="e-cat">カテゴリ</label>
-            <input id="e-cat" className="input" maxLength={30} value={form.category} onChange={(e) => set({ category: e.target.value })} />
+            <TextField id="e-cat" label="カテゴリ" maxLength={30} value={form.category} onChange={(value) => set({ category: value })} />
           </div>
           <div className="field">
             <label htmlFor="e-excerpt">抜粋（一覧に出す短い紹介）</label>
@@ -265,8 +265,7 @@ function Editor() {
               <option value="range">期間</option>
               <option value="unknown">不明</option>
             </select>
-            <label htmlFor="e-dlabel">表示する日付（例: 2026年8月1〜2日）</label>
-            <input id="e-dlabel" className="input" maxLength={100} value={form.dateLabel} onChange={(e) => set({ dateLabel: e.target.value })} />
+            <TextField id="e-dlabel" label="表示する日付（例: 2026年8月1〜2日）" maxLength={100} value={form.dateLabel} onChange={(value) => set({ dateLabel: value })} />
             <label htmlFor="e-dsort">並び替え用の日付{form.dateKind === "unknown" ? "（任意）" : "（必須）"}</label>
             <input id="e-dsort" className="input" type="date" value={form.sortDate} onChange={(e) => set({ sortDate: e.target.value })} />
             <p className="hint">公開サイトには「表示する日付」がそのまま出ます。並び替え用の日付は並び順にだけ使い、開催日としては表示しません。</p>
@@ -284,7 +283,7 @@ function Editor() {
       </div>
 
       <div className="actions sticky-actions">
-        <button className="btn inline" onClick={onSave} disabled={busy || !dirty || !form.title.trim()}>保存する</button>
+        <Button fullWidth={false} type="submit" onClick={onSave} disabled={busy || !dirty || !form.title.trim()}>保存する</Button>
         {dirty ? <span className="hint">保存していない変更があります</span> : <span className="hint">保存済み</span>}
       </div>
 
@@ -294,8 +293,8 @@ function Editor() {
           <>
             <p className="hint">{published === null ? "まだ公開していません。" : `公開中は版${published}です。${published !== w.revisionNo ? `作業中の版${w.revisionNo}は未公開です。` : "作業中の版と同じです。"}`}</p>
             <div className="actions">
-              <button className="btn inline" onClick={onPublish} disabled={busy || dirty || published === w.revisionNo}>版{w.revisionNo}を公開する</button>
-              {published !== null && <button className="btn secondary inline" onClick={onUnpublish} disabled={busy}>公開を止める</button>}
+              <Button fullWidth={false} type="submit" onClick={onPublish} disabled={busy || dirty || published === w.revisionNo}>版{w.revisionNo}を公開する</Button>
+              {published !== null && <Button variant="default" fullWidth={false} type="submit" onClick={onUnpublish} disabled={busy}>公開を止める</Button>}
             </div>
             {dirty && <p className="hint">先に保存してください（保存した版を公開します）。</p>}
           </>

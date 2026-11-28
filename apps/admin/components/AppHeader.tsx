@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Button from "@/components/ui/Button";
+
 
 /**
  * ポータル共通のヘッダー（Charcoal風。ロゴ・アプリの切り替え・表示名・ログアウト）。
@@ -32,9 +34,9 @@ export default function AppHeader({ displayName, onLogout, busy, showNav = true 
           <span className="name" title={displayName}>
             {displayName}
           </span>
-          <button className="btn secondary inline" onClick={onLogout} disabled={busy}>
+          <Button variant="default" fullWidth={false} onClick={onLogout} disabled={busy}>
             ログアウト
-          </button>
+          </Button>
         </div>
       </div>
       {showNav && (

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import AppShell from "@/components/AppShell";
 import Notice from "@/components/Notice";
+import Button from "@/components/ui/Button";
 import { describe, listContents, type ContentListItem } from "@/lib/api";
 
 export default function ContentsPage() {
@@ -34,7 +35,7 @@ function Contents() {
       <h1>記事・作品</h1>
       <p className="lead">活動報告や作品紹介の下書きを書きます。公開できるのは編集者（Editor）以上です。公開すると、公開サイトに表示されます。</p>
       <div className="subnav">
-        <Link className="btn inline" href="/contents/new">新しく書く</Link>
+        <Button fullWidth={false} href="/contents/new">新しく書く</Button>
       </div>
       {error && <Notice kind="error">{error}</Notice>}
       <div className="filters">
@@ -67,7 +68,7 @@ function Contents() {
           ))}
         </ul>
       )}
-      {next && <button className="btn secondary inline" onClick={async () => { try { const r = await listContents({ section, mine, cursor: next }); setItems((c) => [...c, ...r.items]); setNext(r.nextCursor); } catch (e) { setError(describe(e)); } }}>さらに表示</button>}
+      {next && <Button variant="default" fullWidth={false} type="submit" onClick={async () => { try { const r = await listContents({ section, mine, cursor: next }); setItems((c) => [...c, ...r.items]); setNext(r.nextCursor); } catch (e) { setError(describe(e)); } }}>さらに表示</Button>}
     </main>
   );
 }

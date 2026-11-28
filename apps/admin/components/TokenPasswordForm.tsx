@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
-import Link from "next/link";
 
 import Brand from "@/components/Brand";
 import PasswordField from "@/components/PasswordField";
+import Button from "@/components/ui/Button";
 import { describe, submitToken } from "@/lib/api";
 
 type Props = { kind: "accept-invite" | "reset-password"; title: string; lead: string; done: string };
@@ -71,9 +71,9 @@ export default function TokenPasswordForm({ kind, title, lead, done }: Props) {
               <strong>完了</strong>
               <span>{done}</span>
             </div>
-            <Link className="btn" href="/login">
+            <Button href="/login">
               ログイン画面へ
-            </Link>
+            </Button>
           </>
         ) : !token ? (
           <div className="notice error" role="alert">
@@ -92,9 +92,9 @@ export default function TokenPasswordForm({ kind, title, lead, done }: Props) {
             <form onSubmit={onSubmit}>
               <PasswordField label="新しいパスワード" value={password} onChange={setPassword} autoComplete="new-password" hint="10文字以上128文字以内。ログインIDと同じものや、よく使われるものは使えません。" />
               <PasswordField label="新しいパスワード（確認）" value={confirm} onChange={setConfirm} autoComplete="new-password" />
-              <button className="btn" type="submit" disabled={busy}>
+              <Button type="submit" disabled={busy}>
                 {busy ? "送信しています…" : "パスワードを設定する"}
-              </button>
+              </Button>
             </form>
           </>
         )}

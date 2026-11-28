@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import Notice from "@/components/Notice";
 import MediaImg from "@/components/MediaImg";
+import Button from "@/components/ui/Button";
 import { describe, listMembers, type Member } from "@/lib/api";
 
 export default function MembersPage() {
@@ -60,7 +61,7 @@ function Members() {
       <form className="search" role="search" onSubmit={(e) => { e.preventDefault(); setQuery(q.trim()); void load(q.trim()); }}>
         <label className="visually-hidden" htmlFor="mq">表示名で検索</label>
         <input id="mq" className="input" type="search" placeholder="表示名で検索" value={q} onChange={(e) => setQ(e.target.value)} />
-        <button className="btn inline" type="submit">検索</button>
+        <Button fullWidth={false} type="submit">検索</Button>
       </form>
       {loading ? <p aria-busy="true">読み込んでいます…</p> : items.length === 0 ? <p>該当するメンバーはいません。</p> : (
         <ul className="users">
@@ -76,7 +77,7 @@ function Members() {
           ))}
         </ul>
       )}
-      {next && <button className="btn secondary inline" onClick={async () => { try { const r = await listMembers(query, next); setItems((c) => [...c, ...r.items]); setNext(r.nextCursor); } catch (e) { setError(describe(e)); } }}>さらに表示</button>}
+      {next && <Button variant="default" fullWidth={false} type="submit" onClick={async () => { try { const r = await listMembers(query, next); setItems((c) => [...c, ...r.items]); setNext(r.nextCursor); } catch (e) { setError(describe(e)); } }}>さらに表示</Button>}
     </main>
   );
 }

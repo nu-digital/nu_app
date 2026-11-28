@@ -15,19 +15,27 @@ body {
   --charcoal-color-text-default-text1: var(--color-ink);
   --charcoal-color-text-secondary-default: var(--color-ink); /* 入力した文字は本文と同じ濃さで読めるようにする */
   --charcoal-color-text-placeholder-default: var(--color-muted);
+  /* 取り消せない操作（Danger）。Charcoal既定の赤は白文字とのコントラストが足りないため、団体のエラー色にする（白との比 6.5:1） */
+  --charcoal-color-container-negative-default: var(--color-error);
+  --charcoal-color-container-negative-hover: #8c1d18;
+  --charcoal-color-container-negative-press: #6e1713;
+  --charcoal-color-text-on-negative-default: #fff;
+  --charcoal-color-text-on-negative-hover: #fff;
+  --charcoal-color-text-on-negative-press: #fff;
 }
 
 /* タップ対象は44px以上（既存の --tap）。Charcoalの既定は40px */
-.charcoal-button:not([data-size="S"]),
-.charcoal-text-field-container {
-  height: var(--tap);
-}
+.charcoal-text-field-container { height: var(--tap); }
+/* ボタン: 高さは44px以上。長い日本語は折り返す（Charcoal既定の width: min-content・nowrap のままだと、狭い画面ではみ出す） */
+.charcoal-button:not([data-size="S"]) { height: auto; min-height: var(--tap); padding-top: 4px; padding-bottom: 4px; }
+.charcoal-button { white-space: normal; text-align: center; }
+.charcoal-button:not([data-full-width="true"]) { width: auto; max-width: 100%; }
+a.charcoal-button { text-decoration: none; }
 
-/* 入力欄: Charcoalの薄い塗りに、白地でも境界が分かる1pxの枠（白との比 3:1以上）を足す */
-.charcoal-text-field-container {
-  border: 1px solid var(--color-field-border);
-}
-.charcoal-text-field-container[data-invalid="true"] { border-color: var(--color-error); }
+/* 入力欄: Charcoalの薄い塗りに、白地でも境界が分かる1pxの枠（白との比 3:1以上）を足す。
+   枠は内側の影で描く（border にすると中の <input> の高さが44pxを下回るため） */
+.charcoal-text-field-container { box-shadow: inset 0 0 0 1px var(--color-field-border); }
+.charcoal-text-field-container[data-invalid="true"] { box-shadow: inset 0 0 0 1px var(--color-error); }
 .charcoal-text-field-container:has(.charcoal-icon-button) { padding-right: 2px; }
 
 /* フォーカス表示はポータル全体と同じ二重リング（--focus）にそろえる。Charcoalの既定は淡い青で、白地では見えにくい */
@@ -36,18 +44,20 @@ body {
   border-radius: var(--charcoal-radius-oval, 999999px); /* 全体の :focus-visible が角丸4pxにするのを打ち消す */
 }
 .charcoal-text-field-container:not([aria-disabled="true"]):focus-within {
-  border-color: var(--color-brand);
-  box-shadow: var(--focus);
+  box-shadow: inset 0 0 0 1px var(--color-brand), var(--focus);
 }
 .charcoal-text-field-container:not([aria-disabled="true"]):has(.charcoal-icon-button:focus-visible) {
-  box-shadow: none; /* 目のアイコンにフォーカスがあるときは、リングをアイコン側だけに出す */
+  box-shadow: inset 0 0 0 1px var(--color-field-border); /* 目のアイコンにフォーカスがあるときは、リングをアイコン側だけに出す */
 }
 .charcoal-text-field-container:not([aria-disabled="true"])[data-invalid="true"]:focus-within {
-  box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--color-error);
+  box-shadow: inset 0 0 0 1px var(--color-error), 0 0 0 3px #fff, 0 0 0 5px var(--color-error);
 }
 .charcoal-text-field-input:focus-visible {
   box-shadow: none; /* リングは外側の枠に出す */
 }
+/* Charcoalは16pxの文字を0.875倍に縮めて14pxに見せる（iOSの拡大を防ぐため）。縮小のせいで入力の高さが44px未満になるので、
+   縮小をやめて本文と同じ16pxで表示する（16pxならiOSでも拡大されない） */
+.charcoal-text-field-input { transform: none; width: 100%; height: 100%; font-size: 1rem; line-height: 1.5; border-radius: 4px; }
 
 /* ラベルは本文と同じ大きさにする */
 .charcoal-field-label { font-size: 1rem; line-height: 1.5; }

@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import MemberPicker from "@/components/MemberPicker";
 import Notice from "@/components/Notice";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
 import {
   describe, linkLegacyAuthor, listLegacyAuthors, permitLegacyAuthor, unlinkLegacyAuthor, withdrawLegacyAuthor,
   type LegacyAuthor,
@@ -86,18 +88,17 @@ function AuthorRow({ a, onMsg, onChanged }: { a: LegacyAuthor; onMsg: (m: { kind
           <>
             {a.publicationState !== "permitted" && (
               <div className="field">
-                <label htmlFor={nid}>本人の許可をどう確認したか（200文字以内。個人情報は書かない）</label>
-                <input id={nid} className="input" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} />
-                <button type="button" className="btn inline" disabled={busy || note.trim() === ""} onClick={() => run(() => permitLegacyAuthor(a.id, note.trim()), "公開の許可を記録しました。")}>本人の許可を確認した（公開する）</button>
+                <TextField id={nid} label="本人の許可をどう確認したか（200文字以内。個人情報は書かない）" value={note} maxLength={200} onChange={setNote} />
+                <Button fullWidth={false} type="button" disabled={busy || note.trim() === ""} onClick={() => run(() => permitLegacyAuthor(a.id, note.trim()), "公開の許可を記録しました。")}>本人の許可を確認した（公開する）</Button>
               </div>
             )}
             {a.publicationState === "permitted" && (
-              <button type="button" className="btn secondary inline" disabled={busy} onClick={() => run(() => withdrawLegacyAuthor(a.id), "公開を止めました。")}>公開を止める</button>
+              <Button variant="default" fullWidth={false} type="button" disabled={busy} onClick={() => run(() => withdrawLegacyAuthor(a.id), "公開を止めました。")}>公開を止める</Button>
             )}
             <div className="actions">
               {a.linkedUserId
-                ? <button type="button" className="btn secondary inline" disabled={busy} onClick={() => run(() => unlinkLegacyAuthor(a.id), "紐付けを外しました（公開の可否は変わりません）。")}>紐付けを外す</button>
-                : <button type="button" className="btn secondary inline" disabled={busy} onClick={() => setPicking((v) => !v)}>アカウントに紐付ける</button>}
+                ? <Button variant="default" fullWidth={false} type="button" disabled={busy} onClick={() => run(() => unlinkLegacyAuthor(a.id), "紐付けを外しました（公開の可否は変わりません）。")}>紐付けを外す</Button>
+                : <Button variant="default" fullWidth={false} type="button" disabled={busy} onClick={() => setPicking((v) => !v)}>アカウントに紐付ける</Button>}
             </div>
             {picking && !a.linkedUserId && (
               <MemberPicker label="紐付けるメンバー（本人であることを確認してから選ぶ）" exclude={[]} disabled={busy} onPick={(m) => run(() => linkLegacyAuthor(a.id, m.id), `${m.displayName}さんに紐付けました（公開の可否は変わりません）。`)} />

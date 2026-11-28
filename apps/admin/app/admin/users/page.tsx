@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import AppHeader from "@/components/AppHeader";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
 import {
   createUser, deletePrivateProfile, describe, fetchMe, getPrivateProfile, issueLink, listUsers, logout, setRole, setUserStatus,
   type AdminUser, type LinkResult, type Me, type PrivateProfile,
@@ -103,9 +104,9 @@ export default function UsersPage() {
             <strong>エラー</strong>
             <span>この画面を使う権限がありません。管理者（Admin・Owner）だけが使えます。</span>
           </div>
-          <Link className="btn" href="/">
+          <Button href="/">
             ランチャーへ戻る
-          </Link>
+          </Button>
         </div>
       </main>
     );
@@ -127,7 +128,7 @@ export default function UsersPage() {
       />
       <main className="page">
         <h1>ユーザー管理</h1>
-        <nav className="subnav" aria-label="管理のメニュー"><Link className="btn secondary inline" href="/admin/legacy-authors">既存記事の投稿者</Link> <Link className="btn secondary inline" href="/admin/published-search">公開版の本人情報の確認</Link></nav>
+        <nav className="subnav" aria-label="管理のメニュー"><Button variant="default" fullWidth={false} href="/admin/legacy-authors">既存記事の投稿者</Button> <Button variant="default" fullWidth={false} href="/admin/published-search">公開版の本人情報の確認</Button></nav>
 
         {(notice || error) && (
           <div className={`notice ${error ? "error" : "success"}`} role={error ? "alert" : "status"} tabIndex={-1} ref={noticeRef}>
@@ -153,9 +154,9 @@ export default function UsersPage() {
                 </button>
               </div>
             </div>
-            <button className="btn secondary inline" onClick={() => setIssued(null)}>
+            <Button variant="default" fullWidth={false} type="submit" onClick={() => setIssued(null)}>
               閉じる
-            </button>
+            </Button>
           </section>
         )}
 
@@ -184,7 +185,7 @@ export default function UsersPage() {
           >
             <label className="visually-hidden" htmlFor="q">ログインIDまたは表示名で検索</label>
             <input id="q" className="input" type="search" placeholder="ログインIDまたは表示名" value={q} onChange={(e) => setQ(e.target.value)} />
-            <button className="btn inline" type="submit">検索</button>
+            <Button fullWidth={false} type="submit">検索</Button>
           </form>
           {loading ? (
             <p aria-busy="true">読み込んでいます…</p>
@@ -213,46 +214,46 @@ export default function UsersPage() {
                     </div>
                     <div className="actions">
                       {u.status === "invited" && (
-                        <button className="btn secondary inline" disabled={busy || locked} onClick={() => run(u.id, async () => showLink(`${u.displayName || u.loginId}さんの招待URL`, await issueLink(u.id, "invite-link")), "招待URLを再発行しました（以前のURLは使えません）。")}>
+                        <Button variant="default" fullWidth={false} type="submit" disabled={busy || locked} onClick={() => run(u.id, async () => showLink(`${u.displayName || u.loginId}さんの招待URL`, await issueLink(u.id, "invite-link")), "招待URLを再発行しました（以前のURLは使えません）。")}>
                           招待URLを再発行
-                        </button>
+                        </Button>
                       )}
                       {u.status === "active" && (
-                        <button className="btn secondary inline" disabled={busy || locked} onClick={() => run(u.id, async () => showLink(`${u.displayName || u.loginId}さんのパスワード再設定URL`, await issueLink(u.id, "reset-link")), "再設定URLを発行しました。")}>
+                        <Button variant="default" fullWidth={false} type="submit" disabled={busy || locked} onClick={() => run(u.id, async () => showLink(`${u.displayName || u.loginId}さんのパスワード再設定URL`, await issueLink(u.id, "reset-link")), "再設定URLを発行しました。")}>
                           再設定URLを発行
-                        </button>
+                        </Button>
                       )}
                       {u.status !== "disabled" && !self && (
                         confirming === `stop-${u.id}` ? (
                           <span className="confirm" role="group" aria-label={`${u.loginId}を停止する確認`}>
                             <span>停止すると、ログイン中の端末もすべて解除されます。</span>
-                            <button className="btn danger inline" disabled={busy} onClick={() => run(u.id, () => setUserStatus(u.id, "disabled"), `${u.loginId} を停止しました。`)}>停止する</button>
-                            <button className="btn secondary inline" onClick={() => setConfirming(null)}>やめる</button>
+                            <Button variant="danger" fullWidth={false} type="submit" disabled={busy} onClick={() => run(u.id, () => setUserStatus(u.id, "disabled"), `${u.loginId} を停止しました。`)}>停止する</Button>
+                            <Button variant="default" fullWidth={false} type="submit" onClick={() => setConfirming(null)}>やめる</Button>
                           </span>
                         ) : (
-                          <button className="btn secondary inline" disabled={busy || locked} onClick={() => setConfirming(`stop-${u.id}`)}>停止する</button>
+                          <Button variant="default" fullWidth={false} type="submit" disabled={busy || locked} onClick={() => setConfirming(`stop-${u.id}`)}>停止する</Button>
                         )
                       )}
                       {u.status === "disabled" && (
-                        <button className="btn secondary inline" disabled={busy || locked} onClick={() => run(u.id, () => setUserStatus(u.id, "active"), `${u.loginId} を再開しました。` )}>再開する</button>
+                        <Button variant="default" fullWidth={false} type="submit" disabled={busy || locked} onClick={() => run(u.id, () => setUserStatus(u.id, "active"), `${u.loginId} を再開しました。` )}>再開する</Button>
                       )}
                       {isAdmin && !u.roles.includes("owner") && (
-                        <button className="btn secondary inline" disabled={busy} onClick={() => run(u.id, () => setRole(u.id, "editor", !u.roles.includes("editor")), u.roles.includes("editor") ? "Editorを外しました。" : "Editorにしました。")}>
+                        <Button variant="default" fullWidth={false} type="submit" disabled={busy} onClick={() => run(u.id, () => setRole(u.id, "editor", !u.roles.includes("editor")), u.roles.includes("editor") ? "Editorを外しました。" : "Editorにしました。")}>
                           {u.roles.includes("editor") ? "Editorを外す" : "Editorにする"}
-                        </button>
+                        </Button>
                       )}
                       {isOwner && !u.roles.includes("owner") && (
-                        <button className="btn secondary inline" disabled={busy} onClick={() => run(u.id, () => setRole(u.id, "admin", !u.roles.includes("admin")), u.roles.includes("admin") ? "Adminを外しました。" : "Adminにしました。")}>
+                        <Button variant="default" fullWidth={false} type="submit" disabled={busy} onClick={() => run(u.id, () => setRole(u.id, "admin", !u.roles.includes("admin")), u.roles.includes("admin") ? "Adminを外しました。" : "Adminにしました。")}>
                           {u.roles.includes("admin") ? "Adminを外す" : "Adminにする"}
-                        </button>
+                        </Button>
                       )}
                     </div>
                     <div className="actions">
-                      <button className="btn secondary inline" disabled={busy} onClick={() => run(u.id, async () => setPriv(await getPrivateProfile(u.id)), "個人情報を表示しました（この閲覧は記録されます）。")}>
+                      <Button variant="default" fullWidth={false} type="submit" disabled={busy} onClick={() => run(u.id, async () => setPriv(await getPrivateProfile(u.id)), "個人情報を表示しました（この閲覧は記録されます）。")}>
                         個人情報を見る
-                      </button>
+                      </Button>
                       {u.status === "disabled" && deleting !== u.id && (
-                        <button className="btn secondary inline" disabled={busy} onClick={() => { setDeleting(u.id); setReason(""); setAnonymize(true); }}>個人情報を削除する</button>
+                        <Button variant="default" fullWidth={false} type="submit" disabled={busy} onClick={() => { setDeleting(u.id); setReason(""); setAnonymize(true); }}>個人情報を削除する</Button>
                       )}
                     </div>
                     {priv && priv.id === u.id && (
@@ -264,7 +265,7 @@ export default function UsersPage() {
                           <dt>学生証番号</dt><dd>{priv.private.studentNumber ?? "（未入力）"}</dd>
                           <dt>最寄り駅</dt><dd>{priv.private.nearestStation ?? "（未入力）"}</dd>
                         </dl>
-                        <button className="btn secondary inline" onClick={() => setPriv(null)}>閉じる</button>
+                        <Button variant="default" fullWidth={false} type="submit" onClick={() => setPriv(null)}>閉じる</Button>
                       </div>
                     )}
                     {deleting === u.id && (
@@ -286,8 +287,8 @@ export default function UsersPage() {
                           <label><input type="checkbox" checked={anonymize} onChange={(e) => setAnonymize(e.target.checked)} /> 表示名も「退会メンバー」に置き換える</label>
                         </div>
                         <div className="actions">
-                          <button className="btn danger inline" type="submit" disabled={busy || reason.trim() === ""}>完全に削除する</button>
-                          <button className="btn secondary inline" type="button" onClick={() => setDeleting(null)}>やめる</button>
+                          <Button variant="danger" fullWidth={false} type="submit" disabled={busy || reason.trim() === ""}>完全に削除する</Button>
+                          <Button variant="default" fullWidth={false} type="button" onClick={() => setDeleting(null)}>やめる</Button>
                         </div>
                       </form>
                     )}
@@ -298,8 +299,7 @@ export default function UsersPage() {
             </ul>
           )}
           {next && (
-            <button
-              className="btn secondary inline"
+            <Button variant="default" fullWidth={false} type="submit"
               onClick={async () => {
                 try {
                   const r = await listUsers(query, next);
@@ -308,10 +308,9 @@ export default function UsersPage() {
                 } catch (e) {
                   setError(describe(e));
                 }
-              }}
-            >
+              }}>
               さらに表示
-            </button>
+            </Button>
           )}
         </section>
       </main>
@@ -342,18 +341,16 @@ function AddUser({ onCreated, onError }: { onCreated: (r: LinkResult) => void; o
       }}
     >
       <div className="field">
-        <label htmlFor="new-login">ログインID</label>
-        <input id="new-login" className="input" value={loginId} onChange={(e) => setLoginId(e.target.value)} required autoCapitalize="none" spellCheck={false} />
+        <TextField id="new-login" label="ログインID" value={loginId} onChange={setLoginId} required autoCapitalize="none" spellCheck={false} />
         <p className="hint">小文字の英数字と . _ - が使えます（2〜63文字、最初は英数字）。本人は変更できません。</p>
       </div>
       <div className="field">
-        <label htmlFor="new-name">表示名</label>
-        <input id="new-name" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={64} />
+        <TextField id="new-name" label="表示名" value={displayName} onChange={setDisplayName} required maxLength={64} />
         <p className="hint">メンバー一覧などに表示される名前です（64文字まで）。本人があとで変更できます。</p>
       </div>
-      <button className="btn inline" type="submit" disabled={busy}>
+      <Button fullWidth={false} type="submit" disabled={busy}>
         {busy ? "追加しています…" : "追加して招待URLを発行する"}
-      </button>
+      </Button>
     </form>
   );
 }

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import Notice from "@/components/Notice";
 import MediaImg from "@/components/MediaImg";
+import Button from "@/components/ui/Button";
 import { createLoan, describe, getItem, returnLoan, type ItemDetail } from "@/lib/api";
 
 export default function ItemPage() {
@@ -71,7 +72,7 @@ function Detail() {
                   <label htmlFor="qty">借りる数</label>
                   <input id="qty" className="input" type="number" min={1} max={max} inputMode="numeric" value={qty} onChange={(e) => setQty(Math.max(1, Math.min(max, Number(e.target.value) || 1)))} />
                 </div>
-                <button className="btn inline" type="submit" disabled={busy}>借りる</button>
+                <Button fullWidth={false} type="submit" disabled={busy}>借りる</Button>
               </form>
             ) : (
               <p className="hint">いま借りられる数がありません。返却されるまでお待ちください。</p>
@@ -87,7 +88,7 @@ function Detail() {
                     <strong>{u.assetTag}</strong>
                     <div className="user-id">{u.loaned ? `貸出中: ${u.loaned.borrowerDisplayName}さん（${u.loaned.elapsedDays}日目）` : "借りられます"}</div>
                   </div>
-                  {!u.loaned && <button className="btn inline" disabled={busy} onClick={() => act(async () => { await createLoan({ itemId: it.id, unitId: u.id }); return `${u.assetTag} を借りました。`; })}>この個体を借りる</button>}
+                  {!u.loaned && <Button fullWidth={false} type="submit" disabled={busy} onClick={() => act(async () => { await createLoan({ itemId: it.id, unitId: u.id }); return `${u.assetTag} を借りました。`; })}>この個体を借りる</Button>}
                 </li>
               ))}
             </ul>
@@ -107,7 +108,7 @@ function Detail() {
                   <div className="actions">
                     <label className="visually-hidden" htmlFor={`rq-${l.id}`}>{l.borrowerDisplayName}さんの分の返却数</label>
                     <input id={`rq-${l.id}`} className="input narrow-input" type="number" min={1} max={l.quantity} inputMode="numeric" value={retQty[l.id] ?? l.quantity} onChange={(e) => setRetQty({ ...retQty, [l.id]: Math.max(1, Math.min(l.quantity, Number(e.target.value) || 1)) })} />
-                    <button className="btn secondary inline" disabled={busy} onClick={() => act(async () => { const n = retQty[l.id] ?? l.quantity; const r = await returnLoan(l.id, n); return `${n}個返却しました（未返却は${r.outstanding}個）。`; })}>返却する</button>
+                    <Button variant="default" fullWidth={false} type="submit" disabled={busy} onClick={() => act(async () => { const n = retQty[l.id] ?? l.quantity; const r = await returnLoan(l.id, n); return `${n}個返却しました（未返却は${r.outstanding}個）。`; })}>返却する</Button>
                   </div>
                 </li>
               ))}

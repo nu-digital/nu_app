@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import AppShell from "@/components/AppShell";
 import Notice from "@/components/Notice";
+import Button from "@/components/ui/Button";
 import { describe, listLoans, returnLoan, type OutstandingLoan } from "@/lib/api";
 
 export default function LoansPage() {
@@ -62,8 +63,7 @@ function Loans() {
                     <input id={`lq-${l.id}`} className="input narrow-input" type="number" min={1} max={l.quantity} inputMode="numeric" value={retQty[l.id] ?? l.quantity} onChange={(e) => setRetQty({ ...retQty, [l.id]: Math.max(1, Math.min(l.quantity, Number(e.target.value) || 1)) })} />
                   </>
                 )}
-                <button
-                  className="btn secondary inline"
+                <Button variant="default" fullWidth={false} type="submit"
                   disabled={busyId === l.id}
                   onClick={async () => {
                     setBusyId(l.id);
@@ -78,16 +78,15 @@ function Loans() {
                     } finally {
                       setBusyId(null);
                     }
-                  }}
-                >
+                  }}>
                   返却する
-                </button>
+                </Button>
               </div>
             </li>
           ))}
         </ul>
       )}
-      {next && <button className="btn secondary inline" onClick={async () => { try { const r = await listLoans({ mine, cursor: next }); setItems((c) => [...c, ...r.items]); setNext(r.nextCursor); } catch (e) { setMsg({ kind: "error", text: describe(e) }); } }}>さらに表示</button>}
+      {next && <Button variant="default" fullWidth={false} type="submit" onClick={async () => { try { const r = await listLoans({ mine, cursor: next }); setItems((c) => [...c, ...r.items]); setNext(r.nextCursor); } catch (e) { setMsg({ kind: "error", text: describe(e) }); } }}>さらに表示</Button>}
     </main>
   );
 }
