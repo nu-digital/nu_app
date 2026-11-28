@@ -40,6 +40,7 @@ type NotificationPayload struct {
 	Kind      string `json:"kind,omitempty"`   // 訂正: void / adjust
 	Target    string `json:"target,omitempty"` // 訂正: loan / return
 	Delta     int    `json:"delta,omitempty"`
+	Location  string `json:"location,omitempty"` // 返却: 返却した場所
 }
 
 // enqueueNotification は業務のトランザクションの中でoutboxへ積む。設定が無効なら積まない。

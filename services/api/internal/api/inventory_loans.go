@@ -181,9 +181,19 @@ func (s *server) returnLoan(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		Quantity *int `json:"quantity"`
+		// Location は返却した場所（任意。50文字以内・改行なし）。空なら物品の保管場所は変えない。
+		Location string `json:"location"`
 	}
 	if r.ContentLength != 0 && !decodeJSON(w, r, &req) {
 		return
+	}
+	location := strings.TrimSpace(req.Location)
+	if location != "" {
+		var lerr error
+		if location, lerr = checkText(location, "返却場所", 1, 50); lerr != nil || strings.ContainsAny(location, "\n\r\t") {
+			httpx.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INPUT", "返却場所は50文字以内で、改行なしで入力してください")
+			return
+		}
 	}
 	var out struct {
 		LoanID      string `json:"loanId"`
@@ -223,7 +233,7 @@ func (s *server) returnLoan(w http.ResponseWriter, r *http.Request) {
 		if qty > int(outstanding) {
 			return &errTx{http.StatusConflict, "EXCEEDS_OUTSTANDING", "未返却の数（" + strconv.Itoa(int(outstanding)) + "）を超えて返却できません"}
 		}
-		ret, err := q.CreateInventoryReturn(r.Context(), store.CreateInventoryReturnParams{LoanID: loanID, ActorUserID: a.Identity.UserID, Quantity: int32(qty), ReturnedAt: pgtype.Timestamptz{Time: s.Now(), Valid: true}})
+		ret, err := q.CreateInventoryReturn(r.Context(), store.CreateInventoryReturnParams{LoanID: loanID, ActorUserID: a.Identity.UserID, Quantity: int32(qty), ReturnedAt: pgtype.Timestamptz{Time: s.Now(), Valid: true}, Location: location})
 		if err != nil {
 			return err
 		}
@@ -234,7 +244,15 @@ func (s *server) returnLoan(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		out.LoanID, out.Returned, out.Outstanding = loanID.String(), int32(qty), left
-		if err := s.auditEvent(r.Context(), q, a.Identity.UserID, loan.BorrowerUserID, "inventory.loan_returned", map[string]any{"itemId": loan.ItemID.String(), "loanId": loanID.String(), "quantity": qty, "proxy": loan.BorrowerUserID != a.Identity.UserID}); err != nil {
+		// 返却場所が現在の保管場所と違えば、物品の保管場所を更新する（保管場所は物品単位。数量管理・個体管理とも）
+		notifyLocation := ""
+		if location != "" && location != retItem.Location {
+			if err := q.UpdateItemLocation(r.Context(), store.UpdateItemLocationParams{ID: loan.ItemID, Location: location}); err != nil {
+				return err
+			}
+			notifyLocation = location
+		}
+		if err := s.auditEvent(r.Context(), q, a.Identity.UserID, loan.BorrowerUserID, "inventory.loan_returned", map[string]any{"itemId": loan.ItemID.String(), "loanId": loanID.String(), "quantity": qty, "proxy": loan.BorrowerUserID != a.Identity.UserID, "locationChanged": notifyLocation != ""}); err != nil {
 			return err
 		}
 		tag := ""
@@ -243,7 +261,7 @@ func (s *server) returnLoan(w http.ResponseWriter, r *http.Request) {
 		}
 		return s.enqueueNotification(r.Context(), q, EventLoanReturned, "return:"+ret.ID.String(), NotificationPayload{
 			ItemName: retItem.Name, AssetTag: tag, Quantity: qty, Borrower: s.displayName(r.Context(), q, loan.BorrowerUserID),
-			Actor: s.displayName(r.Context(), q, a.Identity.UserID), Proxy: loan.BorrowerUserID != a.Identity.UserID})
+			Actor: s.displayName(r.Context(), q, a.Identity.UserID), Proxy: loan.BorrowerUserID != a.Identity.UserID, Location: location})
 	})
 	if err != nil {
 		s.writeTxErr(w, r, err)
@@ -398,13 +416,14 @@ func (s *server) history(w http.ResponseWriter, r *http.Request) {
 		// 訂正イベントのとき: kind=correction、correctionKind=adjust/void、targetType=loan/return。actor=訂正した人。
 		CorrectionKind string `json:"correctionKind,omitempty"`
 		TargetType     string `json:"targetType,omitempty"`
-		Reason         string `json:"reason,omitempty"` // 理由は管理者にだけ返す（自由記述のため）
+		Reason         string `json:"reason,omitempty"`   // 理由は管理者にだけ返す（自由記述のため）
+		Location       string `json:"location,omitempty"` // 返却した場所（返却のイベントだけ）
 	}
 	items := make([]event, 0, len(rows))
 	for _, x := range rows {
 		items = append(items, event{ID: x.EventID.String(), Kind: x.Kind, ItemID: x.ItemID.String(), ItemName: x.ItemName, AssetTag: x.AssetTag,
 			BorrowerDisplayName: x.BorrowerDisplayName, ActorDisplayName: x.ActorDisplayName, Quantity: x.Quantity, At: x.At.Time,
-			CorrectionKind: x.CorrectionKind, TargetType: x.TargetType, Reason: reasonFor(isAdmin, x.Reason)})
+			CorrectionKind: x.CorrectionKind, TargetType: x.TargetType, Reason: reasonFor(isAdmin, x.Reason), Location: x.Location})
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": next})
 }

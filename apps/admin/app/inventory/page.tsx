@@ -17,8 +17,12 @@ export default function InventoryPage() {
   return <AppShell>{(me) => <Inventory canManage={me.user.roles.includes("admin") || me.user.roles.includes("owner")} />}</AppShell>;
 }
 
-type Filters = { q: string; categoryId: string; onlyAvailable: boolean; mine: boolean; sort: ItemSort };
-const INITIAL: Filters = { q: "", categoryId: "", onlyAvailable: false, mine: false, sort: "name" };
+/** 状態の絞り込み。空なら全部。貸出可能＝借りられる数が1以上（一部貸出中を含む）／貸出中＝貸出中の数が1以上／自分＝自分が借りている */
+type StatusFilter = "" | "available" | "loaned" | "mine";
+type Filters = { q: string; categoryId: string; status: StatusFilter; sort: ItemSort };
+const INITIAL: Filters = { q: "", categoryId: "", status: "", sort: "name" };
+const STATUSES: { key: Exclude<StatusFilter, "">; label: string }[] = [{ key: "available", label: "貸出可能" }, { key: "loaned", label: "貸出中" }, { key: "mine", label: "自分が借りている" }];
+const query = (f: Filters) => ({ q: f.q, categoryId: f.categoryId, available: f.status === "available", loaned: f.status === "loaned", mine: f.status === "mine", sort: f.sort });
 
 /** カードの写真に重ねる状態の札（メルカリのSOLDのように、借りられない物がひと目で分かる） */
 function Ribbon({ it }: { it: Item }) {
@@ -49,7 +53,7 @@ function Inventory({ canManage }: { canManage: boolean }) {
   const loading = loadedKey !== key;
   useEffect(() => {
     let alive = true;
-    listItems({ q: f.q, categoryId: f.categoryId, available: f.onlyAvailable, mine: f.mine, sort: f.sort })
+    listItems(query(f))
       .then((r) => {
         if (!alive) return;
         firstLoad.current = false;
@@ -70,13 +74,13 @@ function Inventory({ canManage }: { canManage: boolean }) {
   }, [f, key]);
 
   const set = useCallback((patch: Partial<Filters>) => setF((cur) => ({ ...cur, ...patch })), []);
-  const filtered = f.q !== "" || f.categoryId !== "" || f.onlyAvailable || f.mine;
+  const filtered = f.q !== "" || f.categoryId !== "" || f.status !== "";
 
   async function loadMore() {
     if (!next || more) return;
     setMore(true);
     try {
-      const r = await listItems({ q: f.q, categoryId: f.categoryId, available: f.onlyAvailable, mine: f.mine, sort: f.sort, cursor: next });
+      const r = await listItems({ ...query(f), cursor: next });
       setItems((c) => [...c, ...r.items]);
       setNext(r.nextCursor);
     } catch (e) {
@@ -91,8 +95,8 @@ function Inventory({ canManage }: { canManage: boolean }) {
       <div className="page-head">
         <h1>物品</h1>
         <nav className="subnav" aria-label="物品のメニュー">
-          <Button variant="default" fullWidth={false} href="/inventory/loans">貸出中の一覧</Button>
           <Button variant="default" fullWidth={false} href="/inventory/history">履歴</Button>
+          {canManage && <Button variant="default" fullWidth={false} href="/inventory/loans">貸出中の一覧</Button>}
           {canManage && <Button variant="default" fullWidth={false} href="/admin/inventory">物品の管理</Button>}
         </nav>
       </div>
@@ -114,9 +118,11 @@ function Inventory({ canManage }: { canManage: boolean }) {
         {categories.map((c) => (
           <button key={c.id} type="button" className="chip" aria-pressed={f.categoryId === c.id} onClick={() => set({ categoryId: f.categoryId === c.id ? "" : c.id })}>{c.name}</button>
         ))}
-        <span className="chip-sep" aria-hidden="true" />
-        <button type="button" className="chip" aria-pressed={f.onlyAvailable} onClick={() => set({ onlyAvailable: !f.onlyAvailable })}>借りられる物だけ</button>
-        <button type="button" className="chip" aria-pressed={f.mine} onClick={() => set({ mine: !f.mine })}>自分が借りている物</button>
+      </div>
+      <div className="chips" role="group" aria-label="貸出の状態">
+        {STATUSES.map((s) => (
+          <button key={s.key} type="button" className="chip" data-status={s.key} aria-pressed={f.status === s.key} onClick={() => set({ status: f.status === s.key ? "" : s.key })}>{s.label}</button>
+        ))}
       </div>
 
       <p className="result-count" aria-live="polite">{loading ? "" : `${items.length}${next ? "件以上" : "件"}の物品`}</p>

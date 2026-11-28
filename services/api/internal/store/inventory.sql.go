@@ -20,6 +20,18 @@ func (q *Queries) ClearUnitLoan(ctx context.Context, currentLoanID pgtype.UUID) 
 	return err
 }
 
+const countAllItemsInCategory = `-- name: CountAllItemsInCategory :one
+SELECT count(*)::bigint FROM inventory_items WHERE category_id = $1
+`
+
+// 廃止した物品を含む（カテゴリを消す前に、外部キーで残る物品がないかを見る）。
+func (q *Queries) CountAllItemsInCategory(ctx context.Context, categoryID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countAllItemsInCategory, categoryID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countItemUnits = `-- name: CountItemUnits :one
 SELECT count(*) FROM inventory_units WHERE item_id = $1 AND state = 'active'
 `
@@ -32,9 +44,10 @@ func (q *Queries) CountItemUnits(ctx context.Context, itemID pgtype.UUID) (int64
 }
 
 const countItemsInCategory = `-- name: CountItemsInCategory :one
-SELECT count(*)::bigint FROM inventory_items WHERE category_id = $1
+SELECT count(*)::bigint FROM inventory_items WHERE category_id = $1 AND archived_at IS NULL
 `
 
+// 使用中の物品の数（廃止した物品は数えない）。
 func (q *Queries) CountItemsInCategory(ctx context.Context, categoryID pgtype.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countItemsInCategory, categoryID)
 	var column_1 int64
@@ -45,7 +58,7 @@ func (q *Queries) CountItemsInCategory(ctx context.Context, categoryID pgtype.UU
 const createCategory = `-- name: CreateCategory :one
 INSERT INTO inventory_categories (name, sort_order)
 VALUES ($1, COALESCE((SELECT MAX(sort_order) FROM inventory_categories), 0) + 10)
-RETURNING id, name, sort_order, created_at
+RETURNING id, name, sort_order, created_at, is_system
 `
 
 func (q *Queries) CreateCategory(ctx context.Context, name string) (InventoryCategory, error) {
@@ -56,6 +69,7 @@ func (q *Queries) CreateCategory(ctx context.Context, name string) (InventoryCat
 		&i.Name,
 		&i.SortOrder,
 		&i.CreatedAt,
+		&i.IsSystem,
 	)
 	return i, err
 }
@@ -139,9 +153,9 @@ func (q *Queries) CreateInventoryLoan(ctx context.Context, arg CreateInventoryLo
 }
 
 const createInventoryReturn = `-- name: CreateInventoryReturn :one
-INSERT INTO inventory_returns (loan_id, actor_user_id, quantity, returned_at)
-VALUES ($1, $2, $3, $4)
-RETURNING id, loan_id, actor_user_id, quantity, returned_at
+INSERT INTO inventory_returns (loan_id, actor_user_id, quantity, returned_at, location)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, loan_id, actor_user_id, quantity, returned_at, location
 `
 
 type CreateInventoryReturnParams struct {
@@ -149,6 +163,7 @@ type CreateInventoryReturnParams struct {
 	ActorUserID pgtype.UUID
 	Quantity    int32
 	ReturnedAt  pgtype.Timestamptz
+	Location    string
 }
 
 func (q *Queries) CreateInventoryReturn(ctx context.Context, arg CreateInventoryReturnParams) (InventoryReturn, error) {
@@ -157,6 +172,7 @@ func (q *Queries) CreateInventoryReturn(ctx context.Context, arg CreateInventory
 		arg.ActorUserID,
 		arg.Quantity,
 		arg.ReturnedAt,
+		arg.Location,
 	)
 	var i InventoryReturn
 	err := row.Scan(
@@ -165,6 +181,7 @@ func (q *Queries) CreateInventoryReturn(ctx context.Context, arg CreateInventory
 		&i.ActorUserID,
 		&i.Quantity,
 		&i.ReturnedAt,
+		&i.Location,
 	)
 	return i, err
 }
@@ -216,7 +233,7 @@ func (q *Queries) DeleteItemImages(ctx context.Context, itemID pgtype.UUID) erro
 }
 
 const getCategory = `-- name: GetCategory :one
-SELECT id, name, sort_order, created_at FROM inventory_categories WHERE id = $1
+SELECT id, name, sort_order, created_at, is_system FROM inventory_categories WHERE id = $1
 `
 
 func (q *Queries) GetCategory(ctx context.Context, id pgtype.UUID) (InventoryCategory, error) {
@@ -227,12 +244,13 @@ func (q *Queries) GetCategory(ctx context.Context, id pgtype.UUID) (InventoryCat
 		&i.Name,
 		&i.SortOrder,
 		&i.CreatedAt,
+		&i.IsSystem,
 	)
 	return i, err
 }
 
 const getCategoryByName = `-- name: GetCategoryByName :one
-SELECT id, name, sort_order, created_at FROM inventory_categories WHERE name = $1
+SELECT id, name, sort_order, created_at, is_system FROM inventory_categories WHERE name = $1
 `
 
 func (q *Queries) GetCategoryByName(ctx context.Context, name string) (InventoryCategory, error) {
@@ -243,12 +261,13 @@ func (q *Queries) GetCategoryByName(ctx context.Context, name string) (Inventory
 		&i.Name,
 		&i.SortOrder,
 		&i.CreatedAt,
+		&i.IsSystem,
 	)
 	return i, err
 }
 
 const getCategoryForUpdate = `-- name: GetCategoryForUpdate :one
-SELECT id, name, sort_order, created_at FROM inventory_categories WHERE id = $1 FOR UPDATE
+SELECT id, name, sort_order, created_at, is_system FROM inventory_categories WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) GetCategoryForUpdate(ctx context.Context, id pgtype.UUID) (InventoryCategory, error) {
@@ -259,6 +278,7 @@ func (q *Queries) GetCategoryForUpdate(ctx context.Context, id pgtype.UUID) (Inv
 		&i.Name,
 		&i.SortOrder,
 		&i.CreatedAt,
+		&i.IsSystem,
 	)
 	return i, err
 }
@@ -397,7 +417,7 @@ func (q *Queries) GetLoanEff(ctx context.Context, id pgtype.UUID) (InventoryLoan
 }
 
 const getRawReturn = `-- name: GetRawReturn :one
-SELECT id, loan_id, actor_user_id, quantity, returned_at FROM inventory_returns WHERE id = $1
+SELECT id, loan_id, actor_user_id, quantity, returned_at, location FROM inventory_returns WHERE id = $1
 `
 
 func (q *Queries) GetRawReturn(ctx context.Context, id pgtype.UUID) (InventoryReturn, error) {
@@ -409,6 +429,7 @@ func (q *Queries) GetRawReturn(ctx context.Context, id pgtype.UUID) (InventoryRe
 		&i.ActorUserID,
 		&i.Quantity,
 		&i.ReturnedAt,
+		&i.Location,
 	)
 	return i, err
 }
@@ -427,6 +448,23 @@ func (q *Queries) GetReturnEff(ctx context.Context, id pgtype.UUID) (InventoryRe
 		&i.ReturnedAt,
 		&i.OriginalQuantity,
 		&i.Quantity,
+	)
+	return i, err
+}
+
+const getSystemCategory = `-- name: GetSystemCategory :one
+SELECT id, name, sort_order, created_at, is_system FROM inventory_categories WHERE is_system ORDER BY sort_order LIMIT 1
+`
+
+func (q *Queries) GetSystemCategory(ctx context.Context) (InventoryCategory, error) {
+	row := q.db.QueryRow(ctx, getSystemCategory)
+	var i InventoryCategory
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SortOrder,
+		&i.CreatedAt,
+		&i.IsSystem,
 	)
 	return i, err
 }
@@ -544,7 +582,7 @@ func (q *Queries) ItemOutstanding(ctx context.Context, itemID pgtype.UUID) (int6
 }
 
 const listCategories = `-- name: ListCategories :many
-SELECT c.id, c.name, c.sort_order,
+SELECT c.id, c.name, c.sort_order, c.is_system,
        (SELECT count(*) FROM inventory_items i WHERE i.category_id = c.id AND i.archived_at IS NULL)::bigint AS item_count
 FROM inventory_categories c ORDER BY c.sort_order, c.name
 `
@@ -553,6 +591,7 @@ type ListCategoriesRow struct {
 	ID        pgtype.UUID
 	Name      string
 	SortOrder int32
+	IsSystem  bool
 	ItemCount int64
 }
 
@@ -570,6 +609,7 @@ func (q *Queries) ListCategories(ctx context.Context) ([]ListCategoriesRow, erro
 			&i.ID,
 			&i.Name,
 			&i.SortOrder,
+			&i.IsSystem,
 			&i.ItemCount,
 		); err != nil {
 			return nil, err
@@ -636,17 +676,17 @@ func (q *Queries) ListInventoryCategories(ctx context.Context) ([]string, error)
 }
 
 const listInventoryHistory = `-- name: ListInventoryHistory :many
-SELECT event_id, kind, item_id, item_name, asset_tag, borrower_display_name, actor_display_name, quantity, at, correction_kind, target_type, reason FROM (
+SELECT event_id, kind, item_id, item_name, asset_tag, borrower_display_name, actor_display_name, quantity, at, correction_kind, target_type, reason, location FROM (
   SELECT l.id AS event_id, 'loan'::text AS kind, l.item_id, i.name AS item_name, COALESCE(un.asset_tag, '') AS asset_tag,
          COALESCE(pb.display_name, '') AS borrower_display_name, COALESCE(pb.display_name, '') AS actor_display_name,
-         l.quantity, l.borrowed_at AS at, ''::text AS correction_kind, ''::text AS target_type, ''::text AS reason
+         l.quantity, l.borrowed_at AS at, ''::text AS correction_kind, ''::text AS target_type, ''::text AS reason, ''::text AS location
   FROM inventory_loans l
   JOIN inventory_items i ON i.id = l.item_id
   LEFT JOIN inventory_units un ON un.id = l.unit_id
   LEFT JOIN profiles pb ON pb.user_id = l.borrower_user_id
   UNION ALL
   SELECT r.id, 'return'::text, l.item_id, i.name, COALESCE(un.asset_tag, ''),
-         COALESCE(pb.display_name, ''), COALESCE(pa.display_name, ''), r.quantity, r.returned_at, ''::text, ''::text, ''::text
+         COALESCE(pb.display_name, ''), COALESCE(pa.display_name, ''), r.quantity, r.returned_at, ''::text, ''::text, ''::text, r.location
   FROM inventory_returns r
   JOIN inventory_loans l ON l.id = r.loan_id
   JOIN inventory_items i ON i.id = l.item_id
@@ -655,7 +695,7 @@ SELECT event_id, kind, item_id, item_name, asset_tag, borrower_display_name, act
   LEFT JOIN profiles pa ON pa.user_id = r.actor_user_id
   UNION ALL
   SELECT c.id, 'correction'::text, c.item_id, i.name, COALESCE(un.asset_tag, ''),
-         COALESCE(pb.display_name, ''), COALESCE(pc.display_name, ''), COALESCE(c.delta_quantity, 0), c.created_at, c.kind, c.target_type, c.reason
+         COALESCE(pb.display_name, ''), COALESCE(pc.display_name, ''), COALESCE(c.delta_quantity, 0), c.created_at, c.kind, c.target_type, c.reason, ''::text
   FROM inventory_correction_events c
   JOIN inventory_items i ON i.id = c.item_id
   LEFT JOIN inventory_loans tl ON c.target_type = 'loan' AND tl.id = c.target_id
@@ -692,6 +732,7 @@ type ListInventoryHistoryRow struct {
 	CorrectionKind      string
 	TargetType          string
 	Reason              string
+	Location            string
 }
 
 // 貸出と返却の履歴（新しい順）。借りた人(borrower)と返却した人(actor)を別に返す。
@@ -723,6 +764,7 @@ func (q *Queries) ListInventoryHistory(ctx context.Context, arg ListInventoryHis
 			&i.CorrectionKind,
 			&i.TargetType,
 			&i.Reason,
+			&i.Location,
 		); err != nil {
 			return nil, err
 		}
@@ -742,7 +784,7 @@ WITH base AS (
     (SELECT count(*) FROM inventory_units u WHERE u.item_id = i.id AND u.state = 'active')::bigint AS unit_count,
     (SELECT count(*) FROM inventory_units u WHERE u.item_id = i.id AND u.state = 'active' AND u.current_loan_id IS NULL)::bigint AS units_available,
     (SELECT COALESCE(SUM(l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r WHERE r.loan_id = l.id), 0)), 0)
-       FROM inventory_loans_eff l WHERE l.item_id = i.id AND l.borrower_user_id = $9::uuid)::bigint AS mine
+       FROM inventory_loans_eff l WHERE l.item_id = i.id AND l.borrower_user_id = $10::uuid)::bigint AS mine
   FROM inventory_items i
   WHERE i.archived_at IS NULL
 ), withavail AS (
@@ -754,10 +796,11 @@ WHERE ($1::text = '' OR name ILIKE '%' || $1 || '%' ESCAPE '\' OR category ILIKE
   AND ($3::uuid IS NULL OR category_id = $3::uuid)
   AND (NOT $4::bool OR available > 0)
   AND (NOT $5::bool OR mine > 0)
-ORDER BY (CASE WHEN $6::text = 'available' THEN available END) DESC NULLS LAST,
-         (CASE WHEN $6::text = 'newest' THEN created_at END) DESC NULLS LAST,
+  AND (NOT $6::bool OR outstanding > 0)
+ORDER BY (CASE WHEN $7::text = 'available' THEN available END) DESC NULLS LAST,
+         (CASE WHEN $7::text = 'newest' THEN created_at END) DESC NULLS LAST,
          name, id
-OFFSET $7::int LIMIT $8::int
+OFFSET $8::int LIMIT $9::int
 `
 
 type ListInventoryItemsParams struct {
@@ -766,6 +809,7 @@ type ListInventoryItemsParams struct {
 	CategoryID    pgtype.UUID
 	OnlyAvailable bool
 	OnlyMine      bool
+	OnlyLoaned    bool
 	Sort          string
 	RowOffset     int32
 	RowLimit      int32
@@ -801,6 +845,7 @@ func (q *Queries) ListInventoryItems(ctx context.Context, arg ListInventoryItems
 		arg.CategoryID,
 		arg.OnlyAvailable,
 		arg.OnlyMine,
+		arg.OnlyLoaned,
 		arg.Sort,
 		arg.RowOffset,
 		arg.RowLimit,
@@ -1067,6 +1112,15 @@ func (q *Queries) LockCategories(ctx context.Context) error {
 	return err
 }
 
+const markCategorySystem = `-- name: MarkCategorySystem :exec
+UPDATE inventory_categories SET is_system = true WHERE id = $1
+`
+
+func (q *Queries) MarkCategorySystem(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, markCategorySystem, id)
+	return err
+}
+
 const moveItemsToCategory = `-- name: MoveItemsToCategory :exec
 UPDATE inventory_items SET category_id = $2, category = $3, updated_at = now() WHERE category_id = $1
 `
@@ -1077,13 +1131,14 @@ type MoveItemsToCategoryParams struct {
 	Category     string
 }
 
+// 廃止した物品も移す（外部キーのため。貸出の履歴は物品のIDで残るので影響しない）。
 func (q *Queries) MoveItemsToCategory(ctx context.Context, arg MoveItemsToCategoryParams) error {
 	_, err := q.db.Exec(ctx, moveItemsToCategory, arg.CategoryID, arg.CategoryID_2, arg.Category)
 	return err
 }
 
 const renameCategory = `-- name: RenameCategory :one
-UPDATE inventory_categories SET name = $2 WHERE id = $1 RETURNING id, name, sort_order, created_at
+UPDATE inventory_categories SET name = $2 WHERE id = $1 RETURNING id, name, sort_order, created_at, is_system
 `
 
 type RenameCategoryParams struct {
@@ -1099,6 +1154,7 @@ func (q *Queries) RenameCategory(ctx context.Context, arg RenameCategoryParams) 
 		&i.Name,
 		&i.SortOrder,
 		&i.CreatedAt,
+		&i.IsSystem,
 	)
 	return i, err
 }
@@ -1198,4 +1254,18 @@ func (q *Queries) UpdateInventoryItem(ctx context.Context, arg UpdateInventoryIt
 		&i.CategoryID,
 	)
 	return i, err
+}
+
+const updateItemLocation = `-- name: UpdateItemLocation :exec
+UPDATE inventory_items SET location = $2, updated_at = now() WHERE id = $1
+`
+
+type UpdateItemLocationParams struct {
+	ID       pgtype.UUID
+	Location string
+}
+
+func (q *Queries) UpdateItemLocation(ctx context.Context, arg UpdateItemLocationParams) error {
+	_, err := q.db.Exec(ctx, updateItemLocation, arg.ID, arg.Location)
+	return err
 }

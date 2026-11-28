@@ -46,9 +46,9 @@ export function seed() {
   };
 
   const categories: Category[] = [
-    { id: "cat-gear", name: "機材", sortOrder: 10, itemCount: 0 },
-    { id: "cat-book", name: "書籍", sortOrder: 20, itemCount: 0 },
-    { id: "cat-other", name: "その他", sortOrder: 30, itemCount: 0 },
+    { id: "cat-gear", name: "機材", sortOrder: 10, itemCount: 0, system: false },
+    { id: "cat-book", name: "書籍", sortOrder: 20, itemCount: 0, system: false },
+    { id: "cat-other", name: "その他", sortOrder: 30, itemCount: 0, system: true },
   ];
 
   // borrowedByMe は ownerでログインしたときの値（ペンタブレットを5個借りている）。モックはロールごとには変えない
@@ -67,7 +67,7 @@ export function seed() {
 
   const units: Record<string, ItemDetail["units"]> = {
     "i-camera": [
-      { id: "un-1", assetTag: "CAM-001", serialNumber: "SN-0001", state: "active", mine: false, loaned: { borrowerDisplayName: "試験 花子", since: T, elapsedDays: 3 } },
+      { id: "un-1", assetTag: "CAM-001", serialNumber: "SN-0001", state: "active", mine: false, loanId: "lo-1", loaned: { borrowerDisplayName: "試験 花子", since: T, elapsedDays: 3 } },
       { id: "un-2", assetTag: "CAM-002", serialNumber: null, state: "active", mine: false, loaned: null },
     ],
     "i-vr": [{ id: "un-3", assetTag: "VR-001", serialNumber: null, state: "active", mine: false, loaned: null }],
@@ -144,4 +144,4 @@ export function seed() {
  * 実APIにあってもデータ次第で省略されうるキー（lib/api.ts で `?` のもの）。
  * 契約比較では「モックにあって実APIに無い」場合だけ、ここに挙げたキーを許す。
  */
-export const OPTIONAL_KEYS = ["archived", "links", "devices", "works", "contributors", "revisions", "correctionKind", "targetType", "reason", "user", "snippet"];
+export const OPTIONAL_KEYS = ["archived", "links", "devices", "works", "contributors", "revisions", "correctionKind", "targetType", "reason", "user", "snippet", "loanId", "location"];

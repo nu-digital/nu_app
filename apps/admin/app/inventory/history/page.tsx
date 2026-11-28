@@ -19,7 +19,7 @@ function describeEvent(e: HistoryEvent): string {
   if (e.kind === "loan") return `${e.borrowerDisplayName}さんが${what}を${e.quantity}個借りました`;
   if (e.kind === "return") {
     const proxy = e.actorDisplayName !== e.borrowerDisplayName;
-    return `${what}を${e.quantity}個返却しました（借りた人: ${e.borrowerDisplayName}さん${proxy ? `／返却を登録した人: ${e.actorDisplayName}さん` : ""}）`;
+    return `${what}を${e.quantity}個返却しました（借りた人: ${e.borrowerDisplayName}さん${proxy ? `／返却を登録した人: ${e.actorDisplayName}さん` : ""}${e.location ? `／返却場所: ${e.location}` : ""}）`;
   }
   const target = e.targetType === "return" ? "返却" : "貸出";
   const action = e.correctionKind === "void" ? `${target}の記録を取り消しました` : `${target}の数量を${e.quantity > 0 ? `+${e.quantity}` : e.quantity}個訂正しました`;

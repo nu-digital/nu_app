@@ -45,7 +45,8 @@ type unitView struct {
 	SerialNumber *string     `json:"serialNumber"`
 	State        string      `json:"state"`
 	Loaned       *loanedView `json:"loaned"`
-	Mine         bool        `json:"mine"` // 自分が借りている個体
+	Mine         bool        `json:"mine"`             // 自分が借りている個体
+	LoanID       string      `json:"loanId,omitempty"` // 貸出中の個体の貸出ID（詳細画面から返却するため）
 }
 
 type loanedView struct {
@@ -441,7 +442,7 @@ func (s *server) listItems(w http.ResponseWriter, r *http.Request) {
 		}
 		offset = n
 	}
-	params := store.ListInventoryItemsParams{Q: likeEscape(search), Category: category, OnlyAvailable: qs.Get("available") == "true", OnlyMine: qs.Get("mine") == "true",
+	params := store.ListInventoryItemsParams{Q: likeEscape(search), Category: category, OnlyAvailable: qs.Get("available") == "true", OnlyMine: qs.Get("mine") == "true", OnlyLoaned: qs.Get("loaned") == "true",
 		Sort: sort, RowOffset: int32(offset), RowLimit: int32(limit + 1), UserID: a.Identity.UserID}
 	if v := qs.Get("categoryId"); v != "" {
 		if err := params.CategoryID.Scan(v); err != nil || !params.CategoryID.Valid {
@@ -537,6 +538,9 @@ func (s *server) getItem(w http.ResponseWriter, r *http.Request) {
 			if !u.CurrentLoanID.Valid {
 				availableUnits++
 			}
+		}
+		if u.CurrentLoanID.Valid {
+			v.LoanID = u.CurrentLoanID.String()
 		}
 		if u.CurrentLoanID.Valid && u.BorrowerUserID == a.Identity.UserID {
 			v.Mine = true

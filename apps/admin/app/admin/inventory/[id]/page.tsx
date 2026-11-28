@@ -128,10 +128,10 @@ function Edit() {
       )}
 
       <section className="panel" aria-labelledby="arch-title">
-        <h2 id="arch-title">この物品を廃止する</h2>
-        <p className="hint">廃止すると一覧に出なくなり、借りられなくなります。履歴は残ります。貸出中のものがあるあいだは廃止できません。</p>
-        <form onSubmit={(e) => { e.preventDefault(); if (!window.confirm(`「${it.name}」を廃止します。よろしいですか？`)) return; void act(async () => { await updateItem(id, { archived: true }); router.push("/admin/inventory"); return "廃止しました。"; }); }}>
-          <Button variant="danger" fullWidth={false} type="submit" disabled={busy}>廃止する</Button>
+        <h2 id="arch-title">この物品を削除する</h2>
+        <p className="hint">削除すると一覧に出なくなり、借りられなくなります。貸出の履歴は残ります。貸出中のものがあるあいだは削除できません。</p>
+        <form onSubmit={(e) => { e.preventDefault(); if (!window.confirm(`「${it.name}」を削除します。よろしいですか？`)) return; void act(async () => { await updateItem(id, { archived: true }); router.push("/admin/inventory"); return "削除しました。"; }); }}>
+          <Button variant="danger" fullWidth={false} type="submit" disabled={busy}>削除する</Button>
         </form>
       </section>
     </main>

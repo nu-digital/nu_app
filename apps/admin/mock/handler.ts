@@ -113,7 +113,7 @@ export function createMock(opts: MockOptions = {}) {
         const name = String(b.name ?? "").trim();
         if (!name) return err(422, "INVALID_INPUT", "カテゴリ名は1〜30文字で入力してください");
         if (db.categories.some((c) => c.name === name)) return err(409, "NAME_TAKEN", "同じ名前のカテゴリが既にあります");
-        const c = { id: `cat-${Date.now()}`, name, sortOrder: Math.max(0, ...db.categories.map((x) => x.sortOrder)) + 10, itemCount: 0 };
+        const c = { id: `cat-${Date.now()}`, name, sortOrder: Math.max(0, ...db.categories.map((x) => x.sortOrder)) + 10, itemCount: 0, system: false };
         db.categories.push(c);
         return { status: 201, json: c };
       }
@@ -127,6 +127,7 @@ export function createMock(opts: MockOptions = {}) {
         const c = db.categories.find((x) => x.id === m![1]);
         if (!c) return err(404, "NOT_FOUND", "見つかりません");
         if (method === "PATCH") {
+          if (c.system) return err(409, "SYSTEM_CATEGORY", `「${c.name}」は物品の移し先として使うため、名前を変えられません`);
           const name = String(b.name ?? "").trim();
           if (db.categories.some((x) => x.name === name && x.id !== c.id)) return err(409, "NAME_TAKEN", "同じ名前のカテゴリが既にあります");
           c.name = name;
@@ -134,10 +135,10 @@ export function createMock(opts: MockOptions = {}) {
           return { status: 200, json: c };
         }
         if (method === "DELETE") {
-          if (db.categories.length <= 1) return err(409, "LAST_CATEGORY", "最後のカテゴリは削除できません");
+          if (c.system) return err(409, "SYSTEM_CATEGORY", `「${c.name}」は物品の移し先として使うため、削除できません`);
+          // 廃止した物品も含めて「その他」へ移す（本物のAPIと同じ）
           const inUse = db.items.filter((i) => i.categoryId === c.id);
-          const to = db.categories.find((x) => x.id === q.get("moveTo") && x.id !== c.id);
-          if (inUse.length && !to) return err(409, "IN_USE", `使われているカテゴリです（${inUse.length}件）。移し先のカテゴリを選んでください`);
+          const to = db.categories.find((x) => x.id === q.get("moveTo") && x.id !== c.id) ?? db.categories.find((x) => x.system);
           if (to) inUse.forEach((i) => { i.categoryId = to.id; i.category = to.name; });
           db.categories.splice(db.categories.indexOf(c), 1);
           return { status: 204 };
@@ -145,8 +146,8 @@ export function createMock(opts: MockOptions = {}) {
       }
     }
     if (p === "/inventory/items" && method === "GET") {
-      const s = (q.get("q") ?? "").trim(), cat = q.get("category"), catId = q.get("categoryId"), avail = q.get("available") === "true", mine = q.get("mine") === "true", sort = q.get("sort");
-      const items = db.items.filter((x) => !x.archived && (!s || [x.name, x.location, x.category, x.description].some((v) => v.includes(s))) && (!cat || x.category === cat) && (!catId || x.categoryId === catId) && (!avail || x.available > 0) && (!mine || x.borrowedByMe > 0));
+      const s = (q.get("q") ?? "").trim(), cat = q.get("category"), catId = q.get("categoryId"), avail = q.get("available") === "true", loaned = q.get("loaned") === "true", mine = q.get("mine") === "true", sort = q.get("sort");
+      const items = db.items.filter((x) => !x.archived && (!s || [x.name, x.location, x.category, x.description].some((v) => v.includes(s))) && (!cat || x.category === cat) && (!catId || x.categoryId === catId) && (!avail || x.available > 0) && (!loaned || x.outstanding > 0) && (!mine || x.borrowedByMe > 0));
       if (sort === "available") items.sort((x, y) => y.available - x.available);
       countCategories();
       return { status: 200, json: { ...page(list(items)), categories: [...new Set(db.items.map((x) => x.category))], categoryList: db.categories } };

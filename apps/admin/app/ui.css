@@ -193,3 +193,9 @@ details.more > summary { cursor: pointer; min-height: var(--tap); display: flex;
 .my-box h3 { margin: 0 0 var(--space-2); font-size: 1rem; }
 .my-box ul { list-style: none; padding: 0; margin: 0; }
 .my-box li { min-height: var(--tap); display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+
+/* 物品の詳細: 保管場所・自分の貸出・返却ダイアログ（第2フェーズ） */
+.location-line { margin: var(--space-2) 0; color: var(--color-text); }
+.location-line .label { font-size: 13px; color: var(--color-muted); margin-right: var(--space-2); }
+.my-loans { margin-top: var(--space-4); }
+.return-form .stepper { margin-bottom: var(--space-3); }

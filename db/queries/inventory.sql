@@ -76,6 +76,7 @@ WHERE (@q::text = '' OR name ILIKE '%' || @q || '%' ESCAPE '\' OR category ILIKE
   AND (@category_id::uuid IS NULL OR category_id = @category_id::uuid)
   AND (NOT @only_available::bool OR available > 0)
   AND (NOT @only_mine::bool OR mine > 0)
+  AND (NOT @only_loaned::bool OR outstanding > 0)
 ORDER BY (CASE WHEN @sort::text = 'available' THEN available END) DESC NULLS LAST,
          (CASE WHEN @sort::text = 'newest' THEN created_at END) DESC NULLS LAST,
          name, id
@@ -86,7 +87,7 @@ SELECT DISTINCT category FROM inventory_items WHERE archived_at IS NULL AND cate
 
 -- カテゴリ管理（UI/UX大改善。00021）
 -- name: ListCategories :many
-SELECT c.id, c.name, c.sort_order,
+SELECT c.id, c.name, c.sort_order, c.is_system,
        (SELECT count(*) FROM inventory_items i WHERE i.category_id = c.id AND i.archived_at IS NULL)::bigint AS item_count
 FROM inventory_categories c ORDER BY c.sort_order, c.name;
 
@@ -119,10 +120,25 @@ UPDATE inventory_categories SET sort_order = $2 WHERE id = $1;
 UPDATE inventory_items SET category = $2 WHERE category_id = $1;
 
 -- name: CountItemsInCategory :one
-SELECT count(*)::bigint FROM inventory_items WHERE category_id = $1;
+-- 使用中の物品の数（廃止した物品は数えない）。
+SELECT count(*)::bigint FROM inventory_items WHERE category_id = $1 AND archived_at IS NULL;
 
 -- name: MoveItemsToCategory :exec
+-- 廃止した物品も移す（外部キーのため。貸出の履歴は物品のIDで残るので影響しない）。
 UPDATE inventory_items SET category_id = $2, category = $3, updated_at = now() WHERE category_id = $1;
+
+-- name: CountAllItemsInCategory :one
+-- 廃止した物品を含む（カテゴリを消す前に、外部キーで残る物品がないかを見る）。
+SELECT count(*)::bigint FROM inventory_items WHERE category_id = $1;
+
+-- name: GetSystemCategory :one
+SELECT * FROM inventory_categories WHERE is_system ORDER BY sort_order LIMIT 1;
+
+-- name: MarkCategorySystem :exec
+UPDATE inventory_categories SET is_system = true WHERE id = $1;
+
+-- name: UpdateItemLocation :exec
+UPDATE inventory_items SET location = $2, updated_at = now() WHERE id = $1;
 
 -- name: DeleteCategory :exec
 DELETE FROM inventory_categories WHERE id = $1;
@@ -164,8 +180,8 @@ UPDATE inventory_units SET current_loan_id = $3 WHERE id = $1 AND item_id = $2 A
 UPDATE inventory_units SET current_loan_id = NULL WHERE current_loan_id = $1;
 
 -- name: CreateInventoryReturn :one
-INSERT INTO inventory_returns (loan_id, actor_user_id, quantity, returned_at)
-VALUES ($1, $2, $3, $4)
+INSERT INTO inventory_returns (loan_id, actor_user_id, quantity, returned_at, location)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: ListOutstandingLoans :many
@@ -190,14 +206,14 @@ LIMIT $8;
 SELECT * FROM (
   SELECT l.id AS event_id, 'loan'::text AS kind, l.item_id, i.name AS item_name, COALESCE(un.asset_tag, '') AS asset_tag,
          COALESCE(pb.display_name, '') AS borrower_display_name, COALESCE(pb.display_name, '') AS actor_display_name,
-         l.quantity, l.borrowed_at AS at, ''::text AS correction_kind, ''::text AS target_type, ''::text AS reason
+         l.quantity, l.borrowed_at AS at, ''::text AS correction_kind, ''::text AS target_type, ''::text AS reason, ''::text AS location
   FROM inventory_loans l
   JOIN inventory_items i ON i.id = l.item_id
   LEFT JOIN inventory_units un ON un.id = l.unit_id
   LEFT JOIN profiles pb ON pb.user_id = l.borrower_user_id
   UNION ALL
   SELECT r.id, 'return'::text, l.item_id, i.name, COALESCE(un.asset_tag, ''),
-         COALESCE(pb.display_name, ''), COALESCE(pa.display_name, ''), r.quantity, r.returned_at, ''::text, ''::text, ''::text
+         COALESCE(pb.display_name, ''), COALESCE(pa.display_name, ''), r.quantity, r.returned_at, ''::text, ''::text, ''::text, r.location
   FROM inventory_returns r
   JOIN inventory_loans l ON l.id = r.loan_id
   JOIN inventory_items i ON i.id = l.item_id
@@ -206,7 +222,7 @@ SELECT * FROM (
   LEFT JOIN profiles pa ON pa.user_id = r.actor_user_id
   UNION ALL
   SELECT c.id, 'correction'::text, c.item_id, i.name, COALESCE(un.asset_tag, ''),
-         COALESCE(pb.display_name, ''), COALESCE(pc.display_name, ''), COALESCE(c.delta_quantity, 0), c.created_at, c.kind, c.target_type, c.reason
+         COALESCE(pb.display_name, ''), COALESCE(pc.display_name, ''), COALESCE(c.delta_quantity, 0), c.created_at, c.kind, c.target_type, c.reason, ''::text
   FROM inventory_correction_events c
   JOIN inventory_items i ON i.id = c.item_id
   LEFT JOIN inventory_loans tl ON c.target_type = 'loan' AND tl.id = c.target_id
