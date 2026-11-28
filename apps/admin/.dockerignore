@@ -5,3 +5,5 @@ Dockerfile
 *.md
 .env
 .env.*
+# 開発用モック（本番イメージに入れない）
+mock

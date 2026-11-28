@@ -197,6 +197,31 @@ try {
         dbExec: (sql) => { const r = compose('exec', '-T', 'db', 'psql', '-U', 'smoke', '-d', 'smoke', '-v', 'ON_ERROR_STOP=1', '-c', sql); if (r.status !== 0) throw new Error('dbExec失敗: ' + (r.stderr || '').slice(0, 300)); },
       });
     }
+
+    // 契約: 開発用モック（apps/admin/mock）の応答の形が、実APIと一致する（E2Eでデータが入った状態で比べる）
+    {
+      const { CONTRACT_PATHS, compareShapes } = await import('./admin-mock-contract.mjs');
+      const { createMock } = await import('../apps/admin/mock/handler.ts');
+      const { OPTIONAL_KEYS } = await import('../apps/admin/mock/fixtures.ts');
+      const mock = createMock();
+      x = await call('POST', '/auth/login', { body: { loginId: 'smoke.owner', password: pw } });
+      const oc = (x.setCookie[0] ?? '').split(';')[0];
+      const realFirst = async (path) => (await call('GET', path, { cookie: oc })).json?.items?.[0]?.id;
+      const mockFirst = (path) => mock('GET', '/api/v1' + path, 'owner').json?.items?.[0]?.id;
+      const listOf = { member: '/members?limit=1', item: '/inventory/items?limit=1', content: '/contents?limit=1' };
+      const realIds = {}, mockIds = {};
+      for (const [k, path] of Object.entries(listOf)) { realIds[k] = await realFirst(path); mockIds[k] = mockFirst(path); }
+      const diffs = [], skipped = [];
+      for (const path of CONTRACT_PATHS) {
+        const key = path.match(/:(\w+)/)?.[1];
+        if (key && !realIds[key]) { skipped.push(path); continue; }
+        const real = await call('GET', path.replace(/:(\w+)/, (_, k) => realIds[k]), { cookie: oc });
+        const m = mock('GET', '/api/v1' + path.replace(/:(\w+)/, (_, k) => mockIds[k]), 'owner');
+        if (real.status !== 200 || m.status !== 200) { diffs.push(`${path}: status 実API=${real.status} モック=${m.status}`); continue; }
+        diffs.push(...compareShapes(m.json, real.json, OPTIONAL_KEYS, path));
+      }
+      check(`契約: 開発用モックと実APIの応答の形が一致（${CONTRACT_PATHS.length - skipped.length}件を比較${skipped.length ? '、比較できず: ' + skipped.join(',') : ''}）`, diffs.length === 0, diffs.slice(0, 12).join(' / '));
+    }
   }
 
   const stopDb = compose('stop', 'db');

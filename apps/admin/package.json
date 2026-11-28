@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --test \"lib/*.test.mjs\""
+    "test": "node --test \"lib/*.test.mjs\" \"mock/*.test.ts\""
   },
   "dependencies": {
     "@charcoal-ui/icons": "6.3.0",
