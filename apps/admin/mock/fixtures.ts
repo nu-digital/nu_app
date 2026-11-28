@@ -46,8 +46,8 @@ export function seed() {
   };
 
   const categories: Category[] = [
-    { id: "cat-gear", name: "機材", sortOrder: 10, itemCount: 0 },
-    { id: "cat-book", name: "書籍", sortOrder: 20, itemCount: 0 },
+    { id: "cat-gear", name: "機材", sortOrder: 10, itemCount: 0, system: false },
+    { id: "cat-book", name: "書籍", sortOrder: 20, itemCount: 0, system: false },
     { id: "cat-other", name: "その他", sortOrder: 30, itemCount: 0, system: true },
   ];
 
@@ -157,4 +157,4 @@ export function seed() {
  * 実APIにあってもデータ次第で省略されうるキー（lib/api.ts で `?` のもの）。
  * 契約比較では「モックにあって実APIに無い」場合だけ、ここに挙げたキーを許す。
  */
-export const OPTIONAL_KEYS = ["archived", "links", "devices", "works", "contributors", "revisions", "correctionKind", "targetType", "reason", "user", "snippet"];
+export const OPTIONAL_KEYS = ["archived", "links", "devices", "works", "contributors", "revisions", "correctionKind", "targetType", "reason", "user", "snippet", "loanId", "location"];
