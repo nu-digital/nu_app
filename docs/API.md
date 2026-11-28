@@ -177,7 +177,7 @@ actor/borrower はクライアント入力を信用せず、セッションの�
 
 - `POST /contents/{id}/publish`: `{revisionNo}`必須（Editor以上。**存在確認の前に403**）。作業版と違えば409 `REVISION_CONFLICT`。公開の直前にMarkdownを再検査（422）。同じ版の再公開は200で何もしない。通知`content.published`をoutboxへ。
 - `POST /contents/{id}/unpublish`: Editor以上。公開中でなければ200で何もしない。作業版・履歴は残る。
-- `GET /public/contents`（`section`・`limit`≤100・`cursor`）: 匿名。**公開版だけ**。日付の新しい順（日付不明は最後）。`{items:[{type,section,slug,title,summary,metadata{category,excerpt,image,author},date{label,kind,sortDate,sortDateIsEstimated}}],nextCursor}`。
+- `GET /public/contents`（`section`・`limit`≤100・`cursor`）: 匿名。**公開版だけ**。日付の新しい順（日付不明は最後）。`{items:[{type,section,slug,title,summary,author,metadata{category,excerpt,image},date{label,kind,sortDate,sortDateIsEstimated},coverUrl?}],nextCursor}`。投稿者名 `author` は配信時に公開許可から解決する（D14）。
 - `GET /public/contents/{section}/{slug}`: 匿名。上記＋`markdown`と`contributors:[{displayName,roleLabel}]`。未公開・存在しないものは同じ404。制作メンバーの`displayName`は、公開クレジットに同意中のメンバーだけ表示名、それ以外は「匿名のメンバー」（ID・氏名は出さない。名前は版に保存せず配信ごとに解決）。強いETagと`Cache-Control: no-cache`（If-None-Matchで304）。認証情報で応答は変わらない。
 - `GET /me/profile`・`GET /members/{id}`に`works`（制作実績: `{section,slug,title,roles[]}`）。本人には常に、他のメンバーには公開クレジットの同意が続いている間だけ。
 
@@ -194,7 +194,7 @@ actor/borrower はクライアント入力を信用せず、セッションの�
 }
 ```
 
-保存時点で公開サイトの内容は変わらない。公開操作はDBのpublished revision pointerを切り替え、画像公開処理と表示キャッシュ更新を実行。競合時は `409 Conflict` と現在のrevisionを返す。公開権限を持たないMemberがAPIを直接呼んでも `403 Forbidden`。
+保存時点で公開サイトの内容は変わらない。公開操作はDBの公開版ポインタを切り替える。公式サイトは次のリクエストで公開版を取得し、公開画像も公開中の版からの参照を条件に配信する。競合時は `409 Conflict` と現在のrevisionを返す。公開権限を持たないMemberがAPIを直接呼んでも `403 Forbidden`。
 
 作品の下書き・公開権限は記事と同一（D01確定）。`date.kind`はday/month/range/unknown。`sortDate`は並び替え用で、`kind`がday以外のときは実際の日付として表示しない（`label`の原文を表示する）。
 

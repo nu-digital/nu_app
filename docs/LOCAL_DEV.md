@@ -1,6 +1,38 @@
 # ローカル開発の起動手順
 
-前提: WSL2/LinuxのUbuntu、Docker Engine（`docker compose`）、Node.js（[.node-version](../.node-version)）、Git。初回の準備は[WSL_SETUP](WSL_SETUP.md)。固定版は[TOOLCHAIN](TOOLCHAIN.md)。ホストにGoは不要。
+## フロントエンドだけを開く（GitとNode.js）
+
+リポジトリのルートで実行する。Nodeは [.node-version](../.node-version) の固定版を使う。次の手順はクリーンなcloneを想定し、アプリ用の環境変数・`.env`・APIキーの設定は不要。PowerShellで `npm.ps1` が実行制限を受ける場合は `npm.cmd` と入力する。Next.jsはWindows・macOS・Linuxに対応する。[Next.jsの対応環境](https://nextjs.org/docs/app/getting-started/installation)
+
+**公式サイト**は最初の端末で既存記事のモックを起動する。既定の8080が空いていることを確認する（Composeと同時に使う場合は次節の構成を使う）。
+
+```sh
+npm run web:ci
+node scripts/mock-public-api.mjs --port 8080
+```
+
+別の端末を同じルートで開いて起動する。
+
+```sh
+npm --prefix apps/web run dev -- --hostname 127.0.0.1 --port 3001
+```
+
+ブラウザーで `http://127.0.0.1:3001/blog/` を開いて記事を選ぶ。コンポーネントやCSSの変更は開発サーバーで反映される。記事モックはMarkdownを起動時に読むため、記事データを読み直すときはモックを再起動する。
+
+**管理ポータル**は単独の端末で起動し、`http://127.0.0.1:3000/login` を開く。
+
+```sh
+npm run admin:ci
+npm --prefix apps/admin run dev -- --hostname 127.0.0.1 --port 3000
+```
+
+現状この方法で確認できるのはログインフォームなどの未認証画面。APIを起動していないと `/auth/me` の中継は失敗する。ログイン後の業務操作は下記のCompose手順を使う。サーバーを終了するときは起動した各端末でCtrl+Cを押す。Next 16.4.6が各アプリ直下に生成する `AGENTS.md` はフレームワークの案内で、団体共通のルールはルートの [AGENTS.md](../AGENTS.md) にある。
+
+2026-11-28のWindows実測では、Node 22.23.5で両方の `next dev`、Edgeでの表示、管理ポータルのFast Refreshを確認した。macOS・Linuxの開発モードは今回未検証。権限別モックと1コマンド化は [FRONTEND](FRONTEND.md) の提案を参照。
+
+## システム全体を起動する前提
+
+WSL2/LinuxのUbuntu、Docker Engine（`docker compose`）、Node.js、Git。初回の準備は[WSL_SETUP](WSL_SETUP.md)。固定版は[TOOLCHAIN](TOOLCHAIN.md)。ホストにGoは不要。
 
 ## 1. 起動
 
@@ -33,7 +65,7 @@ npm run dev:reset     # 停止してDBのvolumeも削除（開発用プロジェ
 ```sh
 npm run check            # harness・web・adminのlint/型検査
 npm run test:unit        # 単体テスト
-npm run web:e2e          # 全ルート・ギャラリーのブラウザー確認（要 playwright install。README参照）
+npm run web:site-check   # web:build後、apps/webにPlaywrightのChromiumを導入して実行（TESTING参照）
 npm run compose:smoke    # 専用プロジェクト(nu_app_smoke)で起動し、全サービスの健全性・全72ルート・DB停止時の挙動を確認して片付ける
 scripts/go-docker.sh services/api go test -race -count=1 ./...
 scripts/test-integration.sh   # 実PostgreSQLの統合テスト（使い捨てコンテナ）

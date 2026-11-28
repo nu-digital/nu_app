@@ -12,7 +12,8 @@
 | Go（api・bot・**agent**）の整形・vet・単体・race | `scripts/go-docker.sh services/<名前> sh -c 'test -z "$(gofmt -l .)" && go vet ./... && go test -race -count=1 ./...'` | `go / services/api`・`go / services/bot`・`go / services/agent` |
 | DB・クエリ（実PostgreSQLで本物のmigrationを適用。api・agent） | `scripts/test-integration.sh`（`TEST_DATABASE_URL`が無いと失敗し、skipしない）・`scripts/sqlc.sh generate`／`diff` | `go / integration`・`go / sqlc` |
 | コンテナのビルド（api・bot・migrate・agent） | `docker build`（CIと同じ） | `go / docker build` |
-| 全サービスの起動・全ルート・DB停止時の挙動・既存サイトとの一致・画面E2E | `npm run compose:smoke`（専用プロジェクトで起動して片付ける）・`npm run web:site-check`・`npm run web:e2e` | `compose / smoke` |
+| 公式サイトの全ルート・ギャラリー・指紋・API障害時の応答 | `npm run web:site-check`（web:build済み、apps/webにPlaywrightのChromiumが必要。公開モックとstandaloneを起動） | `web / lint-typecheck-build` |
+| 全サービスの起動・DB停止時の挙動・実APIでの公式サイト比較・ポータル画面E2E | `npm run compose:smoke`（専用プロジェクトで起動して片付ける） | `compose / smoke` |
 | バックアップ→隔離環境での復元・Nginx・デプロイスクリプト・証明書確認 | `scripts/backup-restore-test.sh`・`scripts/nginx-test.sh`・`scripts/deploy-test.sh`・`scripts/cert-check-test.sh` | `ops / backup-restore`・`ops / nginx`・`ops / deploy-script` |
 
 - マージの必須チェック（ブランチ保護）は[DEVELOPMENT](DEVELOPMENT.md)。デプロイは、そのコミットの**CI全成功**（`ops`・`go / services/agent`を含む）を確認してから進む（`deploy.yml`の`verify`）。

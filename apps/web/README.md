@@ -1,8 +1,8 @@
 # nu_digital
 
-ゲーム制作・VRChat・3D・Webなどの活動と作品を紹介する、nu_digital の公式ホームページです。団体カラーは **#004aad**。記事は Markdown で管理し、ブラウザーで編集できる **nu_digital_localEditor** を同梱しています。
+ゲーム制作・VRChat・3D・Webなどの活動と作品を紹介する、nu_digital の公式ホームページです。団体カラーは **#004aad**。掲載記事はポータルのCMSで編集・公開します。旧記事の移行データを扱うローカルエディターも同梱しています。
 
-[公開サイト](https://nu-digital.github.io/nu_digital/) · [記事の編集](#localeditor) · [記事メタデータ](#記事メタデータ)
+[公開サイト](https://nu-digital.jp) · [移行データの編集](#localeditor) · [記事メタデータ](#記事メタデータ)
 
 ## ホームページ
 
@@ -25,9 +25,9 @@ npm ci
 
 | やりたいこと | コマンド | 開く場所 |
 | --- | --- | --- |
-| ホームページの表示確認 | `npm run dev` | http://localhost:3000 |
-| 記事の編集 | `npm run editor` | http://127.0.0.1:4310 |
-| 公開用ファイルの生成 | `npm run build` | `out/` に出力 |
+| ホームページの表示確認 | [LOCAL_DEVの手順](../../docs/LOCAL_DEV.md) で公開モックと開発サーバーを起動 | http://127.0.0.1:3001 |
+| 移行データの編集 | `npm run editor` | http://127.0.0.1:4310 |
+| 配信用サーバーの生成 | `npm run build` | `.next/standalone/` に出力 |
 
 Windows PowerShell で npm の実行が制限される場合は `npm.cmd` を使ってください。サーバーの終了は `Ctrl+C` です。
 
@@ -46,7 +46,7 @@ Windows PowerShell で npm の実行が制限される場合は `npm.cmd` を使
 
 保存先は `content/` の Markdown ファイルです。保存前の原文は `.content-editor/backups/` に自動で残ります。別のアプリなどで更新された記事は、競合を知らせて上書きを止めます。
 
-> 保存だけでは公開されません。内容を確認して commit・push すると公開サイトに反映されます。プレビューは記事本文の確認用で、ページ全体や動画の動作はホームページ側で確認してください。
+> LocalEditorで保存した変更はローカルの移行データに反映されます。公開サイトに掲載する記事はポータルのCMSから公開してください。ページ全体や動画の動作はホームページ側で確認できます。
 
 エディターはこのPCの `127.0.0.1` で動作し、公開サイトには含まれません。新規記事は次のテンプレートでファイルを作り、エディターを再読み込みすると編集できます。
 
@@ -105,18 +105,18 @@ excerpt: "制作したゲームとVR作品を展示しました。"
 
 ## 公開と管理
 
-`main` に push すると GitHub Actions が lint → ビルド → Pages 公開を実行します。Pull Request では lint とビルドのみ実行します。GitHub の **Settings → Pages → Source** は **GitHub Actions** に設定してください。
+サイトのコードはPRでレビューし、mainへのマージ後にGitHub ActionsのCI・ビルドと運用責任者のproduction承認を経てVPSへ配信します。[開発・デプロイの手順](../../docs/START_HERE.md)
 
-画像は記事・コードと**別コミット**にします。サイト画像は `public/images/`、このREADMEのスクリーンショットは `docs/screenshots/` に保管します。`out/`・`.next/`・元の移行資料・エディターのバックアップは Git 対象外です。
+移設済みの静的素材は `public/images/`、このREADMEのスクリーンショットは `docs/screenshots/` にあります。CMSでアップロードされた画像はVPSの永続ボリュームで管理します。[素材の扱い](ASSETS.md)
 
 | 場所 | 管理する内容 |
 | --- | --- |
-| `content/` | 記事・作品の本文とメタデータ |
+| `content/` | 移行・モック・比較基準に使う旧記事とメタデータ |
 | `data/site.ts` | 団体情報、SNSリンク、トップのおすすめ作品 |
 | `app/`・`components/` | ホームページの構成・見た目 |
 | `tools/content-editor/` | LocalEditor の画面・保存処理 |
 | `lib/content-presentation.mjs` | 日付・カテゴリ・ギャラリーの共通処理 |
-| `.github/workflows/pages.yml` | GitHub Pages の自動公開 |
+| [web.yml](../../.github/workflows/web.yml)・[deploy.yml](../../.github/workflows/deploy.yml) | 公式サイトの検証と承認付き配信 |
 
 色の調整はホームページの `app/globals.css`、LocalEditor の `tools/content-editor/style.css` にある `--brand-blue` を使います。
 
@@ -129,4 +129,4 @@ node --test scripts/content-presentation.test.mjs
 npm run build
 ```
 
-GitHub Pages と同じ `/nu_digital/` 配下でビルドする場合は、`NEXT_PUBLIC_BASE_PATH=/nu_digital` と `NEXT_PUBLIC_SITE_URL=https://nu-digital.github.io/nu_digital` を環境変数に設定します。静的出力のため `npm run start` は使わず、普段の確認には `npm run dev` を使います。
+ビルド後の公開モックを使った全ルート・画像・ギャラリーの確認は、リポジトリルートから実行する [web:site-check](../../docs/TESTING.md) を参照してください。

@@ -2,6 +2,8 @@
 
 初めてこのプロジェクトに入る人（人間でもAIエージェントでも）が、**この順に読んで・実行すれば**、一人で開発して本番に反映できることを目指した手順です。詳細は各リンク先。サーバーの運用は [RUNBOOK](RUNBOOK.md)、サーバーの新規構築・移行は [SERVER_SETUP](SERVER_SETUP.md)。
 
+画面を編集したい人は [LOCAL_DEVのフロントエンド単体手順](LOCAL_DEV.md) から始められる。Windows・Codexでも同じリポジトリを使う。以下はシステム全体を起動して検証する手順。
+
 ## 0. 先に用意するもの（アカウント・権限）
 
 | 何 | なぜ・どこで |
@@ -45,7 +47,7 @@ npm run dev:up                 # db・migrate・api・bot・web・adminをビル
 | 変更したもの | 実行するもの |
 |---|---|
 | 文書・設定 | `node scripts/check.mjs` |
-| web・admin | `npm run check`（lint・型）・`npm run test:unit`・必要なら `npm run web:e2e`・`npm run compose:smoke` |
+| web・admin | `npm run check`（lint・型）・`npm run test:unit`・`npm run admin:test`・必要に応じてビルド後の `npm run web:site-check`・`npm run compose:smoke`（前提はTESTING） |
 | Go（api・bot・agent） | `scripts/go-docker.sh services/<名前> go vet ./... && scripts/go-docker.sh services/<名前> go test -race -count=1 ./...` |
 | DB・クエリ | `scripts/test-integration.sh`（実PostgreSQLの使い捨てコンテナ）・`scripts/sqlc.sh generate`（生成コードを更新してコミット） |
 | インフラのスクリプト | CIの `ops / *`（バックアップ復元・Nginx・デプロイスクリプト）。ローカルは `scripts/nginx-test.sh` など |

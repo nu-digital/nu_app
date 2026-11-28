@@ -33,6 +33,7 @@
 | [DATABASE](DATABASE.md) | 論理モデルとデータ整合性（**DDLの正本は `db/migrations`**） |
 | [API](API.md) | APIの契約と権限（認可表の正本は [AUTHZ](AUTHZ.md)＋`services/api/internal/authz`） |
 | [DESIGN](DESIGN.md) | UI・デザインの方針 |
+| [FRONTEND](FRONTEND.md) | フロントエンドの現状、単体開発・モック・共通部品の比較と段階導入案（レビュー待ち） |
 | [design/](design/) | 設計メモ（履歴。各ファイル冒頭に状態を書く）: 認証・内部UI・CMS・メディア・公式サイト配信・**ぬる（`nul-agent.md`=仕様v0.1、`nul-agent-p1.md`=P1計画、`nul-admin-dashboard.md`=管理画面の設計）** |
 | [LEGACY_SITE](LEGACY_SITE.md)・[legacy-baseline/](legacy-baseline/README.md) | 既存公式サイトの調査と、移設前の比較基準（P0時点の記録） |
 
