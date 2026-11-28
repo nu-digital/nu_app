@@ -119,6 +119,15 @@ type AgentSummary struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+type AgentToolAudit struct {
+	ID        int64
+	At        pgtype.Timestamptz
+	UserID    int64
+	ChannelID int64
+	Tool      string
+	Ok        bool
+}
+
 type AuditLog struct {
 	ID          pgtype.UUID
 	ActorUserID pgtype.UUID

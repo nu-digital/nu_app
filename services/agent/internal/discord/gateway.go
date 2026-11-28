@@ -36,7 +36,7 @@ func NewGateway(token string, guildID uint64, rec *Recorder, cmd *Commander, log
 	if err != nil {
 		return nil, errors.New("Discordのクライアントを作れません")
 	}
-	s.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages | discordgo.IntentsDirectMessages |
+	s.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages |
 		discordgo.IntentsGuildMessageReactions | discordgo.IntentsGuildMembers | discordgo.IntentMessageContent
 	s.StateEnabled = true
 	g := &Gateway{s: s, guildID: strconv.FormatUint(guildID, 10), rec: rec, cmd: cmd, log: log}
@@ -180,13 +180,13 @@ func (g *Gateway) onMessageDeleteBulk(s *discordgo.Session, m *discordgo.Message
 	g.rec.OnDelete(context.Background(), ids...)
 }
 
-// convert はdiscordgoのメッセージを Msg にする。対象サーバー以外（別のサーバー）のメッセージは記録しない（DMは記録する）。
+// convert はdiscordgoのメッセージを Msg にする。対象サーバー以外（別のサーバー）とDMのメッセージは記録しない。
 func (g *Gateway) convert(m *discordgo.Message) (Msg, bool) {
 	if m == nil || m.Author == nil {
 		return Msg{}, false
 	}
-	if m.GuildID != "" && m.GuildID != g.guildID {
-		return Msg{}, false
+	if m.GuildID != g.guildID {
+		return Msg{}, false // 対象サーバー以外、およびDM（GuildIDが空）は記録も応答もしない（第3フェーズ P0）
 	}
 	parent, thread := g.threadParent(m.ChannelID)
 	msg := ConvertMessage(m, parent, thread)
@@ -243,6 +243,9 @@ func displayName(m *discordgo.Message) string {
 
 func (g *Gateway) onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if i.Type != discordgo.InteractionApplicationCommand || i.ApplicationCommandData().Name != "nul" {
+		return
+	}
+	if i.GuildID != g.guildID || i.Member == nil { // DM・ほかのサーバーからのコマンドは受けない
 		return
 	}
 	var roles []string

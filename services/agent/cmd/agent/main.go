@@ -89,6 +89,13 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 		}
 	}
 	defer db.Close()
+	// DMは廃止した（第3フェーズ P0）。以前のDM由来のデータを削除する（冪等。件数だけを記録し、内容はログに出さない）
+	if pr, err := db.PurgeDMData(ctx); err != nil {
+		log.Error("DM由来のデータを削除できませんでした", "error", err.Error())
+	} else if pr != (store.PurgeResult{}) {
+		log.Info("DM由来のデータを削除しました", "messages", pr.Messages, "notes", pr.Notes, "reminders", pr.Reminders, "summaries", pr.Summaries, "import_progress", pr.Progress)
+		_ = db.SetSetting(ctx, "dm_purge.last", map[string]any{"at": time.Now().UTC().Format(time.RFC3339), "messages": pr.Messages, "notes": pr.Notes, "reminders": pr.Reminders, "summaries": pr.Summaries, "import_progress": pr.Progress})
+	}
 	ctl, err := control.New(ctx, db)
 	if err != nil {
 		log.Error("停止状態を読めないため、停止状態で始めます")
@@ -113,7 +120,7 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 	// 応答（P1-4a）: メンション・返信・DM・times。ぬるの頭脳は実Claude APIに繋ぐ（上限はbudgetが守る）
 	tracker := budget.New(db, budget.Config{}, nil)
 	claude := llm.NewAnthropic(cfg.AnthropicKey)
-	br := &brain.Brain{LLM: claude, Budget: tracker, State: brainState{db}, Memory: db, Reminders: db, Log: log}
+	br := &brain.Brain{LLM: claude, Budget: tracker, State: brainState{db}, Memory: db, Reminders: db, Audit: db, Log: log}
 	resp := &responder.Responder{Ctl: ctl, Brain: br, Hist: db, Mem: db, Send: gw, Img: discord.NewImageFetcher(),
 		Reacts: db, BotID: gw.BotUserID, TimesChannel: int64(cfg.TimesChannel), Log: log}
 	gw.SetTimesChannel(cfg.TimesChannel)
@@ -155,6 +162,27 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 	}()
 	go sch.Run(ctx) // 毎日の気分・気まぐれ投稿・予算停止のお知らせ
 
+	// 異常検知: 10分間にツールの拒否・失敗が30件以上なら、自動で全停止にして管理者に知らせる（暴走・攻撃への緊急停止。再開は /nul resume）
+	go func() {
+		t := time.NewTicker(time.Minute)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				if !ctl.MayRespond() {
+					continue
+				}
+				if n, err := db.ToolDenials(ctx, time.Now().Add(-10*time.Minute)); err == nil && n >= toolDenialStopThreshold {
+					log.Error("ツールの拒否・失敗が多すぎるため、全停止にします", "count", n)
+					if err := ctl.Set(ctx, control.Stopped); err == nil {
+						_ = gw.PostTimes(ctx, "ツールの失敗が短時間に大量に出たので、安全のため自分で止まる。管理者が /nul resume で再開して。")
+					}
+				}
+			}
+		}
+	}()
 	// 切断が3分以上続いたら異常にする（コンテナのヘルスチェックに出る）
 	go func() {
 		t := time.NewTicker(30 * time.Second)
@@ -171,6 +199,9 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 	// 過去ログの取り込み。ゆっくり（1ページごとに1秒待つ）。完了済みは飛ばすので、6時間ごとに新しいスレッドを拾う
 	im := &discord.Importer{Hist: gw.History(), St: db, Log: log, PageSize: 100, PageDelay: time.Second}
 	for {
+		if err := db.Maintain(ctx, time.Now()); err != nil {
+			log.Warn("定期の掃除に失敗しました")
+		}
 		if err := im.Run(ctx, int64(cfg.GuildID)); err != nil && ctx.Err() == nil {
 			log.Warn("過去ログの取り込みを中断しました（次回に続きから）")
 		}
@@ -181,6 +212,9 @@ func runEnabled(ctx context.Context, log *slog.Logger, cfg config.Config, st *he
 		}
 	}
 }
+
+// toolDenialStopThreshold は、10分間のツール拒否・失敗がこの件数以上なら自動で全停止にする閾値。
+const toolDenialStopThreshold = 30
 
 // brainState は store.State を brain.State に変える。
 type brainState struct{ db *store.Store }
