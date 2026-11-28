@@ -17,6 +17,7 @@
 管理ポータル（`apps/admin`）の見た目はCharcoal（pixiv・BOOTH）に寄せる。採用の経緯と上書きした値は [design/charcoal.md](design/charcoal.md)。人もAIも、画面を作るときは次の順で部品を選び、その場で独自のボタンや色を作らない。
 
 1. **団体の共通部品** `apps/admin/components/ui/`: `Button`（variant: primary・default・danger、`href` でリンク、並べるときは `fullWidth={false}`、フォームの送信は `type="submit"`）、`TextField`（ラベル必須・onChangeは文字列）、`IconButton`（読み上げ名 `label` 必須）。パスワードは `components/PasswordField`、通知は `components/Notice`。
+   - 追加した部品（#186。スタイルは `app/ui.css`）: `Select`・`Textarea`・`Checkbox`（ラベル必須・onChangeは値）、`Badge`（tone: success/warning/danger/info/neutral。**色だけでなく記号と文字**で状態を示す）、`Avatar`・`AvatarStack`（画像が無ければ頭文字。重ね表示、クリックで名前の一覧）、`Dialog`（ネイティブ`<dialog>`。Esc・フォーカス復帰・キャンセル必須）、`useToast`（保存完了などの短い確認。入力の修正が必要なエラーは残る`Notice`）、`Loading`・`CardSkeleton`・`EmptyState`（読込中・空）、`Card`、`SegmentedControl`（表示の切り替え）。
 2. **共通CSSのクラス**（`app/globals.css`）: `.page`・`.panel`・`.items`/`.item`・`.badge`・`.notice`・`.field`・`.subnav`・`.actions`。数値・日付・セレクト・テキストエリア・読み取り専用の入力は、ネイティブの要素に `className="input"`（見た目はTextFieldと同じ）。
 3. **Charcoalの部品**（[公式Storybook](https://charcoal-web.pixiv.design/)）で足りないものを探し、使うときは `components/ui` に包んでから画面で使う。画面から `@charcoal-ui/react` を直接importしない。
 4. それでも無いものだけ、セマンティックなHTMLと上のトークン（`--color-*`・`--radius*`・`--space-*`）で作る。新しい外部ライブラリは採用理由と固定版をTOOLCHAINに記録する。

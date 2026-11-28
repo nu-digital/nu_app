@@ -1,0 +1,54 @@
+/* components/ui の部品のスタイル。色・余白は globals.css のトークンだけを使う（独自の色を足さない）。 */
+
+/* Badge（状態の札。文字+記号+色） */
+.ui-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px var(--space-2); font-size: 12px; line-height: 18px; font-weight: 700; border-radius: 4px; background: var(--color-surface); color: var(--color-muted); white-space: nowrap; }
+.ui-badge.tone-success { color: var(--color-success); background: var(--color-success-bg); }
+.ui-badge.tone-warning { color: #7a4b00; background: #fff3d6; }
+.ui-badge.tone-danger { color: var(--color-error); background: var(--color-error-bg); }
+.ui-badge.tone-info { color: var(--color-brand); background: var(--color-info-bg); }
+
+/* Avatar */
+.ui-avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden; background: var(--color-info-bg); color: var(--color-brand); font-weight: 700; flex: none; box-shadow: 0 0 0 2px var(--color-bg); }
+.ui-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ui-avatar.more { background: var(--color-surface-hover); color: var(--color-ink); }
+.ui-avatar-stack { position: relative; display: inline-block; }
+.ui-avatar-stack > summary { list-style: none; cursor: pointer; display: inline-flex; min-height: 32px; align-items: center; }
+.ui-avatar-stack > summary::-webkit-details-marker { display: none; }
+.ui-avatar-stack .stack { display: inline-flex; }
+.ui-avatar-stack .stack .ui-avatar + .ui-avatar { margin-left: -8px; }
+.ui-avatar-stack .people-pop { position: absolute; z-index: 4; left: 0; top: 100%; min-width: 180px; margin: 4px 0 0; padding: var(--space-2) var(--space-3); list-style: none; background: var(--color-bg); border-radius: var(--radius); box-shadow: 0 0 0 1px var(--color-border), 0 4px 16px rgba(0,0,0,.12); }
+.ui-avatar-stack .people-pop li { display: flex; align-items: center; gap: var(--space-2); min-height: 32px; font-size: 14px; }
+
+/* Dialog */
+.ui-dialog { border: none; border-radius: var(--radius-l); padding: 0; width: min(520px, calc(100vw - 2 * var(--space-4))); max-height: calc(100dvh - 2 * var(--space-4)); color: var(--color-ink); background: var(--color-bg); }
+.ui-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+.ui-dialog-body { padding: var(--space-5); }
+.ui-dialog h2 { font-size: 1.125rem; }
+
+/* Toast */
+.ui-toasts { position: fixed; z-index: 20; left: 50%; bottom: var(--space-4); transform: translateX(-50%); display: grid; gap: var(--space-2); width: min(480px, calc(100vw - 2 * var(--space-4))); pointer-events: none; }
+.ui-toast { padding: var(--space-3) var(--space-4); border-radius: var(--radius); background: var(--color-ink); color: #fff; font-size: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.25); pointer-events: auto; }
+.ui-toast.error { background: var(--color-error); }
+
+/* 読み込み・空 */
+.ui-loading { display: flex; align-items: center; gap: var(--space-2); color: var(--color-muted); }
+.ui-spinner { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--color-surface-hover); border-top-color: var(--color-brand); animation: ui-spin .8s linear infinite; }
+@keyframes ui-spin { to { transform: rotate(360deg); } }
+.ui-skeleton { background: linear-gradient(90deg, var(--color-surface) 25%, var(--color-surface-hover) 50%, var(--color-surface) 75%); background-size: 200% 100%; animation: ui-shimmer 1.4s infinite; border-radius: var(--radius); }
+@keyframes ui-shimmer { to { background-position: -200% 0; } }
+.ui-skeleton-card { list-style: none; }
+.ui-skeleton.thumb-sk { aspect-ratio: 4 / 3; }
+.ui-skeleton.line { height: 16px; margin-top: var(--space-2); }
+.ui-skeleton.line.short { width: 60%; }
+.ui-empty { text-align: center; padding: var(--space-6) var(--space-4); background: var(--color-surface); border-radius: var(--radius-l); }
+.ui-empty-title { font-weight: 700; margin-bottom: var(--space-1); }
+
+/* Card・Segmented */
+.ui-card { background: var(--color-surface); border-radius: var(--radius-l); padding: var(--space-4) var(--space-5); margin-bottom: var(--space-4); }
+.ui-segmented { display: inline-flex; background: var(--color-surface); border-radius: 999px; padding: 2px; }
+.ui-segmented label { position: relative; display: flex; align-items: center; min-height: 40px; padding: 0 var(--space-4); border-radius: 999px; font-size: 14px; font-weight: 700; color: var(--color-muted); cursor: pointer; }
+.ui-segmented label.on { background: var(--color-bg); color: var(--color-ink); box-shadow: 0 0 0 1px var(--color-border); }
+.ui-segmented input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.ui-segmented label:has(input:focus-visible) { box-shadow: var(--focus); }
+
+@media (prefers-reduced-motion: reduce) { .ui-spinner, .ui-skeleton { animation: none; } }
