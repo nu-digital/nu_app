@@ -1,6 +1,8 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useState } from "react";
+import IconButton from "@/components/ui/IconButton";
+import TextField from "@/components/ui/TextField";
 
 type Props = {
   label: string;
@@ -11,35 +13,33 @@ type Props = {
   required?: boolean;
 };
 
-/** パスワード入力。ラベルは常に表示し、「表示する」で確認できる（貼り付けは禁止しない）。 */
+/**
+ * パスワード入力（Charcoalの TextField）。ラベルは常に表示し、枠の中の目のアイコンで表示・非表示を切り替える。
+ * 貼り付けは禁止しない。切り替えボタンは読み上げ用の名前と押下状態（aria-pressed）を持つ。
+ */
 export default function PasswordField({ label, value, onChange, autoComplete, hint, required = true }: Props) {
-  const id = useId();
   const [shown, setShown] = useState(false);
   return (
     <div className="field">
-      <label htmlFor={id}>{label}</label>
-      <div className="input-row">
-        <input
-          id={id}
-          className="input"
-          type={shown ? "text" : "password"}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          autoComplete={autoComplete}
-          required={required}
-          aria-describedby={hint ? `${id}-hint` : undefined}
-          autoCapitalize="none"
-          spellCheck={false}
-        />
-        <button type="button" className="toggle" onClick={() => setShown((s) => !s)} aria-pressed={shown}>
-          {shown ? "隠す" : "表示する"}
-        </button>
-      </div>
-      {hint && (
-        <p className="hint" id={`${id}-hint`}>
-          {hint}
-        </p>
-      )}
+      <TextField
+        label={label}
+        type={shown ? "text" : "password"}
+        value={value}
+        onChange={onChange}
+        autoComplete={autoComplete}
+        required={required}
+        assistiveText={hint}
+        autoCapitalize="none"
+        spellCheck={false}
+        suffix={
+          <IconButton
+            icon={shown ? "24/Hide" : "24/Show"}
+            label={shown ? "パスワードを隠す" : "パスワードを表示する"}
+            aria-pressed={shown}
+            onClick={() => setShown((s) => !s)}
+          />
+        }
+      />
     </div>
   );
 }

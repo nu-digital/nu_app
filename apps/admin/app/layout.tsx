@@ -1,6 +1,10 @@
 import type { Metadata, Viewport } from "next";
 
+// Charcoal（試験導入 #178）: 部品CSS（@layer charcoal）→ トークン（Token v2・ライト）→ 既存の全体CSS → 団体テーマの上書き の順。
+import "@charcoal-ui/react/dist/layered.css";
+import "@charcoal-ui/theme/css/v2/light.css";
 import "./globals.css";
+import "./charcoal-theme.css";
 
 export const metadata: Metadata = {
   title: "nu_digital ポータル",
@@ -12,7 +16,7 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, them
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ja">
+    <html lang="ja" className="ch-token-v2">
       <body>{children}</body>
     </html>
   );

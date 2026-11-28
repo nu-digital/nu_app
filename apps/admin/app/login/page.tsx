@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 
 import Brand from "@/components/Brand";
 import PasswordField from "@/components/PasswordField";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
 import { describe, fetchMe, login } from "@/lib/api";
 
 export default function LoginPage() {
@@ -53,13 +55,12 @@ export default function LoginPage() {
         )}
         <form onSubmit={onSubmit} noValidate={false}>
           <div className="field">
-            <label htmlFor="loginId">ログインID</label>
-            <input
+            <TextField
               id="loginId"
-              className="input"
+              label="ログインID"
               type="text"
               value={loginId}
-              onChange={(e) => setLoginId(e.target.value)}
+              onChange={setLoginId}
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
@@ -67,9 +68,9 @@ export default function LoginPage() {
             />
           </div>
           <PasswordField label="パスワード" value={password} onChange={setPassword} autoComplete="current-password" />
-          <button className="btn" type="submit" disabled={busy}>
+          <Button type="submit" disabled={busy}>
             {busy ? "ログインしています…" : "ログイン"}
-          </button>
+          </Button>
         </form>
         <p className="hint" style={{ marginTop: "var(--space-4)", color: "var(--color-muted)" }}>
           ログインIDやパスワードが分からないときは、管理者に連絡してください。

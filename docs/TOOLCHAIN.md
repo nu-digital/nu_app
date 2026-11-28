@@ -31,6 +31,7 @@
 | Nodeイメージ | `node:22.23.5-alpine`（digest固定） | `.node-version`と同版 |
 | react-markdown / remark-gfm / rehype-raw / rehype-sanitize | 10.1.0 / 4.0.1 / 7.0.0 / 6.0.0（`apps/admin`。いずれも完全固定。P3-03a） | CMSのプレビュー。react-markdown・remark-gfm・rehype-rawは既存サイト（`apps/web`）と同じ版。`rehype-sanitize`は描画時のサニタイズ（保存型XSSの防壁）のため。`npm audit`は0件 |
 | unified / remark-parse / remark-rehype / rehype-stringify | 11.0.5 / 11.0.0 / 11.1.2 / 10.0.1（`apps/admin`のdevDependency。P3-03a） | サニタイズのテスト（`node --test`）で、プレビューと同じプラグインのパイプラインをHTML文字列にするため |
+| @charcoal-ui/react / @charcoal-ui/theme / @charcoal-ui/icons / react-aria / react-stately | 6.3.0 / 6.3.0 / 6.3.0 / 3.53.1 / 3.51.0（`apps/admin`。完全固定。#178 試験導入） | 管理ポータルのUI部品とデザイントークン（pixivのデザインシステムCharcoal、Apache-2.0）。react-aria・react-statelyはCharcoal Reactのpeer。iconsは同梱のSVGを読むアイコン（外部通信なし）。正式採用は代表画面で評価してから（[charcoal.md](design/charcoal.md)） |
 | Playwright | 1.65.1（`apps/web`のdevDependency） | P0-02b。ブラウザー確認用 |
 | Next.js / eslint-config-next | 16.4.6 | P0-02b。[legacy-baseline](legacy-baseline/README.md) |
 
