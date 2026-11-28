@@ -82,8 +82,9 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] 全員共通のカードが5枚あり、すべての機能が開ける（準備中のカードは無い）`, (await page.locator('.tiles li').count()) === 5 && (await page.getByText('準備中').count()) === 0);
       // メインビジュアル（公開中の作品・記事の画像、無ければ団体写真）が表示されるまで待つ。画面の外の遅延読み込みの画像は対象外
       await page.locator('[data-testid="hero-slide"] img').first().waitFor();
-      await page.waitForFunction(() => [...document.images].filter((i) => i.loading !== 'lazy').every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 15000 }).catch(() => {});
-      const broken = await page.evaluate(() => [...document.images].filter((i) => i.loading !== 'lazy' && (!i.complete || i.naturalWidth === 0)).map((i) => i.getAttribute('src')));
+      const brokenNow = () => page.evaluate(() => [...document.images].filter((i) => i.loading !== 'lazy' && (!i.complete || i.naturalWidth === 0)).map((i) => i.getAttribute('src')));
+      let broken = await brokenNow();
+      for (let t = 0; t < 30 && broken.length > 0; t++) { await page.waitForTimeout(500); broken = await brokenNow(); }
       check(`[${label}] 画像（ロゴ・団体写真）がすべて読み込まれる`, broken.length === 0, broken.join(','));
       const wrapped = await page.getByRole('button', { name: 'ログアウト' }).evaluate((el) => el.getBoundingClientRect().height <= 60);
       check(`[${label}] ログアウトボタンが折り返さない`, wrapped);
