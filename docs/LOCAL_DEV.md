@@ -26,7 +26,26 @@ npm run admin:ci
 npm --prefix apps/admin run dev -- --hostname 127.0.0.1 --port 3000
 ```
 
-現状この方法で確認できるのはログインフォームなどの未認証画面。APIを起動していないと `/auth/me` の中継は失敗する。ログイン後の業務操作は下記のCompose手順を使う。サーバーを終了するときは起動した各端末でCtrl+Cを押す。Next 16.4.6が各アプリ直下に生成する `AGENTS.md` はフレームワークの案内で、団体共通のルールはルートの [AGENTS.md](../AGENTS.md) にある。
+この方法で確認できるのはログインフォームなどの未認証画面。APIを起動していないと `/auth/me` の中継は失敗する。
+
+**ログイン後の画面を確認する（開発用モック）**。Docker・Go・DBは不要。次の1コマンドで、架空データを返すモックAPIとadminの開発サーバーを一緒に起動する（Ctrl+Cで両方止まる）。
+
+```sh
+npm run admin:ci
+npm run admin:dev:mock
+```
+
+`http://127.0.0.1:3000/login` を開き、ログインIDに `owner`・`admin`・`editor`・`member` のどれかを入れる（パスワードは何でもよい）。ロールごとに使える機能の違い（例: memberはユーザー管理が「権限がありません」）を確認できる。ポートは `npm run admin:dev:mock -- --port 3100 --mock-port 18391` で変えられる。
+
+| 再現したい状態 | 起動前に設定する環境変数（PowerShellは `$env:MOCK_EMPTY="1"`、macOS・Linuxは `MOCK_EMPTY=1 npm run admin:dev:mock`） |
+|---|---|
+| 読み込み中（遅い通信） | `MOCK_DELAY_MS=1500` |
+| データが無い | `MOCK_EMPTY=1` |
+| サーバーエラー | `MOCK_FAIL=/inventory`（そのパスで始まるAPIを500にする） |
+
+モックは `apps/admin/mock/` にある（データ `fixtures.ts`・応答 `handler.ts`・サーバー `server.ts`）。アプリのコードには分岐を入れず、adminの `/api/v1` の中継先をモックに向けるだけ。アプリからのimportは `lib/no-mock-import.test.mjs` で禁止し、Dockerイメージからも除外している（`.dockerignore`）。データの型は `lib/api.ts` と同じ型で宣言し（tsc）、CIのcompose smokeで実APIの応答と形（キーの集合）を比べる。APIや画面の型を変えたらモックも同じPRで直す。モックの権限は実APIを模した簡易版で、認可の検査には使わない（実APIのテストとE2Eで確認する）。
+
+実際のAPI・DBでの業務操作は下記のCompose手順を使う。サーバーを終了するときは起動した各端末でCtrl+Cを押す。Next 16.4.6が各アプリ直下に生成する `AGENTS.md` はフレームワークの案内で、団体共通のルールはルートの [AGENTS.md](../AGENTS.md) にある。
 
 2026-11-28のWindows実測では、Node 22.23.5で両方の `next dev`、Edgeでの表示、管理ポータルのFast Refreshを確認した。macOS・Linuxの開発モードは今回未検証。権限別モックと1コマンド化は [FRONTEND](FRONTEND.md) の提案を参照。
 

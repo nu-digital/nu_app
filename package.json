@@ -9,7 +9,7 @@
     "web:build": "npm run build --prefix apps/web",
     "web:verify": "node scripts/web-verify.mjs",
     "check": "node scripts/check.mjs && npm run web:lint && npm run web:typecheck && npm run admin:lint && npm run admin:typecheck",
-    "test:unit": "node --test scripts/harness.test.mjs && npm run test:editor --prefix apps/web && node --test apps/web/scripts/content-presentation.test.mjs && node --test apps/web/lib/markdown-sanitize.test.mjs && node --test scripts/page-fingerprint.test.mjs",
+    "test:unit": "node --test scripts/harness.test.mjs && npm run test:editor --prefix apps/web && node --test apps/web/scripts/content-presentation.test.mjs && node --test apps/web/lib/markdown-sanitize.test.mjs && node --test scripts/page-fingerprint.test.mjs && node --test scripts/admin-mock-contract.test.mjs",
     "build": "npm run web:build && npm run admin:build",
     "web:e2e": "node scripts/legacy-baseline-capture.mjs",
     "admin:ci": "npm ci --prefix apps/admin",
@@ -22,6 +22,7 @@
     "compose:smoke": "node scripts/compose-smoke.mjs",
     "admin:test": "npm test --prefix apps/admin",
     "web:goldens": "node scripts/legacy-goldens.mjs --check",
-    "web:site-check": "node scripts/web-site-check.mjs"
+    "web:site-check": "node scripts/web-site-check.mjs",
+    "admin:dev:mock": "node scripts/admin-dev-mock.mjs"
   }
 }
