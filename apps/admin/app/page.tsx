@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import AppHeader from "@/components/AppHeader";
 import { describe, fetchMe, logout, type Me } from "@/lib/api";
 
 // アプリの定義（コード上の一覧）。全員に同じカードを表示する。権限はAPIが強制するため、画面の表示・非表示では制御しない。
@@ -67,21 +68,7 @@ export default function Launcher() {
 
   return (
     <>
-      <header className="app-header">
-        <span className="brand">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/logo.webp" alt="" width={36} height={36} />
-          <span className="brand-text">nu_digital ポータル</span>
-        </span>
-        <div className="who">
-          <span className="name" title={me.user.displayName}>
-            {me.user.displayName}
-          </span>
-          <button className="btn secondary inline" onClick={onLogout} disabled={busy}>
-            ログアウト
-          </button>
-        </div>
-      </header>
+      <AppHeader displayName={me.user.displayName} onLogout={onLogout} busy={busy} showNav={false} />
       <section className="hero" aria-labelledby="hello">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/images/hero.webp" alt="nu_digitalのメンバーが集まっている写真" />
