@@ -114,7 +114,7 @@ export default function MembersPanel({ doc, ensureSaved, onSaved, onConflict }: 
       {mayAdd && <MemberPicker label="メンバーを追加する" disabled={busy} exclude={rows.map((r) => r.userId)} onPick={add} />}
       <div className="actions">
         <Button fullWidth={false} onClick={save} disabled={busy || !changed}>{busy ? "保存しています…" : "メンバーを保存する"}</Button>
-        {changed && <span className="hint">保存していない変更があります{contribChanged ? "（制作メンバーの保存は新しい版を作ります。編集中の本文も一緒に保存されます）" : ""}</span>}
+        {changed && <span className="hint">保存していない変更があります{contribChanged ? "（制作メンバーを保存すると、編集中の本文も一緒に下書き保存されます）" : ""}</span>}
       </div>
     </section>
   );

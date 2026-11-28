@@ -65,7 +65,9 @@ function Editor() {
   const [device, setDevice] = useState<"pc" | "sp">("pc");
   const [version, setVersion] = useState(0);
   const [confirm, setConfirm] = useState<Confirm>(null);
-  const [metaOpen, setMetaOpen] = useState(true);
+  // 設定欄は本文の広さを優先して、既定ではたたむ（開閉はブラウザーに覚える）
+  const [metaOpen, setMetaOpenState] = useState(() => { try { return localStorage.getItem("nu.editor-meta-open") === "1"; } catch { return false; } });
+  const setMetaOpen = (open: boolean) => { setMetaOpenState(open); try { localStorage.setItem("nu.editor-meta-open", open ? "1" : "0"); } catch { /* 覚えられなくてもよい */ } };
   const [dragging, setDragging] = useState(false);
   const [restore, setRestore] = useState<Form | null>(null);
   const [coverBusy, setCoverBusy] = useState<number | null>(null);
@@ -273,6 +275,7 @@ function Editor() {
 
   return (
     <main className="editor-page">
+      <h1 className="visually-hidden">{w.title}</h1>
       <header className="editor-bar">
         <Link href="/contents" className="back-link">← 記事・作品</Link>
         <div className="editor-state" aria-live="polite">
@@ -315,7 +318,7 @@ function Editor() {
           <div className="field grow meta-title">
             <TextField id="e-title" label="タイトル（必須）" maxLength={200} value={form.title} onChange={(value: string) => set({ title: value })} />
           </div>
-          <Button variant="default" fullWidth={false} aria-expanded={metaOpen} onClick={() => setMetaOpen((o) => !o)}>{metaOpen ? "設定をたたむ" : "設定を開く"}</Button>
+          <Button variant="default" fullWidth={false} aria-expanded={metaOpen} onClick={() => setMetaOpen(!metaOpen)}>{metaOpen ? "設定をたたむ" : "設定を開く"}</Button>
         </div>
         {metaOpen ? (
           <div className="meta-body">
@@ -333,7 +336,7 @@ function Editor() {
                 <button type="button" className="cover-pick" disabled={coverBusy !== null} onClick={() => coverFileRef.current?.click()}>
                   {coverBusy !== null ? `アップロード中 ${Math.round(coverBusy * 100)}%` : coverSrc ? "変更する（ドロップでも可）" : "画像をドロップ、またはクリックして選ぶ"}
                 </button>
-                <input ref={coverFileRef} type="file" accept="image/jpeg,image/png,image/webp" className="visually-hidden" aria-label="カバー画像を選ぶ" onChange={(e) => { void setCoverFrom(imageFiles(e.target.files)); e.target.value = ""; }} />
+                <input ref={coverFileRef} type="file" accept="image/jpeg,image/png,image/webp" className="file-hidden" aria-label="カバー画像を選ぶ" onChange={(e) => { void setCoverFrom(imageFiles(e.target.files)); e.target.value = ""; }} />
               </div>
               {form.cover && <Button variant="default" fullWidth={false} onClick={() => set({ cover: null })}>カバー画像を外す</Button>}
               {!form.cover && w.metadata.image && <p className="hint">いまのカバーは公式サイトにある既存の画像です。</p>}
@@ -366,7 +369,15 @@ function Editor() {
             </details>
           </div>
         ) : (
-          <p className="hint meta-summary">{[SECTION[doc.section], shownDate, form.cover ? "カバーあり" : "カバーなし"].filter(Boolean).join(" ・ ")}</p>
+          <div className="meta-collapsed" data-testid="meta-collapsed">
+            {coverSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="mini-cover" src={coverSrc} alt="カバー画像" />
+            ) : <span className="mini-cover empty" aria-label="カバー画像なし">なし</span>}
+            <span className="mini-date">{[SECTION[doc.section], shownDate || "日付未設定"].join(" ・ ")}</span>
+            <AvatarStack people={people.map((p) => ({ userId: p.userId, displayName: p.displayName, avatarMediaId: p.avatarMediaId }))} />
+            {form.summary && <span className="hint mini-summary">{form.summary}</span>}
+          </div>
         )}
       </section>
 
@@ -380,7 +391,7 @@ function Editor() {
           <div className="write-bar">
             <label htmlFor="e-md" className="write-title">本文（Markdown）</label>
             <Button variant="default" fullWidth={false} onClick={() => fileRef.current?.click()}>画像を追加</Button>
-            <input ref={fileRef} type="file" multiple accept="image/jpeg,image/png,image/webp" className="visually-hidden" aria-label="本文に画像を追加" onChange={(e) => { images.addFiles(imageFiles(e.target.files)); e.target.value = ""; }} />
+            <input ref={fileRef} type="file" multiple accept="image/jpeg,image/png,image/webp" className="file-hidden" aria-label="本文に画像を追加" onChange={(e) => { images.addFiles(imageFiles(e.target.files)); e.target.value = ""; }} />
           </div>
           <textarea
             id="e-md"

@@ -241,8 +241,8 @@ details.more > summary { cursor: pointer; min-height: var(--tap); display: flex;
 .editor-work.tab-edit .editor-preview, .editor-work.tab-preview .editor-write { display: none; }
 .write-bar { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-2); }
 .write-bar .write-title { font-weight: 700; margin-right: auto; }
-.md-input { flex: 1; width: 100%; min-height: 60vh; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Noto Sans Mono CJK JP", monospace; font-size: 15px; line-height: 1.7; resize: vertical; padding: var(--space-3) var(--space-4); }
-.md-input.dragging { outline: 3px dashed var(--color-brand); outline-offset: -3px; background: var(--color-info-bg); }
+textarea.md-input { flex: 1; width: 100%; min-height: 60vh; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Noto Sans Mono CJK JP", monospace; font-size: 15px; line-height: 1.7; resize: vertical; padding: var(--space-3) var(--space-4); }
+textarea.md-input.dragging { outline: 3px dashed var(--color-brand); outline-offset: -3px; background: var(--color-info-bg); }
 .upload-list { list-style: none; margin: var(--space-2) 0; padding: 0; display: grid; gap: var(--space-2); }
 .upload-item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius); background: var(--color-surface); font-size: 14px; }
 .upload-item .upload-name { font-weight: 700; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -259,7 +259,7 @@ details.more > summary { cursor: pointer; min-height: var(--tap); display: flex;
   .editor-meta .meta-body { grid-template-columns: minmax(220px, 300px) 1fr; }
   .editor-work, .editor-work.tab-edit, .editor-work.tab-preview { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); height: max(520px, calc(100dvh - 150px)); }
   .editor-work.tab-edit .editor-preview, .editor-work.tab-preview .editor-write { display: flex; }
-  .md-input { min-height: 0; resize: none; height: 100%; }
+  textarea.md-input { min-height: 0; resize: none; height: 100%; }
   .preview-scroll { min-height: 0; }
   .editor-tabs { display: none; }
 }
@@ -269,3 +269,14 @@ details.more > summary { cursor: pointer; min-height: var(--tap); display: flex;
 .content-grid .card-menu { position: absolute; top: var(--space-2); right: var(--space-2); z-index: 3; }
 .content-grid .card-menu .charcoal-icon-button { background: rgba(255, 255, 255, .92); border-radius: 50%; }
 .kind-tag.kind-project { background: var(--color-brand); color: #fff; }
+
+/* 設定欄をたたんだ表示: カバー・日付・メンバー・要約を1行で */
+.meta-collapsed { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); min-width: 0; flex-wrap: wrap; }
+.meta-collapsed .mini-cover { width: 56px; height: 32px; object-fit: cover; border-radius: 4px; background: var(--color-bg); flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: var(--color-muted); }
+.meta-collapsed .mini-date { font-size: 14px; font-weight: 700; }
+.meta-collapsed .mini-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 制作画面（記事の編集）は、ヘッダーを固定せず、編集のバーだけを上に固定する（集中できるように、狭い画面を取らない） */
+body:has(.editor-page) .app-header { position: static; }
+.file-hidden { display: none; }
+.ui-menu .charcoal-icon-button { min-width: var(--tap); min-height: var(--tap); }

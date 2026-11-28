@@ -40,7 +40,7 @@ function Search() {
     <main className="page wide">
       <p><Link href="/admin/users">← ユーザー管理へ</Link></p>
       <h1>公開版に残る本人情報の確認</h1>
-      <p className="lead">個人情報の削除や公開同意の撤回の依頼があったとき、<strong>公開中</strong>の記事・作品の題名・要約・本文・制作メンバーの役割名に、その人の名前などが残っていないかを探します。見つかったら、記事を編集して新しい版を公開してください（過去の版は公開されませんが、書き換えられません）。探した語は記録に残りません（探したことだけが残ります）。</p>
+      <p className="lead">個人情報の削除や公開同意の撤回の依頼があったとき、<strong>公開中</strong>の記事・作品の題名・要約・本文・制作メンバーの役割名に、その人の名前などが残っていないかを探します。見つかったら、記事を編集して公開し直してください（以前の内容は公開されませんが、書き換えられません）。探した語は記録に残りません（探したことだけが残ります）。</p>
       <form className="input-row" onSubmit={submit} role="search">
         <label className="visually-hidden" htmlFor="pq">探す語（2〜50文字）</label>
         <input id="pq" className="input" type="search" required minLength={2} maxLength={50} placeholder="名前など" value={q} onChange={(e) => setQ(e.target.value)} />
