@@ -1,7 +1,7 @@
 /*
- * Charcoal（@charcoal-ui）を nu_digital のポータルに合わせる上書き。試験導入（#178）。
- * 方針は docs/design/charcoal.md。上流のCSSは layout.tsx でパッケージのまま読み込み、団体側の調整はこのファイルに集める。
- * Charcoalの部品CSSは @layer charcoal に入っているため、ここ（レイヤーなし）の指定が優先される。
+ * Charcoal（@charcoal-ui）を nu_digital のポータルに合わせる上書き。
+ * 方針は docs/design/charcoal.md。見た目はCharcoal（pixiv・BOOTH）に寄せ、団体色とアクセシビリティの最低基準だけを上書きする。
+ * 上流のCSSは layout.tsx でパッケージのまま読み込む。Charcoalの部品CSSは @layer charcoal に入っているため、ここ（レイヤーなし）の指定が優先される。
  */
 
 /* 団体テーマ: Charcoalのトークンを団体の値で置き換える（CSS変数は継承されるのでbodyで定義すれば十分） */
@@ -22,14 +22,25 @@ body {
 .charcoal-text-field-container {
   height: var(--tap);
 }
-.charcoal-button { font-size: 1rem; }
+
+/* 入力欄: Charcoalの薄い塗りに、白地でも境界が分かる1pxの枠（白との比 3:1以上）を足す */
+.charcoal-text-field-container {
+  border: 1px solid var(--color-field-border);
+}
+.charcoal-text-field-container[data-invalid="true"] { border-color: var(--color-error); }
+.charcoal-text-field-container:has(.charcoal-icon-button) { padding-right: 2px; }
 
 /* フォーカス表示はポータル全体と同じ二重リング（--focus）にそろえる。Charcoalの既定は淡い青で、白地では見えにくい */
-.charcoal-button:focus-visible {
+.charcoal-button:focus-visible,
+.charcoal-icon-button:focus-visible {
   border-radius: var(--charcoal-radius-oval, 999999px); /* 全体の :focus-visible が角丸4pxにするのを打ち消す */
 }
 .charcoal-text-field-container:not([aria-disabled="true"]):focus-within {
+  border-color: var(--color-brand);
   box-shadow: var(--focus);
+}
+.charcoal-text-field-container:not([aria-disabled="true"]):has(.charcoal-icon-button:focus-visible) {
+  box-shadow: none; /* 目のアイコンにフォーカスがあるときは、リングをアイコン側だけに出す */
 }
 .charcoal-text-field-container:not([aria-disabled="true"])[data-invalid="true"]:focus-within {
   box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--color-error);
@@ -38,5 +49,5 @@ body {
   box-shadow: none; /* リングは外側の枠に出す */
 }
 
-/* ラベルは既存の .field label と同じ大きさにする */
+/* ラベルは本文と同じ大きさにする */
 .charcoal-field-label { font-size: 1rem; line-height: 1.5; }

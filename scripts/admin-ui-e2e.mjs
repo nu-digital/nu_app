@@ -27,8 +27,15 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] 未ログインでは/へ入れずログイン画面になる`, new URL(page.url()).pathname === '/login');
       check(`[${label}] ログイン画面に横溢れがない`, (await overflow()) <= 0, `overflow=${await overflow()}`);
       await page.getByLabel('ログインID').waitFor();
-      const toggleH = await page.locator('.toggle').first().evaluate((el) => el.getBoundingClientRect().height);
-      check(`[${label}] 「表示する」ボタンが折り返さない`, toggleH <= 60, `height=${toggleH}`);
+      // パスワード欄の目のアイコン: 枠の中に収まり、押すと表示・非表示が切り替わる（読み上げ名と押下状態つき）
+      const pass = page.getByLabel('パスワード', { exact: true });
+      const eye = page.getByRole('button', { name: 'パスワードを表示する' });
+      const [passBox, eyeBox] = await Promise.all([pass.locator('xpath=ancestor::div[contains(@class,"charcoal-text-field-container")]').boundingBox(), eye.boundingBox()]);
+      check(`[${label}] 目のアイコンがパスワード欄の枠内にある`, eyeBox && passBox && eyeBox.y >= passBox.y && eyeBox.y + eyeBox.height <= passBox.y + passBox.height + 1, JSON.stringify({ passBox, eyeBox }));
+      await eye.click();
+      check(`[${label}] 目のアイコンでパスワードを表示できる`, (await pass.getAttribute('type')) === 'text' && (await page.getByRole('button', { name: 'パスワードを隠す' }).getAttribute('aria-pressed')) === 'true');
+      await page.getByRole('button', { name: 'パスワードを隠す' }).click();
+      check(`[${label}] もう一度押すと隠れる`, (await pass.getAttribute('type')) === 'password');
       const brokenLogin = await page.evaluate(() => [...document.images].filter((i) => !i.complete || i.naturalWidth === 0).length);
       check(`[${label}] ログイン画面のロゴが読み込まれる`, brokenLogin === 0);
       await shot('login');

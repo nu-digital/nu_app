@@ -61,4 +61,25 @@ WindowsのGit管理外に最小のApp Routerアプリを作成。Node 22.23.5、
 3. CSSの増分 +11.4KB（gzip）は内部ポータルとしては許容範囲と考えるが、使う部品が増えなくても全量を読む。
 4. ボタンの形はCharcoal標準の丸型のまま。団体の角丸（`--radius`）に寄せるかは見た目の判断として残す。
 
-次の判断点2（Icon・ModalとStorybook）に進む前に、上の1・2の方針を運用責任者が決める。
+### 運用責任者の判断（2026-11-28）と反映
+
+- **見た目はCharcoal（pixiv・BOOTH）に寄せる。** 「AIがその場で考えた見た目」にしないため、形・余白・文字の大きさはCharcoalの標準を使い、団体側で変えるのは主操作の色（#004aad）と、アクセシビリティの最低基準（タップ44px・二重のフォーカスリング・入力欄の枠）だけにする。ボタンの丸型もCharcoalのまま（上の課題4）。
+- **入力欄は「Charcoalの薄い塗り＋1pxの枠」**（課題1・2）。枠の色は `--color-field-border: #8a8f99`（白との比 3.2:1）。
+- **パスワードの表示切り替えは、枠の中の目のアイコン**（Charcoalのアイコン `24/Show`・`24/Hide`）。読み上げ名「パスワードを表示する／隠す」と `aria-pressed` を付ける。`PasswordField` をCharcoalの `TextField` で作り直したため、招待・再設定の画面も同じ見た目になる。
+
+反映した内容:
+
+- 部品へ移していない既存画面も、全体CSSの `.btn`（丸型・14px太字・secondaryは薄い塗り）・`.input`（薄い塗り＋1px枠・角丸4px）・`.toggle` をCharcoalの見た目に合わせた。画面ごとに `components/ui` の部品へ置き換えていく。
+- `components/ui/IconButton` を追加。Charcoalの `IconButton` は `<pixiv-icon>` に寸法を付けずに描画するため、要素の登録後に付くstyleがSSRとずれてhydrationの警告が出た。団体の部品はCharcoalの `Icon`（`fixedSize` がSSR時にも寸法を付ける）と同じクラス名で組み、警告が消えることを確認した。
+- アイコンは `@charcoal-ui/icons`（直接依存に追加、6.3.0固定）が同梱の `@charcoal-ui/icon-files` から読み込む。外部への通信はない（ソースで確認）。
+- E2E（`scripts/admin-ui-e2e.mjs`）の「表示する」ボタンの検査を、目のアイコンが枠内にあること・押すと表示/非表示が切り替わることの検査に置き換えた。
+
+| 確認（反映後） | 結果 |
+|---|---|
+| `tsc --noEmit`・`eslint .`・`npm test`・`next build`・`node scripts/check.mjs` | すべて終了0（テスト7件） |
+| `/login` のJS | gzip 193,150B（導入前から **+14.7KB**。アイコンの登録処理を含む） |
+| 全画面共通のCSS | gzip 14,692B（導入前から +11.6KB） |
+| Edge（`next dev`・APIは停止） | 目のアイコンが枠内（40×40px）、押すと type=text・「パスワードを隠す」・`aria-pressed=true`。Tab順は ID→パスワード→目のアイコン→ログイン。アイコンにフォーカスすると二重リング。375px幅で横あふれなし。hydrationの警告なし |
+| 未実施 | 招待・再設定の画面は有効なトークンが必要なため手元では未確認（CIのcompose・admin UI E2Eで確認）。ダークテーマ |
+
+次は判断点2（ModalとStorybook）と、既存画面の `components/ui` への置き換え。

@@ -13,6 +13,10 @@
 - macOS・Linuxでのビルド、Composeでの実API結合（ログイン成功まで）、ダークテーマ。CIのadmin・composeジョブで結合を確認する。
 - `next dev` が `apps/admin/AGENTS.md` を生成するが、扱いは分割案1で決めるためコミットしていない。
 
+## 運用責任者の判断を反映（2026-11-28）
+
+見た目はCharcoalに寄せる・入力欄は塗り＋枠・パスワードは枠内の目のアイコン。内容と検証は [charcoal.md「運用責任者の判断」](../design/charcoal.md)。
+
 ## 次の一手
 
-運用責任者が「試作の結果」の課題1（入力の見た目の統一とPasswordFieldの移行）・2（入力欄の境界）を決める → 判断点2（Icon・Modal・Storybook）。
+CI（admin・compose・admin UI E2E）の結果を確認 → 判断点2（Modal・Storybook）と、既存画面の `components/ui` への置き換え。
