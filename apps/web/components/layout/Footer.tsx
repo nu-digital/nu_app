@@ -29,6 +29,9 @@ export default function Footer() {
           <Link href="/terms" className="hover:text-white">
             利用規約
           </Link>
+          <Link href="/privacy" className="hover:text-white">
+            プライバシーポリシー
+          </Link>
 
           {githubLink && (
             <a
