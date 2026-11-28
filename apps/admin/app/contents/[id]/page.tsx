@@ -358,7 +358,7 @@ function Editor() {
               <p className="hint">公開されるURL: /{doc.section}/{doc.slug}/</p>
             </div>
             <details className="meta-members">
-              <summary>メンバー（{people.length}人）<AvatarStack people={people.map((p) => ({ userId: p.userId, displayName: p.displayName, avatarMediaId: p.avatarMediaId }))} /></summary>
+              <summary>メンバー（{people.length}人）：{people.map((p) => p.displayName).join("、")}</summary>
               <MembersPanel
                 key={`${doc.id}:${w.revisionNo}:${doc.collaborators.map((c) => c.userId).join(",")}`}
                 doc={doc}
