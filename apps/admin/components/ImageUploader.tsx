@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 
 import MediaImg from "@/components/MediaImg";
+import Button from "@/components/ui/Button";
 import { describe, uploadMedia } from "@/lib/api";
 
 /**
@@ -65,7 +66,7 @@ export default function ImageUploader({
           id={`file-${purpose}`} ref={input} className="input" type="file" accept="image/jpeg,image/png,image/webp" disabled={disabled}
           onChange={(e) => void choose(e.target.files?.[0])}
         />
-        {currentId && <button type="button" className="btn secondary inline" disabled={disabled} onClick={() => void remove()}>外す</button>}
+        {currentId && <Button variant="default" fullWidth={false} type="button" disabled={disabled} onClick={() => void remove()}>外す</Button>}
       </div>
       {working && <p className="hint" aria-busy="true">処理しています…</p>}
     </div>

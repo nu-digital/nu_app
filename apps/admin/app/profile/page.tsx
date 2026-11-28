@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import AppShell from "@/components/AppShell";
 import ImageUploader from "@/components/ImageUploader";
 import Notice from "@/components/Notice";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
 import {
   addDevice, addLink, clearAvatar, setAvatar, deleteDevice, deleteLink, describe, getMyProfile, patchDevice, patchLink, patchMyProfile, putConsent, putVisibility,
   type MyProfile, type Visibility,
@@ -113,9 +115,9 @@ function Profile() {
         <p>
           現在: <strong>{p.publicCreditConsent.granted ? "同意しています" : "同意していません"}</strong>
         </p>
-        <button className="btn inline" disabled={busy} onClick={() => run(() => putConsent(!p.publicCreditConsent.granted), p.publicCreditConsent.granted ? "同意を取り消しました。" : "同意しました。")}>
+        <Button fullWidth={false} type="submit" disabled={busy} onClick={() => run(() => putConsent(!p.publicCreditConsent.granted), p.publicCreditConsent.granted ? "同意を取り消しました。" : "同意しました。")}>
           {p.publicCreditConsent.granted ? "同意を取り消す" : "インターネット公開に同意する"}
-        </button>
+        </Button>
       </section>
     </main>
   );
@@ -142,8 +144,7 @@ function BasicSection({ p, busy, run }: SectionProps) {
       <h2 id="basic-title">基本情報</h2>
       <form onSubmit={submit}>
         <div className="field">
-          <label htmlFor="displayName">表示名（必須）</label>
-          <input id="displayName" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={64} />
+          <TextField id="displayName" label="表示名（必須）" value={displayName} onChange={setDisplayName} required maxLength={64} />
           <p className="hint">ログインしているメンバーに表示されます（64文字まで）。</p>
         </div>
         <div className="field">
@@ -152,13 +153,11 @@ function BasicSection({ p, busy, run }: SectionProps) {
           <VisibilitySelect id="vis-bio" label="自己紹介" value={vis.bio} onChange={(v) => setVis({ ...vis, bio: v })} />
         </div>
         <div className="field">
-          <label htmlFor="faculty">学部</label>
-          <input id="faculty" className="input" value={faculty} onChange={(e) => setFaculty(e.target.value)} maxLength={64} />
+          <TextField id="faculty" label="学部" value={faculty} onChange={setFaculty} maxLength={64} />
           <VisibilitySelect id="vis-faculty" label="学部" value={vis.faculty} onChange={(v) => setVis({ ...vis, faculty: v })} />
         </div>
         <div className="field">
-          <label htmlFor="department">学科</label>
-          <input id="department" className="input" value={department} onChange={(e) => setDepartment(e.target.value)} maxLength={64} />
+          <TextField id="department" label="学科" value={department} onChange={setDepartment} maxLength={64} />
           <VisibilitySelect id="vis-department" label="学科" value={vis.department} onChange={(v) => setVis({ ...vis, department: v })} />
         </div>
         <div className="field">
@@ -166,7 +165,7 @@ function BasicSection({ p, busy, run }: SectionProps) {
           <input id="year" className="input" type="number" min={1} max={10} inputMode="numeric" value={year} onChange={(e) => setYear(e.target.value)} />
           <VisibilitySelect id="vis-year" label="学年" value={vis.schoolYear} onChange={(v) => setVis({ ...vis, schoolYear: v })} />
         </div>
-        <button className="btn inline" type="submit" disabled={busy}>基本情報を保存する</button>
+        <Button fullWidth={false} type="submit" disabled={busy}>基本情報を保存する</Button>
       </form>
     </section>
   );
@@ -182,11 +181,11 @@ function PrivateSection({ p, busy, run }: SectionProps) {
       <h2 id="private-title">個人情報（任意）</h2>
       <p className="notice-inline"><strong>この4項目は、あなた本人と、権限のある管理者（Admin・Owner）だけが見られます。</strong>ほかのメンバーには決して表示されず、公開設定もできません。入力は任意です。</p>
       <form onSubmit={(e) => { e.preventDefault(); void run(() => patchMyProfile({ legalName: legal, universityEmail: email, studentNumber: num, nearestStation: station }), "個人情報を保存しました。"); }}>
-        <div className="field"><label htmlFor="legal">氏名</label><input id="legal" className="input" value={legal} onChange={(e) => setLegal(e.target.value)} maxLength={100} autoComplete="name" /></div>
-        <div className="field"><label htmlFor="email">大学メール</label><input id="email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} autoComplete="email" /></div>
-        <div className="field"><label htmlFor="num">学生証番号</label><input id="num" className="input" value={num} onChange={(e) => setNum(e.target.value)} maxLength={32} inputMode="text" /><p className="hint">半角英数字とハイフンで入力します。</p></div>
-        <div className="field"><label htmlFor="station">最寄り駅</label><input id="station" className="input" value={station} onChange={(e) => setStation(e.target.value)} maxLength={50} /></div>
-        <button className="btn inline" type="submit" disabled={busy}>個人情報を保存する</button>
+        <div className="field"><TextField id="legal" label="氏名" value={legal} onChange={setLegal} maxLength={100} autoComplete="name" /></div>
+        <div className="field"><TextField id="email" label="大学メール" type="email" value={email} onChange={setEmail} maxLength={254} autoComplete="email" /></div>
+        <div className="field"><TextField id="num" label="学生証番号" value={num} onChange={setNum} maxLength={32} inputMode="text" /><p className="hint">半角英数字とハイフンで入力します。</p></div>
+        <div className="field"><TextField id="station" label="最寄り駅" value={station} onChange={setStation} maxLength={50} /></div>
+        <Button fullWidth={false} type="submit" disabled={busy}>個人情報を保存する</Button>
       </form>
     </section>
   );
@@ -208,17 +207,17 @@ function LinksSection({ p, busy, run }: SectionProps) {
               <select aria-label={`${l.label}の公開範囲`} className="input" value={l.visibility} onChange={(e) => run(() => patchLink(l.id, { visibility: e.target.value }), "公開範囲を変更しました。")}>
                 <option value="private">{VIS_LABEL.private}</option><option value="members">{VIS_LABEL.members}</option>
               </select>
-              <button className="btn secondary inline" disabled={busy} onClick={() => run(() => deleteLink(l.id), `「${l.label}」を削除しました。`)}>削除</button>
+              <Button variant="default" fullWidth={false} type="submit" disabled={busy} onClick={() => run(() => deleteLink(l.id), `「${l.label}」を削除しました。`)}>削除</Button>
             </div>
           </li>
         ))}
         {p.links.length === 0 && <li className="hint">リンクはまだありません。</li>}
       </ul>
       <form onSubmit={(e) => { e.preventDefault(); void run(async () => { await addLink({ label, url, visibility: vis }); setLabel(""); setUrl(""); setVis("private"); }, "リンクを追加しました。"); }}>
-        <div className="field"><label htmlFor="link-label">リンクの名前</label><input id="link-label" className="input" value={label} onChange={(e) => setLabel(e.target.value)} required maxLength={50} /></div>
-        <div className="field"><label htmlFor="link-url">URL</label><input id="link-url" className="input" type="text" inputMode="url" value={url} onChange={(e) => setUrl(e.target.value)} required autoCapitalize="none" spellCheck={false} /></div>
+        <div className="field"><TextField id="link-label" label="リンクの名前" value={label} onChange={setLabel} required maxLength={50} /></div>
+        <div className="field"><TextField id="link-url" label="URL" type="text" inputMode="url" value={url} onChange={setUrl} required autoCapitalize="none" spellCheck={false} /></div>
         <VisibilitySelect id="link-vis" label="リンク" value={vis} onChange={setVis} />
-        <button className="btn inline" type="submit" disabled={busy}>リンクを追加する</button>
+        <Button fullWidth={false} type="submit" disabled={busy}>リンクを追加する</Button>
       </form>
     </section>
   );
@@ -241,18 +240,18 @@ function DevicesSection({ p, busy, run }: SectionProps) {
               <select aria-label={`${d.name}の公開範囲`} className="input" value={d.visibility} onChange={(e) => run(() => patchDevice(d.id, { visibility: e.target.value }), "公開範囲を変更しました。")}>
                 <option value="private">{VIS_LABEL.private}</option><option value="members">{VIS_LABEL.members}</option>
               </select>
-              <button className="btn secondary inline" disabled={busy} onClick={() => run(() => deleteDevice(d.id), `「${d.name}」を削除しました。`)}>削除</button>
+              <Button variant="default" fullWidth={false} type="submit" disabled={busy} onClick={() => run(() => deleteDevice(d.id), `「${d.name}」を削除しました。`)}>削除</Button>
             </div>
           </li>
         ))}
         {p.devices.length === 0 && <li className="hint">機材はまだありません。</li>}
       </ul>
       <form onSubmit={(e) => { e.preventDefault(); void run(async () => { await addDevice({ category, name, spec, visibility: vis }); setCategory(""); setName(""); setSpec(""); setVis("private"); }, "機材を追加しました。"); }}>
-        <div className="field"><label htmlFor="dev-cat">種類（例: PC、VR機器）</label><input id="dev-cat" className="input" value={category} onChange={(e) => setCategory(e.target.value)} required maxLength={30} /></div>
-        <div className="field"><label htmlFor="dev-name">名前</label><input id="dev-name" className="input" value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} /></div>
+        <div className="field"><TextField id="dev-cat" label="種類（例: PC、VR機器）" value={category} onChange={setCategory} required maxLength={30} /></div>
+        <div className="field"><TextField id="dev-name" label="名前" value={name} onChange={setName} required maxLength={100} /></div>
         <div className="field"><label htmlFor="dev-spec">詳細（任意）</label><textarea id="dev-spec" className="input" rows={2} value={spec} onChange={(e) => setSpec(e.target.value)} maxLength={500} /></div>
         <VisibilitySelect id="dev-vis" label="機材" value={vis} onChange={setVis} />
-        <button className="btn inline" type="submit" disabled={busy}>機材を追加する</button>
+        <Button fullWidth={false} type="submit" disabled={busy}>機材を追加する</Button>
       </form>
     </section>
   );

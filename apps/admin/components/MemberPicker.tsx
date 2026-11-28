@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import Button from "@/components/ui/Button";
 import { describe, listMembers, type Member } from "@/lib/api";
 
 /** メンバーを表示名で探して選ぶ（有効なメンバーだけが出る）。共同編集者・制作メンバーの追加に使う。 */
@@ -29,7 +30,7 @@ export default function MemberPicker({ label, exclude, onPick, disabled }: { lab
         <label htmlFor={id}>{label}</label>
         <div className="actions">
           <input id={id} className="input" type="search" placeholder="表示名で探す" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void search(); } }} />
-          <button type="button" className="btn secondary inline" onClick={search} disabled={busy || disabled}>探す</button>
+          <Button variant="default" fullWidth={false} type="button" onClick={search} disabled={busy || disabled}>探す</Button>
         </div>
       </div>
       {error && <p className="hint" role="alert">{error}</p>}
@@ -38,7 +39,7 @@ export default function MemberPicker({ label, exclude, onPick, disabled }: { lab
           {items.filter((m) => !exclude.includes(m.id)).map((m) => (
             <li key={m.id} className="item" data-member={m.displayName}>
               <strong>{m.displayName}</strong>
-              <button type="button" className="btn secondary inline" disabled={disabled} onClick={() => onPick(m)}>{m.displayName}さんを追加</button>
+              <Button variant="default" fullWidth={false} type="button" disabled={disabled} onClick={() => onPick(m)}>{m.displayName}さんを追加</Button>
             </li>
           ))}
         </ul>

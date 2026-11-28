@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 
 import AppShell from "@/components/AppShell";
 import Notice from "@/components/Notice";
+import Button from "@/components/ui/Button";
 import { describe, searchPublished, type PublishedHit } from "@/lib/api";
 
 export default function PublishedSearchPage() {
@@ -43,7 +44,7 @@ function Search() {
       <form className="input-row" onSubmit={submit} role="search">
         <label className="visually-hidden" htmlFor="pq">探す語（2〜50文字）</label>
         <input id="pq" className="input" type="search" required minLength={2} maxLength={50} placeholder="名前など" value={q} onChange={(e) => setQ(e.target.value)} />
-        <button className="btn inline" type="submit" disabled={busy}>探す</button>
+        <Button fullWidth={false} type="submit" disabled={busy}>探す</Button>
       </form>
       {msg && <Notice kind="error">{msg}</Notice>}
       {result && (

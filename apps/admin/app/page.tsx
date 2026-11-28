@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import AppHeader from "@/components/AppHeader";
+import Button from "@/components/ui/Button";
 import { describe, fetchMe, logout, type Me } from "@/lib/api";
 
 // アプリの定義（コード上の一覧）。全員に同じカードを表示する。権限はAPIが強制するため、画面の表示・非表示では制御しない。
@@ -57,9 +58,9 @@ export default function Launcher() {
             <strong>エラー</strong>
             <span>{error}</span>
           </div>
-          <button className="btn" onClick={() => window.location.reload()}>
+          <Button type="submit" onClick={() => window.location.reload()}>
             もう一度読み込む
-          </button>
+          </Button>
         </div>
       </main>
     );

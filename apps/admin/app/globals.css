@@ -31,7 +31,7 @@ body {
 }
 h1, h2 { line-height: 1.35; margin: 0 0 var(--space-3); }
 p { margin: 0 0 var(--space-3); }
-a { color: var(--color-brand); }
+a:not(.charcoal-button) { color: var(--color-brand); } /* ボタンの形のリンク（components/ui/Button の href）は部品の色を使う */
 :focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -48,7 +48,7 @@ a { color: var(--color-brand); }
 .field label { display: block; font-weight: 700; margin-bottom: var(--space-1); }
 .field .hint { color: var(--color-muted); font-size: .875rem; margin-top: var(--space-1); }
 .input-row { display: flex; gap: var(--space-2); }
-/* 入力・ボタンの見た目はCharcoal（components/ui の部品）にそろえる。部品へ移すまでの既存画面用（docs/design/charcoal.md） */
+/* ネイティブの入力（数値・日付・セレクト・テキストエリア・読み取り専用）。見た目は components/ui/TextField（Charcoal）にそろえる */
 .input {
   width: 100%; min-height: var(--tap); padding: 0 var(--space-3); font: inherit; color: var(--color-ink);
   background: var(--charcoal-color-container-secondary-default-a, #f5f5f5); border: 1px solid var(--color-field-border); border-radius: 4px;
@@ -62,18 +62,9 @@ a { color: var(--color-brand); }
 }
 .toggle:hover { background: var(--charcoal-color-container-secondary-hover-a, #ebebeb); }
 
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap); width: 100%;
-  padding: 0 var(--space-5); font: inherit; font-size: 14px; line-height: 22px; font-weight: 700; color: #fff; background: var(--color-brand);
-  border: none; border-radius: 999px; cursor: pointer; text-decoration: none; transition: .2s background-color, .2s box-shadow;
-}
-.btn:hover { background: var(--color-brand-dark); }
-.btn:focus-visible, .toggle:focus-visible { border-radius: 999px; }
-.btn[disabled] { opacity: .32; cursor: progress; }
-.btn.secondary { background: var(--charcoal-color-container-secondary-default-a, #f5f5f5); color: var(--color-ink); }
-.btn.secondary:hover { background: var(--charcoal-color-container-secondary-hover-a, #ebebeb); }
-.btn.inline { width: auto; max-width: 100%; text-align: center; }
-.app-header .btn.inline, .actions .btn.inline { white-space: nowrap; }
+/* ボタンは components/ui/Button（Charcoalの Button）。ここでは並べ方だけを決める（色・形は charcoal-theme.css） */
+.toggle:focus-visible { border-radius: 999px; } /* .toggle はユーザー管理の「コピー」 */
+.app-header .charcoal-button, .actions .charcoal-button { white-space: nowrap; }
 .app-header .who { flex-wrap: wrap; justify-content: flex-end; }
 
 .notice { display: flex; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-radius: var(--radius); margin-bottom: var(--space-4); border: none; border-left: 4px solid; font-size: 14px; }
@@ -130,8 +121,9 @@ a.card:focus-visible { border-radius: var(--radius-l); }
 .panel { background: var(--color-surface); border: none; border-radius: var(--radius-l); padding: var(--space-4) var(--space-5); margin-bottom: var(--space-5); }
 /* 灰色の面の上では、入力欄・副ボタン・タグを白にして見分ける */
 .panel .input, .panel .charcoal-text-field-container, .user .input, .item .input { background: var(--color-bg); }
-.panel .btn.secondary, .user .btn.secondary, .item .btn.secondary, .panel .toggle { background: var(--color-bg); }
-.panel .btn.secondary:hover, .user .btn.secondary:hover, .item .btn.secondary:hover { background: var(--color-surface-hover); }
+.panel .charcoal-button[data-variant="Default"], .user .charcoal-button[data-variant="Default"], .item .charcoal-button[data-variant="Default"], .editor fieldset .charcoal-button[data-variant="Default"], .panel .toggle { background: var(--color-bg); }
+.panel .charcoal-button[data-variant="Default"]:hover:not(:disabled), .user .charcoal-button[data-variant="Default"]:hover:not(:disabled), .item .charcoal-button[data-variant="Default"]:hover:not(:disabled) { background: var(--color-surface-hover); }
+.user .charcoal-text-field-container, .item .charcoal-text-field-container { background: var(--color-bg); }
 .panel h2 { margin-top: 0; }
 .add-panel > summary { cursor: pointer; font-weight: 700; font-size: 1rem; min-height: var(--tap); display: flex; align-items: center; }
 .add-panel[open] > summary { margin-bottom: var(--space-3); }
@@ -149,8 +141,6 @@ a.card:focus-visible { border-radius: var(--radius-l); }
 .badge.status-disabled { color: var(--color-error); background: var(--color-error-bg); }
 .actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); align-items: center; }
 .confirm { display: inline-flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
-.btn.danger { background: var(--color-error); color: #fff; }
-.btn.danger:hover { background: #8c1d18; }
 .hint { color: var(--color-muted); font-size: .875rem; margin: var(--space-2) 0 0; }
 
 /* プロフィール・メンバー */
@@ -163,7 +153,7 @@ select.input { padding: 0 var(--space-3); }
 .items { list-style: none; padding: 0; margin: 0 0 var(--space-4); display: grid; gap: var(--space-3); }
 .item { display: flex; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; border: none; border-radius: var(--radius-l); padding: var(--space-3) var(--space-4); background: var(--color-surface); }
 .panel .item { background: var(--color-bg); }
-.panel .item .btn.secondary, .panel .item .badge, .panel .item .input { background: var(--color-surface); }
+.panel .item .charcoal-button[data-variant="Default"], .panel .item .badge, .panel .item .input, .panel .item .charcoal-text-field-container { background: var(--color-surface); }
 .item .user-id { word-break: break-all; }
 .member-link { color: var(--color-ink); text-decoration: none; display: inline-block; min-height: var(--tap); line-height: var(--tap); }
 .member-link:hover strong { text-decoration: underline; }
@@ -181,7 +171,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--color-brand); 
 .page.wide { max-width: 1100px; }
 .subnav { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-5); }
 .filters { display: grid; gap: var(--space-2); grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); align-items: end; margin-bottom: var(--space-4); }
-.filters .btn { align-self: end; margin-bottom: var(--space-4); }
+.filters .charcoal-button { align-self: end; margin-bottom: var(--space-4); }
 .grid { list-style: none; padding: 0; margin: 0 0 var(--space-4); display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 .item-card { display: block; border: none; border-radius: var(--radius); background: transparent; color: var(--color-ink); text-decoration: none; height: 100%; }
 .item-card:focus-visible { border-radius: var(--radius); }

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import MemberPicker from "@/components/MemberPicker";
 import Notice from "@/components/Notice";
+import Button from "@/components/ui/Button";
 import { conflictRevision, describe, putContributors, type ContentDetail } from "@/lib/api";
 
 type Row = { userId: string; displayName: string; roleLabel: string };
@@ -58,14 +59,14 @@ export default function ContributorsPanel({ doc, dirty, onSaved, onConflict }: {
                   <input id={`role-${i}`} className="input" maxLength={50} value={r.roleLabel} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, roleLabel: e.target.value } : x)))} />
                 </div>
               </div>
-              <button className="btn secondary inline" disabled={busy} onClick={() => setRows(rows.filter((_, j) => j !== i))}>{r.displayName}さんを外す</button>
+              <Button variant="default" fullWidth={false} type="submit" disabled={busy} onClick={() => setRows(rows.filter((_, j) => j !== i))}>{r.displayName}さんを外す</Button>
             </li>
           ))}
         </ul>
       )}
       <MemberPicker label="制作メンバーを追加する" disabled={busy} exclude={[]} onPick={(m) => setRows([...rows, { userId: m.id, displayName: m.displayName, roleLabel: "" }])} />
       <div className="actions">
-        <button className="btn inline" onClick={save} disabled={busy || !changed || !valid || dirty}>制作メンバーを保存する</button>
+        <Button fullWidth={false} type="submit" onClick={save} disabled={busy || !changed || !valid || dirty}>制作メンバーを保存する</Button>
         {dirty ? <span className="hint">先に、本文などの変更を保存してください（制作メンバーの保存は、新しい版を作ります）。</span> : !valid ? <span className="hint">すべての人に役割を入れてください。</span> : null}
       </div>
     </section>

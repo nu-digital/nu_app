@@ -6,6 +6,8 @@ import { useState } from "react";
 
 import AppShell from "@/components/AppShell";
 import Notice from "@/components/Notice";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
 import { createContent, describe } from "@/lib/api";
 
 export default function NewContentPage() {
@@ -55,15 +57,13 @@ function NewContent() {
           </select>
         </div>
         <div className="field">
-          <label htmlFor="n-title">タイトル（必須）</label>
-          <input id="n-title" className="input" required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} />
+          <TextField id="n-title" label="タイトル（必須）" required maxLength={200} value={title} onChange={setTitle} />
         </div>
         <div className="field">
-          <label htmlFor="n-slug">URL用の名前（必須）</label>
-          <input id="n-slug" className="input" required maxLength={100} pattern="[A-Za-z0-9][A-Za-z0-9._\-]*" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={slug} onChange={(e) => setSlug(e.target.value)} />
+          <TextField id="n-slug" label="URL用の名前（必須）" required maxLength={100} pattern="[A-Za-z0-9][A-Za-z0-9._\-]*" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={slug} onChange={setSlug} />
           <p className="hint">英数字と . _ - だけ。公開サイトのURL（/{KINDS[kind].section}/<strong>{slug || "名前"}</strong>/）になり、<strong>作成後は変えられません</strong>。</p>
         </div>
-        <button className="btn inline" type="submit" disabled={busy || !title.trim() || !slug.trim()}>下書きを作る</button>
+        <Button fullWidth={false} type="submit" disabled={busy || !title.trim() || !slug.trim()}>下書きを作る</Button>
       </form>
     </main>
   );

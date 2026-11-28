@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import AppShell from "@/components/AppShell";
 import Notice from "@/components/Notice";
+import Button from "@/components/ui/Button";
 import { createCorrection, describe, listHistory, type HistoryEvent } from "@/lib/api";
 
 export default function HistoryPage() {
@@ -61,7 +62,7 @@ function History({ canCorrect }: { canCorrect: boolean }) {
           ))}
         </ul>
       )}
-      {next && <button className="btn secondary inline" onClick={async () => { try { const r = await listHistory(next); setItems((c) => [...c, ...r.items]); setNext(r.nextCursor); } catch (e) { setError(describe(e)); } }}>さらに表示</button>}
+      {next && <Button variant="default" fullWidth={false} type="submit" onClick={async () => { try { const r = await listHistory(next); setItems((c) => [...c, ...r.items]); setNext(r.nextCursor); } catch (e) { setError(describe(e)); } }}>さらに表示</Button>}
     </main>
   );
 }
@@ -77,9 +78,9 @@ function CorrectionForm({ ev, onDone, onError }: { ev: HistoryEvent; onDone: (te
   const individual = ev.assetTag !== "";
   if (!open) {
     return (
-      <button className="btn secondary inline" onClick={() => { setKey(`ui-${crypto.randomUUID()}`); setOpen(true); }}>
+      <Button variant="default" fullWidth={false} type="submit" onClick={() => { setKey(`ui-${crypto.randomUUID()}`); setOpen(true); }}>
         この記録を訂正する
-      </button>
+      </Button>
     );
   }
   return (
@@ -118,8 +119,8 @@ function CorrectionForm({ ev, onDone, onError }: { ev: HistoryEvent; onDone: (te
         <input id={`cr-${ev.kind}-${ev.id}`} className="input" maxLength={200} value={reason} onChange={(x) => setReason(x.target.value)} />
       </div>
       <div className="actions">
-        <button className="btn inline" type="submit" disabled={busy || !reason.trim() || (kind === "adjust" && delta === 0)}>訂正する</button>
-        <button className="btn secondary inline" type="button" onClick={() => setOpen(false)} disabled={busy}>やめる</button>
+        <Button fullWidth={false} type="submit" disabled={busy || !reason.trim() || (kind === "adjust" && delta === 0)}>訂正する</Button>
+        <Button variant="default" fullWidth={false} type="button" onClick={() => setOpen(false)} disabled={busy}>やめる</Button>
       </div>
     </form>
   );

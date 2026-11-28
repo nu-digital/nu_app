@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import MemberPicker from "@/components/MemberPicker";
 import Notice from "@/components/Notice";
+import Button from "@/components/ui/Button";
 import { describe, putCollaborators } from "@/lib/api";
 
 type Person = { userId: string; displayName: string };
@@ -39,7 +40,7 @@ export default function CollaboratorsPanel({ contentId, creator, initial, canMan
           {list.map((p) => (
             <li key={p.userId} className="item" data-person={p.displayName}>
               <strong>{p.displayName}</strong>
-              {canManage && <button className="btn secondary inline" disabled={busy} onClick={() => apply(list.filter((x) => x.userId !== p.userId), `${p.displayName}さんを共同編集者から外しました。`)}>{p.displayName}さんを外す</button>}
+              {canManage && <Button variant="default" fullWidth={false} type="submit" disabled={busy} onClick={() => apply(list.filter((x) => x.userId !== p.userId), `${p.displayName}さんを共同編集者から外しました。`)}>{p.displayName}さんを外す</Button>}
             </li>
           ))}
         </ul>

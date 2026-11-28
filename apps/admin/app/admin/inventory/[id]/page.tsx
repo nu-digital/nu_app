@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import ImageUploader from "@/components/ImageUploader";
 import Notice from "@/components/Notice";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
 import { clearItemPhoto, createUnit, describe, getItem, setItemPhoto, updateItem, type ItemDetail } from "@/lib/api";
 
 export default function AdminItemPage() {
@@ -78,11 +80,11 @@ function Edit() {
       <section className="panel" aria-labelledby="basic-title">
         <h2 id="basic-title">基本情報</h2>
         <form onSubmit={(e) => { e.preventDefault(); void act(async () => { await updateItem(id, { name: f.name.trim(), category: f.category.trim(), location: f.location.trim(), description: f.description.trim() }); return "基本情報を保存しました。"; }); }}>
-          <div className="field"><label htmlFor="e-name">名前（必須）</label><input id="e-name" className="input" required maxLength={100} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
-          <div className="field"><label htmlFor="e-cat">カテゴリ</label><input id="e-cat" className="input" maxLength={50} value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} /></div>
-          <div className="field"><label htmlFor="e-loc">保管場所</label><input id="e-loc" className="input" maxLength={100} value={f.location} onChange={(e) => setF({ ...f, location: e.target.value })} /></div>
+          <div className="field"><TextField id="e-name" label="名前（必須）" required maxLength={100} value={f.name} onChange={(value) => setF({ ...f, name: value })} /></div>
+          <div className="field"><TextField id="e-cat" label="カテゴリ" maxLength={50} value={f.category} onChange={(value) => setF({ ...f, category: value })} /></div>
+          <div className="field"><TextField id="e-loc" label="保管場所" maxLength={100} value={f.location} onChange={(value) => setF({ ...f, location: value })} /></div>
           <div className="field"><label htmlFor="e-desc">説明</label><textarea id="e-desc" className="input" rows={3} maxLength={1000} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></div>
-          <button className="btn inline" type="submit" disabled={busy || !f.name.trim()}>保存する</button>
+          <Button fullWidth={false} type="submit" disabled={busy || !f.name.trim()}>保存する</Button>
         </form>
       </section>
 
@@ -92,8 +94,8 @@ function Edit() {
           <p className="hint">現在の総数は{it.totalQuantity}個、貸出中は{outstanding}個です。貸出中の数より少なくはできません。変更は理由つきで履歴に残ります。</p>
           <form onSubmit={(e) => { e.preventDefault(); void act(async () => { await updateItem(id, { totalQuantity: total, reason: reason.trim() }); setReason(""); return `総数を${total}個に変更しました。`; }); }}>
             <div className="field"><label htmlFor="t-total">新しい総数</label><input id="t-total" className="input" type="number" min={1} inputMode="numeric" value={total} onChange={(e) => setTotal(Number(e.target.value) || 1)} /></div>
-            <div className="field"><label htmlFor="t-reason">変更の理由（必須）</label><input id="t-reason" className="input" maxLength={200} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
-            <button className="btn inline" type="submit" disabled={busy || !reason.trim() || total === it.totalQuantity}>総数を変更する</button>
+            <div className="field"><TextField id="t-reason" label="変更の理由（必須）" maxLength={200} value={reason} onChange={setReason} /></div>
+            <Button fullWidth={false} type="submit" disabled={busy || !reason.trim() || total === it.totalQuantity}>総数を変更する</Button>
           </form>
         </section>
       ) : (
@@ -106,9 +108,9 @@ function Edit() {
             {it.units.length === 0 && <li className="hint">個体がまだありません。</li>}
           </ul>
           <form onSubmit={(e) => { e.preventDefault(); void act(async () => { await createUnit(id, tag.trim(), serial.trim() || undefined); const t = tag.trim(); setTag(""); setSerial(""); return `管理番号 ${t} を登録しました。`; }); }}>
-            <div className="field"><label htmlFor="u-tag">管理番号（必須）</label><input id="u-tag" className="input" required maxLength={50} value={tag} onChange={(e) => setTag(e.target.value)} /></div>
-            <div className="field"><label htmlFor="u-serial">シリアル番号</label><input id="u-serial" className="input" maxLength={100} value={serial} onChange={(e) => setSerial(e.target.value)} /></div>
-            <button className="btn inline" type="submit" disabled={busy || !tag.trim()}>個体を登録する</button>
+            <div className="field"><TextField id="u-tag" label="管理番号（必須）" required maxLength={50} value={tag} onChange={setTag} /></div>
+            <div className="field"><TextField id="u-serial" label="シリアル番号" maxLength={100} value={serial} onChange={setSerial} /></div>
+            <Button fullWidth={false} type="submit" disabled={busy || !tag.trim()}>個体を登録する</Button>
           </form>
         </section>
       )}
@@ -117,7 +119,7 @@ function Edit() {
         <h2 id="arch-title">この物品を廃止する</h2>
         <p className="hint">廃止すると一覧に出なくなり、借りられなくなります。履歴は残ります。貸出中のものがあるあいだは廃止できません。</p>
         <form onSubmit={(e) => { e.preventDefault(); if (!window.confirm(`「${it.name}」を廃止します。よろしいですか？`)) return; void act(async () => { await updateItem(id, { archived: true }); router.push("/admin/inventory"); return "廃止しました。"; }); }}>
-          <button className="btn danger inline" type="submit" disabled={busy}>廃止する</button>
+          <Button variant="danger" fullWidth={false} type="submit" disabled={busy}>廃止する</Button>
         </form>
       </section>
     </main>

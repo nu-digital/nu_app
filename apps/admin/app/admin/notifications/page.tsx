@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import AppShell from "@/components/AppShell";
 import Notice from "@/components/Notice";
+import Button from "@/components/ui/Button";
 import {
   describe, listDeliveries, listNotificationSettings, putNotificationSetting, retryDelivery, testNotification,
   type Delivery, type NotificationSetting,
@@ -83,8 +84,8 @@ function SettingRow({ s, onSaved, onMsg }: { s: NotificationSetting; onSaved: (n
         </div>
         {enabled && !(s.discordChannelId ?? "") && <p className="hint">チャンネルが未設定のあいだは送らず、送信待ちとして溜まります（設定すると送られます）。</p>}
         <div className="actions">
-          <button className="btn inline" disabled={!dirty || !!busy} onClick={() => run("save", async () => { const n = await putNotificationSetting(s.eventType, enabled, channel.trim()); onSaved(n); setChannel(n.discordChannelId ?? ""); return `「${s.label}」の設定を保存しました。`; })}>保存する</button>
-          <button className="btn secondary inline" disabled={!channel.trim() || !!busy} onClick={() => run("test", async () => { await testNotification(channel.trim()); return "テスト通知を送りました。Discordのチャンネルを確認してください。"; })}>接続テスト</button>
+          <Button fullWidth={false} type="submit" disabled={!dirty || !!busy} onClick={() => run("save", async () => { const n = await putNotificationSetting(s.eventType, enabled, channel.trim()); onSaved(n); setChannel(n.discordChannelId ?? ""); return `「${s.label}」の設定を保存しました。`; })}>保存する</Button>
+          <Button variant="default" fullWidth={false} type="submit" disabled={!channel.trim() || !!busy} onClick={() => run("test", async () => { await testNotification(channel.trim()); return "テスト通知を送りました。Discordのチャンネルを確認してください。"; })}>接続テスト</Button>
         </div>
       </section>
     </li>
@@ -119,7 +120,7 @@ function Deliveries({ onMsg }: { onMsg: (m: { kind: "error" | "success"; text: s
             <option value="sent">送信済み</option>
           </select>
         </div>
-        <button className="btn secondary inline" onClick={() => { setLoading(true); setVersion((v) => v + 1); }}>更新する</button>
+        <Button variant="default" fullWidth={false} type="submit" onClick={() => { setLoading(true); setVersion((v) => v + 1); }}>更新する</Button>
       </div>
       {loading ? <p aria-busy="true">読み込んでいます…</p> : items.length === 0 ? <p>該当する通知はありません。</p> : (
         <ul className="items">
@@ -131,8 +132,7 @@ function Deliveries({ onMsg }: { onMsg: (m: { kind: "error" | "success"; text: s
                 {d.lastError && <div className="user-id">直近の失敗: {d.lastError}</div>}
               </div>
               {d.status === "dead" && (
-                <button
-                  className="btn secondary inline"
+                <Button variant="default" fullWidth={false} type="submit"
                   disabled={busyId === d.id}
                   onClick={async () => {
                     setBusyId(d.id);
@@ -147,10 +147,9 @@ function Deliveries({ onMsg }: { onMsg: (m: { kind: "error" | "success"; text: s
                     } finally {
                       setBusyId("");
                     }
-                  }}
-                >
+                  }}>
                   再送する
-                </button>
+                </Button>
               )}
             </li>
           ))}
