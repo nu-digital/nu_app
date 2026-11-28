@@ -422,12 +422,12 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] 検索で絞り込める`, (await pa.locator(`a.item-card[data-name="${cable}"]`).count()) === 0);
       await pa.getByRole('searchbox').fill('');
       await pa.locator(`a.item-card[data-name="${cable}"]`).waitFor();
-      // 状態の表示: 全部貸出可能のあいだは「貸出可能」。カテゴリ・「借りられる物だけ」で絞れる
+      // 状態の表示: 全部貸出可能のあいだは「貸出可能」。カテゴリ・「貸出可能」で絞れる
       check(`[${label}] 貸出可能な物品に「貸出可能」の札が出る`, /貸出可能/.test(await pa.locator(`a.item-card[data-name="${cable}"]`).innerText()));
-      await pa.getByRole('button', { name: '借りられる物だけ' }).click();
+      await pa.getByRole('button', { name: '貸出可能', exact: true }).click();
       await pa.waitForTimeout(600);
-      check(`[${label}] 「借りられる物だけ」で貸出可能な物品が残る`, (await pa.locator(`a.item-card[data-name="${cable}"]`).count()) === 1);
-      await pa.getByRole('button', { name: '借りられる物だけ' }).click();
+      check(`[${label}] 「貸出可能」で貸出可能な物品が残る`, (await pa.locator(`a.item-card[data-name="${cable}"]`).count()) === 1);
+      await pa.getByRole('button', { name: '貸出可能', exact: true }).click();
       await pa.locator(`a.item-card[data-name="${cable}"]`).waitFor();
 
       // 数量管理: 2個借りる → 残り3
