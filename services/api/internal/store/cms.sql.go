@@ -157,6 +157,18 @@ func (q *Queries) ExistingUserIDs(ctx context.Context, ids []pgtype.UUID) ([]pgt
 	return items, nil
 }
 
+const getAvatarMediaID = `-- name: GetAvatarMediaID :one
+SELECT avatar_media_id FROM profiles WHERE user_id = $1
+`
+
+// 作者のアバター（詳細用）
+func (q *Queries) GetAvatarMediaID(ctx context.Context, userID pgtype.UUID) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, getAvatarMediaID, userID)
+	var avatar_media_id pgtype.UUID
+	err := row.Scan(&avatar_media_id)
+	return avatar_media_id, err
+}
+
 const getContent = `-- name: GetContent :one
 SELECT id, type, section, slug, creator_user_id, working_revision_id, published_revision_id, archived_at, created_at, updated_at, legacy_author_id FROM contents WHERE id = $1
 `
@@ -459,15 +471,16 @@ func (q *Queries) IsContentCollaborator(ctx context.Context, arg IsContentCollab
 }
 
 const listContentCollaborators = `-- name: ListContentCollaborators :many
-SELECT c.user_id, COALESCE(p.display_name, '') AS display_name
+SELECT c.user_id, COALESCE(p.display_name, '') AS display_name, p.avatar_media_id
 FROM content_collaborators c LEFT JOIN profiles p ON p.user_id = c.user_id
 WHERE c.content_id = $1
 ORDER BY c.added_at, c.user_id
 `
 
 type ListContentCollaboratorsRow struct {
-	UserID      pgtype.UUID
-	DisplayName string
+	UserID        pgtype.UUID
+	DisplayName   string
+	AvatarMediaID pgtype.UUID
 }
 
 func (q *Queries) ListContentCollaborators(ctx context.Context, contentID pgtype.UUID) ([]ListContentCollaboratorsRow, error) {
@@ -479,7 +492,41 @@ func (q *Queries) ListContentCollaborators(ctx context.Context, contentID pgtype
 	items := []ListContentCollaboratorsRow{}
 	for rows.Next() {
 		var i ListContentCollaboratorsRow
-		if err := rows.Scan(&i.UserID, &i.DisplayName); err != nil {
+		if err := rows.Scan(&i.UserID, &i.DisplayName, &i.AvatarMediaID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listContentPeople = `-- name: ListContentPeople :many
+SELECT c.id AS content_id, c.creator_user_id AS user_id, 0::int AS ord FROM contents c WHERE c.id = ANY($1::uuid[])
+UNION ALL
+SELECT cc.content_id, cc.user_id, 1::int FROM content_collaborators cc WHERE cc.content_id = ANY($1::uuid[])
+ORDER BY 1, 3
+`
+
+type ListContentPeopleRow struct {
+	ContentID pgtype.UUID
+	UserID    pgtype.UUID
+	Ord       int32
+}
+
+// 一覧に出す関わるメンバー: 作者と共同編集者（編集できる人にだけ使う）
+func (q *Queries) ListContentPeople(ctx context.Context, ids []pgtype.UUID) ([]ListContentPeopleRow, error) {
+	rows, err := q.db.Query(ctx, listContentPeople, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListContentPeopleRow{}
+	for rows.Next() {
+		var i ListContentPeopleRow
+		if err := rows.Scan(&i.ContentID, &i.UserID, &i.Ord); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -532,15 +579,23 @@ func (q *Queries) ListContentRevisionSummaries(ctx context.Context, contentID pg
 }
 
 const listContents = `-- name: ListContents :many
-SELECT c.id, c.type, c.section, c.slug, c.updated_at, (c.published_revision_id IS NOT NULL)::boolean AS is_published,
+SELECT c.id, c.type, c.section, c.slug, c.updated_at, c.creator_user_id, (c.published_revision_id IS NOT NULL)::boolean AS is_published,
        v.can_edit::boolean AS can_edit,
        (CASE WHEN v.can_edit THEN w.title ELSE p.title END)::text AS title,
        (CASE WHEN v.can_edit THEN w.summary ELSE p.summary END)::text AS summary,
        (CASE WHEN v.can_edit THEN w.revision_no ELSE p.revision_no END)::integer AS revision_no,
+       (CASE WHEN v.can_edit THEN w.id ELSE p.id END)::uuid AS shown_revision_id,
+       (CASE WHEN v.can_edit THEN w.date_label ELSE p.date_label END)::text AS date_label,
+       (CASE WHEN v.can_edit THEN w.sort_date ELSE p.sort_date END)::date AS sort_date,
+       (CASE WHEN v.can_edit THEN cw.id ELSE cp.id END)::uuid AS cover_media_id,
+       COALESCE((CASE WHEN v.can_edit THEN cw.public_id ELSE cp.public_id END), '')::text AS cover_public_id,
+       COALESCE((CASE WHEN v.can_edit THEN w.metadata_json->>'image' ELSE p.metadata_json->>'image' END), '')::text AS legacy_image,
        (CASE WHEN v.can_edit AND c.published_revision_id IS NOT NULL THEN c.working_revision_id <> c.published_revision_id ELSE false END)::boolean AS has_unpublished_changes
 FROM contents c
 JOIN content_revisions w ON w.id = c.working_revision_id
 LEFT JOIN content_revisions p ON p.id = c.published_revision_id
+LEFT JOIN media_assets cw ON cw.id = w.cover_media_id AND cw.redacted_at IS NULL
+LEFT JOIN media_assets cp ON cp.id = p.cover_media_id AND cp.redacted_at IS NULL
 CROSS JOIN LATERAL (
     SELECT ($1::boolean OR c.creator_user_id = $2
             OR EXISTS (SELECT 1 FROM content_collaborators cc WHERE cc.content_id = c.id AND cc.user_id = $2)) AS can_edit
@@ -549,9 +604,11 @@ WHERE (v.can_edit OR c.published_revision_id IS NOT NULL)
   AND ($3::text IS NULL OR c.section = $3::text)
   AND (NOT $4::boolean OR c.creator_user_id = $2
        OR EXISTS (SELECT 1 FROM content_collaborators cc WHERE cc.content_id = c.id AND cc.user_id = $2))
-  AND ($5::timestamptz IS NULL OR (c.updated_at, c.id) < ($5::timestamptz, $6::uuid))
+  AND ($5::text = '' OR (CASE WHEN v.can_edit THEN w.title ELSE p.title END) ILIKE '%' || $5 || '%' ESCAPE '\')
+  AND ($6::text = '' OR ($6::text = 'published' AND c.published_revision_id IS NOT NULL) OR ($6::text = 'draft' AND c.published_revision_id IS NULL))
+  AND ($7::timestamptz IS NULL OR (c.updated_at, c.id) < ($7::timestamptz, $8::uuid))
 ORDER BY c.updated_at DESC, c.id DESC
-LIMIT $7
+LIMIT $9
 `
 
 type ListContentsParams struct {
@@ -559,6 +616,8 @@ type ListContentsParams struct {
 	UserID   pgtype.UUID
 	Section  pgtype.Text
 	Mine     bool
+	Q        string
+	Status   string
 	BeforeAt pgtype.Timestamptz
 	BeforeID pgtype.UUID
 	Lim      int32
@@ -570,22 +629,33 @@ type ListContentsRow struct {
 	Section               string
 	Slug                  string
 	UpdatedAt             pgtype.Timestamptz
+	CreatorUserID         pgtype.UUID
 	IsPublished           bool
 	CanEdit               bool
 	Title                 string
 	Summary               string
 	RevisionNo            int32
+	ShownRevisionID       pgtype.UUID
+	DateLabel             string
+	SortDate              pgtype.Date
+	CoverMediaID          pgtype.UUID
+	CoverPublicID         string
+	LegacyImage           string
 	HasUnpublishedChanges bool
 }
 
 // 一覧。編集できる人（Editor以上・作者・共同編集者）には作業版の値、それ以外には**公開版の値だけ**を返す
 // （公開中の記事の未公開の書き換えを、他のメンバーに見せない）。
+// 一覧。編集できるものは作業版、そうでない公開中のものは**公開版の値だけ**を返す（カバー・日付・タイトルも同じ）。
+// q: タイトルの部分一致。status: ”（すべて）・published（公開中）・draft（未公開）
 func (q *Queries) ListContents(ctx context.Context, arg ListContentsParams) ([]ListContentsRow, error) {
 	rows, err := q.db.Query(ctx, listContents,
 		arg.IsEditor,
 		arg.UserID,
 		arg.Section,
 		arg.Mine,
+		arg.Q,
+		arg.Status,
 		arg.BeforeAt,
 		arg.BeforeID,
 		arg.Lim,
@@ -603,13 +673,81 @@ func (q *Queries) ListContents(ctx context.Context, arg ListContentsParams) ([]L
 			&i.Section,
 			&i.Slug,
 			&i.UpdatedAt,
+			&i.CreatorUserID,
 			&i.IsPublished,
 			&i.CanEdit,
 			&i.Title,
 			&i.Summary,
 			&i.RevisionNo,
+			&i.ShownRevisionID,
+			&i.DateLabel,
+			&i.SortDate,
+			&i.CoverMediaID,
+			&i.CoverPublicID,
+			&i.LegacyImage,
 			&i.HasUnpublishedChanges,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listContributorUsers = `-- name: ListContributorUsers :many
+SELECT revision_id, user_id FROM work_contributors WHERE revision_id = ANY($1::uuid[]) ORDER BY revision_id, sort_order
+`
+
+type ListContributorUsersRow struct {
+	RevisionID pgtype.UUID
+	UserID     pgtype.UUID
+}
+
+// 一覧に出す関わるメンバー: 表示する版の制作メンバー
+func (q *Queries) ListContributorUsers(ctx context.Context, revIds []pgtype.UUID) ([]ListContributorUsersRow, error) {
+	rows, err := q.db.Query(ctx, listContributorUsers, revIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListContributorUsersRow{}
+	for rows.Next() {
+		var i ListContributorUsersRow
+		if err := rows.Scan(&i.RevisionID, &i.UserID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProfileCards = `-- name: ListProfileCards :many
+SELECT p.user_id, p.display_name, p.avatar_media_id FROM profiles p WHERE p.user_id = ANY($1::uuid[])
+`
+
+type ListProfileCardsRow struct {
+	UserID        pgtype.UUID
+	DisplayName   string
+	AvatarMediaID pgtype.UUID
+}
+
+// 表示名とアバター（一覧用）。有効なユーザーだけ。
+func (q *Queries) ListProfileCards(ctx context.Context, ids []pgtype.UUID) ([]ListProfileCardsRow, error) {
+	rows, err := q.db.Query(ctx, listProfileCards, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProfileCardsRow{}
+	for rows.Next() {
+		var i ListProfileCardsRow
+		if err := rows.Scan(&i.UserID, &i.DisplayName, &i.AvatarMediaID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -782,17 +920,18 @@ func (q *Queries) ListPublishedWorksOfUser(ctx context.Context, userID pgtype.UU
 }
 
 const listWorkContributors = `-- name: ListWorkContributors :many
-SELECT w.user_id, w.role_label, w.sort_order, COALESCE(p.display_name, '') AS display_name
+SELECT w.user_id, w.role_label, w.sort_order, COALESCE(p.display_name, '') AS display_name, p.avatar_media_id
 FROM work_contributors w LEFT JOIN profiles p ON p.user_id = w.user_id
 WHERE w.revision_id = $1
 ORDER BY w.sort_order, w.id
 `
 
 type ListWorkContributorsRow struct {
-	UserID      pgtype.UUID
-	RoleLabel   string
-	SortOrder   int32
-	DisplayName string
+	UserID        pgtype.UUID
+	RoleLabel     string
+	SortOrder     int32
+	DisplayName   string
+	AvatarMediaID pgtype.UUID
 }
 
 func (q *Queries) ListWorkContributors(ctx context.Context, revisionID pgtype.UUID) ([]ListWorkContributorsRow, error) {
@@ -809,6 +948,7 @@ func (q *Queries) ListWorkContributors(ctx context.Context, revisionID pgtype.UU
 			&i.RoleLabel,
 			&i.SortOrder,
 			&i.DisplayName,
+			&i.AvatarMediaID,
 		); err != nil {
 			return nil, err
 		}

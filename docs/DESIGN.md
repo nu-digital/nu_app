@@ -22,6 +22,8 @@
 3. **Charcoalの部品**（[公式Storybook](https://charcoal-web.pixiv.design/)）で足りないものを探し、使うときは `components/ui` に包んでから画面で使う。画面から `@charcoal-ui/react` を直接importしない。
 4. それでも無いものだけ、セマンティックなHTMLと上のトークン（`--color-*`・`--radius*`・`--space-*`）で作る。新しい外部ライブラリは採用理由と固定版をTOOLCHAINに記録する。
 
+**画面の作り方（UI/UX改善 #186〜#190で固めた型）**: 一覧は写真・サムネイル中心のカード＋検索＋チップ（絞り込み）、状態は`Badge`（文字＋記号＋色）、読込中は`CardSkeleton`/`Loading`、空は`EmptyState`（次の行動つき）、完了は`useToast`、入力の修正が必要なエラーは`Notice`、確認は`Dialog`（キャンセル必須。`window.confirm`は使わない）、設定は`Row`形式（項目名・内容・公開範囲・変更）、メンバー表示は`AvatarStack`、数の入力はステッパー。物品の状態の判定は`lib/item-status.ts`、記事の日付は`lib/content-date.ts`（ユーザーに内部の日付項目を見せない）。
+
 画面を変えたら `npm run admin:dev:mock`（[LOCAL_DEV](LOCAL_DEV.md)）で、PC・スマホ幅・キーボード操作を確認する。
 
 ## 共通の品質基準

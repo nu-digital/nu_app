@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -75,14 +76,32 @@ type dateView struct {
 }
 
 type contributorView struct {
-	UserID      string `json:"userId"`
-	DisplayName string `json:"displayName"`
-	RoleLabel   string `json:"roleLabel"`
+	UserID        string  `json:"userId"`
+	DisplayName   string  `json:"displayName"`
+	RoleLabel     string  `json:"roleLabel"`
+	AvatarMediaID *string `json:"avatarMediaId"`
 }
 
 type personView struct {
-	UserID      string `json:"userId"`
-	DisplayName string `json:"displayName"`
+	UserID        string  `json:"userId"`
+	DisplayName   string  `json:"displayName"`
+	AvatarMediaID *string `json:"avatarMediaId"` // プロフィール画像（ログイン中のメンバーに配信される）。無ければnull
+}
+
+func (s *server) avatarOf(ctx context.Context, q *store.Queries, id pgtype.UUID) *string {
+	m, err := q.GetAvatarMediaID(ctx, id)
+	if err != nil {
+		return nil
+	}
+	return avatarPtr(m)
+}
+
+func avatarPtr(m pgtype.UUID) *string {
+	if !m.Valid {
+		return nil
+	}
+	s := m.String()
+	return &s
 }
 
 type revisionView struct {
@@ -433,7 +452,7 @@ func toRevisionView(r store.ContentRevision, editedBy string, contribs []store.L
 		v.Date.SortDate = &d
 	}
 	for _, c := range contribs {
-		v.Contributors = append(v.Contributors, contributorView{UserID: c.UserID.String(), DisplayName: c.DisplayName, RoleLabel: c.RoleLabel})
+		v.Contributors = append(v.Contributors, contributorView{UserID: c.UserID.String(), DisplayName: c.DisplayName, RoleLabel: c.RoleLabel, AvatarMediaID: avatarPtr(c.AvatarMediaID)})
 	}
 	return v
 }
@@ -470,13 +489,13 @@ func (s *server) loadContentView(r *http.Request, q *store.Queries, a authCtx, c
 	}
 	v := contentView{
 		ID: c.ID.String(), Type: c.Type, Section: c.Section, Slug: c.Slug,
-		Creator:         personView{UserID: c.CreatorUserID.String(), DisplayName: s.displayName(ctx, q, c.CreatorUserID)},
+		Creator:         personView{UserID: c.CreatorUserID.String(), DisplayName: s.displayName(ctx, q, c.CreatorUserID), AvatarMediaID: s.avatarOf(ctx, q, c.CreatorUserID)},
 		WorkingRevision: withCover(toRevisionView(*rev, s.displayName(ctx, q, rev.EditedBy), contribs), cover),
 		Collaborators:   []personView{},
 		CreatedAt:       c.CreatedAt.Time, UpdatedAt: c.UpdatedAt.Time,
 	}
 	for _, cl := range collabs {
-		v.Collaborators = append(v.Collaborators, personView{UserID: cl.UserID.String(), DisplayName: cl.DisplayName})
+		v.Collaborators = append(v.Collaborators, personView{UserID: cl.UserID.String(), DisplayName: cl.DisplayName, AvatarMediaID: avatarPtr(cl.AvatarMediaID)})
 	}
 	subject := a.Identity.Subject()
 	v.CanManageCollab = authz.Decide(subject, "contents.collaborators.update", res).Allowed
@@ -665,6 +684,20 @@ type contentListItem struct {
 	CanEdit               bool      `json:"canEdit"`
 	HasUnpublishedChanges bool      `json:"hasUnpublishedChanges"`
 	UpdatedAt             time.Time `json:"updatedAt"`
+	// DateLabel は利用者が設定した日付の表示（空なら未設定）。SortDate は並び順の日付（YYYY-MM-DD）。
+	DateLabel string  `json:"dateLabel"`
+	SortDate  *string `json:"sortDate"`
+	// CoverURL はカバー画像の表示URL。編集できる人には作業版の画像（ログイン中のメンバー向けの配信）、そうでない人には公開版の画像（公開URL）。
+	// 既存記事は公式サイトのファイル（/images/…。管理ポータルでは中継して表示する）。
+	CoverURL *string `json:"coverUrl"`
+	// Members は関わるメンバー（作者・共同編集者・表示している版の制作メンバー）。編集できない人には作者と公開版の制作メンバーだけ。
+	Members []listMember `json:"members"`
+}
+
+type listMember struct {
+	UserID        string  `json:"userId"`
+	DisplayName   string  `json:"displayName"`
+	AvatarMediaID *string `json:"avatarMediaId"`
 }
 
 // listContents は GET /contents（Member）。編集できるものは作業版、そうでない公開中のものは**公開版の値だけ**を返す。
@@ -683,7 +716,17 @@ func (s *server) listContents(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = n
 	}
-	p := store.ListContentsParams{IsEditor: a.Identity.Subject().IsEditorPlus(), UserID: a.Identity.UserID, Mine: qp.Get("mine") == "true", Lim: int32(limit + 1)}
+	q := strings.TrimSpace(qp.Get("q"))
+	if utf8.RuneCountInString(q) > 100 {
+		httpx.Error(w, r, http.StatusBadRequest, "INVALID_REQUEST", "検索語が長すぎます")
+		return
+	}
+	status := qp.Get("status")
+	if status != "" && status != "published" && status != "draft" {
+		httpx.Error(w, r, http.StatusBadRequest, "INVALID_REQUEST", "status は published か draft を指定してください")
+		return
+	}
+	p := store.ListContentsParams{Q: likeEscape(q), Status: status, IsEditor: a.Identity.Subject().IsEditorPlus(), UserID: a.Identity.UserID, Mine: qp.Get("mine") == "true", Lim: int32(limit + 1)}
 	if v := qp.Get("section"); v != "" {
 		if v != "blog" && v != "news" && v != "project" {
 			httpx.Error(w, r, http.StatusBadRequest, "INVALID_REQUEST", "section が正しくありません")
@@ -711,10 +754,38 @@ func (s *server) listContents(w http.ResponseWriter, r *http.Request) {
 		next = &c
 		rows = rows[:limit]
 	}
+	people, err := s.listPeople(r.Context(), store.New(s.Pool), rows)
+	if err != nil {
+		s.internal(w, r)
+		return
+	}
 	items := make([]contentListItem, 0, len(rows))
 	for _, x := range rows {
 		it := contentListItem{ID: x.ID.String(), Type: x.Type, Section: x.Section, Slug: x.Slug, Title: x.Title, Summary: x.Summary, RevisionNo: int(x.RevisionNo),
-			IsPublished: x.IsPublished, CanEdit: x.CanEdit, HasUnpublishedChanges: x.HasUnpublishedChanges, UpdatedAt: x.UpdatedAt.Time}
+			IsPublished: x.IsPublished, CanEdit: x.CanEdit, HasUnpublishedChanges: x.HasUnpublishedChanges, UpdatedAt: x.UpdatedAt.Time, DateLabel: x.DateLabel,
+			Members: people[x.ID.String()]}
+		if it.Members == nil {
+			it.Members = []listMember{}
+		}
+		if x.SortDate.Valid {
+			d := x.SortDate.Time.Format("2006-01-02")
+			it.SortDate = &d
+		}
+		// 既存記事（移行した記事）のカバーは metadata.image（公式サイトのファイル）。公式サイトでもこちらが優先されるので、一覧でも優先する
+		if strings.HasPrefix(x.LegacyImage, "/images/") && !strings.Contains(x.LegacyImage, "..") {
+			u := x.LegacyImage
+			it.CoverURL = &u
+		} else if x.CoverMediaID.Valid {
+			var u string
+			if x.CanEdit {
+				u = "/api/v1/media/" + x.CoverMediaID.String()
+			} else if x.CoverPublicID != "" {
+				u = "/api/v1/public/media/" + x.CoverPublicID
+			}
+			if u != "" {
+				it.CoverURL = &u
+			}
+		}
 		items = append(items, it)
 	}
 	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": next})
@@ -968,7 +1039,7 @@ func (s *server) putCollaborators(w http.ResponseWriter, r *http.Request) {
 		}
 		out = make([]personView, 0, len(list))
 		for _, p := range list {
-			out = append(out, personView{UserID: p.UserID.String(), DisplayName: p.DisplayName})
+			out = append(out, personView{UserID: p.UserID.String(), DisplayName: p.DisplayName, AvatarMediaID: avatarPtr(p.AvatarMediaID)})
 		}
 		return nil
 	})
@@ -1127,4 +1198,78 @@ func (s *server) putContributors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, status, out)
+}
+
+// listPeople は、一覧の各コンテンツの関わるメンバー（作者・共同編集者・表示する版の制作メンバー）を集める。
+// 共同編集者は編集できる人にだけ見せる（編集できない人には作者と、公開版の制作メンバーだけ）。
+func (s *server) listPeople(ctx context.Context, q *store.Queries, rows []store.ListContentsRow) (map[string][]listMember, error) {
+	out := map[string][]listMember{}
+	if len(rows) == 0 {
+		return out, nil
+	}
+	ids := make([]pgtype.UUID, 0, len(rows))
+	revs := make([]pgtype.UUID, 0, len(rows))
+	canEdit := map[string]bool{}
+	revOf := map[string]string{}
+	for _, x := range rows {
+		ids = append(ids, x.ID)
+		revs = append(revs, x.ShownRevisionID)
+		canEdit[x.ID.String()] = x.CanEdit
+		revOf[x.ShownRevisionID.String()] = x.ID.String()
+	}
+	order := map[string][]pgtype.UUID{} // コンテンツID → ユーザーID（重複なし・作者が先頭）
+	seen := map[string]map[string]bool{}
+	add := func(content string, u pgtype.UUID) {
+		if seen[content] == nil {
+			seen[content] = map[string]bool{}
+		}
+		if !seen[content][u.String()] {
+			seen[content][u.String()] = true
+			order[content] = append(order[content], u)
+		}
+	}
+	ppl, err := q.ListContentPeople(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range ppl {
+		c := p.ContentID.String()
+		if p.Ord == 0 || canEdit[c] {
+			add(c, p.UserID)
+		}
+	}
+	cs, err := q.ListContributorUsers(ctx, revs)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range cs {
+		add(revOf[c.RevisionID.String()], c.UserID)
+	}
+	var all []pgtype.UUID
+	for _, us := range order {
+		all = append(all, us...)
+	}
+	cards, err := q.ListProfileCards(ctx, all)
+	if err != nil {
+		return nil, err
+	}
+	byUser := map[string]store.ListProfileCardsRow{}
+	for _, c := range cards {
+		byUser[c.UserID.String()] = c
+	}
+	for c, us := range order {
+		for _, u := range us {
+			card, ok := byUser[u.String()]
+			if !ok {
+				continue
+			}
+			m := listMember{UserID: u.String(), DisplayName: card.DisplayName}
+			if card.AvatarMediaID.Valid {
+				a := card.AvatarMediaID.String()
+				m.AvatarMediaID = &a
+			}
+			out[c] = append(out[c], m)
+		}
+	}
+	return out, nil
 }

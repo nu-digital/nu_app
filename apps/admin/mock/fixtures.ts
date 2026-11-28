@@ -3,7 +3,7 @@
 // 実APIの応答との形の比較は scripts/compose-smoke.mjs（CI）で行う。
 // このディレクトリはアプリ本体からimportしない（lib/no-mock-import.test.mjs で検査）。Dockerイメージにも入れない（.dockerignore）。
 import type {
-  AdminUser, ContentDetail, ContentListItem, Delivery, HistoryEvent, Item, ItemDetail, LegacyAuthor, Member, MyProfile,
+  AdminUser, Category, ContentDetail, ContentListItem, Delivery, HistoryEvent, Item, ItemDetail, LegacyAuthor, Member, MyProfile,
   NotificationSetting, OutstandingLoan, PublishedHit,
 } from "../lib/api";
 
@@ -45,19 +45,32 @@ export function seed() {
     works: [{ section: "project", slug: "sample-work", title: "見本の作品", roles: ["モデリング"] }],
   };
 
-  const items: Item[] = [
-    { id: "i-camera", name: "ミラーレスカメラ", description: "撮影用。レンズ2本つき。", category: "カメラ", location: "部室 棚A", mode: "individual", totalQuantity: 2, outstanding: 1, unitCount: 2, available: 1, archived: false, photoMediaId: "m-camera" },
-    { id: "i-tablet", name: "ペンタブレット", description: "", category: "PC周辺", location: "部室 棚B", mode: "quantity", totalQuantity: 5, outstanding: 5, unitCount: 0, available: 0, archived: false, photoMediaId: null },
-    { id: "i-tripod", name: "三脚", description: "", category: "カメラ", location: "部室 ロッカー", mode: "quantity", totalQuantity: 4, outstanding: 1, unitCount: 0, available: 3, archived: false, photoMediaId: null },
-    { id: "i-vr", name: "VRヘッドセット", description: "動作確認用。", category: "VR", location: "部室 棚C", mode: "individual", totalQuantity: 1, outstanding: 0, unitCount: 1, available: 1, archived: false, photoMediaId: "m-vr" },
+  const categories: Category[] = [
+    { id: "cat-gear", name: "機材", sortOrder: 10, itemCount: 0 },
+    { id: "cat-book", name: "書籍", sortOrder: 20, itemCount: 0 },
+    { id: "cat-other", name: "その他", sortOrder: 30, itemCount: 0 },
   ];
+
+  // borrowedByMe は ownerでログインしたときの値（ペンタブレットを5個借りている）。モックはロールごとには変えない
+  const base = { archived: false, borrowedByMe: 0 };
+  const items: Item[] = [
+    { ...base, id: "i-camera", name: "ミラーレスカメラ", description: "撮影用。レンズ2本つき。", category: "機材", categoryId: "cat-gear", location: "部室 棚A", mode: "individual", totalQuantity: 2, outstanding: 1, unitCount: 2, available: 1, photoMediaId: "m-camera" },
+    { ...base, id: "i-tablet", name: "ペンタブレット", description: "", category: "機材", categoryId: "cat-gear", location: "部室 棚B", mode: "quantity", totalQuantity: 5, outstanding: 5, unitCount: 0, available: 0, photoMediaId: null, borrowedByMe: 5 },
+    { ...base, id: "i-tripod", name: "三脚", description: "", category: "機材", categoryId: "cat-gear", location: "部室 ロッカー", mode: "quantity", totalQuantity: 4, outstanding: 1, unitCount: 0, available: 3, photoMediaId: null },
+    { ...base, id: "i-vr", name: "VRヘッドセット", description: "動作確認用。", category: "機材", categoryId: "cat-gear", location: "部室 棚C", mode: "individual", totalQuantity: 1, outstanding: 0, unitCount: 1, available: 1, photoMediaId: "m-vr" },
+    { ...base, id: "i-book", name: "デジタル作画の教科書", description: "初心者向けの入門書。", category: "書籍", categoryId: "cat-book", location: "本棚", mode: "quantity", totalQuantity: 2, outstanding: 0, unitCount: 0, available: 2, photoMediaId: null },
+    { ...base, id: "i-cable", name: "延長コード（長い名前の例：たこ足配線タイプ・6口・3メートル・雷サージ対応）", description: "", category: "その他", categoryId: "cat-other", location: "部室 棚D", mode: "quantity", totalQuantity: 3, outstanding: 0, unitCount: 0, available: 3, photoMediaId: null },
+  ];
+  for (const c of categories) c.itemCount = items.filter((i) => i.categoryId === c.id).length;
+  /** 物品の画像（メディアID。先頭がメイン）。画像は /media/<id> をモックが色つきの図で返す */
+  const images: Record<string, string[]> = { "i-camera": ["m-camera", "m-camera-2", "m-camera-3"], "i-vr": ["m-vr"] };
 
   const units: Record<string, ItemDetail["units"]> = {
     "i-camera": [
-      { id: "un-1", assetTag: "CAM-001", serialNumber: "SN-0001", state: "active", loaned: { borrowerDisplayName: "試験 花子", since: T, elapsedDays: 3 } },
-      { id: "un-2", assetTag: "CAM-002", serialNumber: null, state: "active", loaned: null },
+      { id: "un-1", assetTag: "CAM-001", serialNumber: "SN-0001", state: "active", mine: false, loaned: { borrowerDisplayName: "試験 花子", since: T, elapsedDays: 3 } },
+      { id: "un-2", assetTag: "CAM-002", serialNumber: null, state: "active", mine: false, loaned: null },
     ],
-    "i-vr": [{ id: "un-3", assetTag: "VR-001", serialNumber: null, state: "active", loaned: null }],
+    "i-vr": [{ id: "un-3", assetTag: "VR-001", serialNumber: null, state: "active", mine: false, loaned: null }],
   };
 
   const loans: OutstandingLoan[] = [
@@ -72,22 +85,35 @@ export function seed() {
     { id: "h-3", kind: "correction", itemId: "i-tablet", itemName: "ペンタブレット", assetTag: "", borrowerDisplayName: "例示 三郎", actorDisplayName: "見本 太郎", quantity: 1, at: T, correctionKind: "void", targetType: "loan", reason: "記録の誤り" },
   ];
 
+  const owner = { userId: "u-owner", displayName: "見本 太郎", avatarMediaId: "m-avatar" };
+  const hanako = { userId: "u-admin", displayName: "試験 花子", avatarMediaId: null };
+  const jiro = { userId: "u-editor", displayName: "仮名 次郎", avatarMediaId: null };
+  const saburo = { userId: "u-member", displayName: "例示 三郎", avatarMediaId: null };
   const contents: ContentListItem[] = [
-    { id: "c-1", type: "article", section: "blog", slug: "sample-blog", title: "学園祭の展示レポート", summary: "展示の様子をまとめました。", revisionNo: 3, isPublished: true, canEdit: true, hasUnpublishedChanges: true, updatedAt: T },
-    { id: "c-2", type: "project", section: "project", slug: "sample-work", title: "見本の作品", summary: "短編アニメーション。", revisionNo: 1, isPublished: false, canEdit: true, hasUnpublishedChanges: true, updatedAt: T },
-    { id: "c-3", type: "article", section: "news", slug: "sample-news", title: "新歓のお知らせ", summary: "", revisionNo: 2, isPublished: true, canEdit: false, hasUnpublishedChanges: false, updatedAt: T },
+    { id: "c-1", type: "article", section: "blog", slug: "sample-blog", title: "学園祭の展示レポート", summary: "展示の様子をまとめました。", revisionNo: 3, isPublished: true, canEdit: true, hasUnpublishedChanges: true, updatedAt: T,
+      dateLabel: "2026年11月3日", sortDate: "2026-11-03", coverUrl: "/api/v1/media/m-camera", members: [owner, hanako, jiro, saburo] },
+    { id: "c-2", type: "project", section: "project", slug: "sample-work", title: "見本の作品（長いタイトルの例：夜の街を駆ける少女と猫の短編アニメーション）", summary: "短編アニメーション。", revisionNo: 1, isPublished: false, canEdit: true, hasUnpublishedChanges: true, updatedAt: T,
+      dateLabel: "", sortDate: null, coverUrl: null, members: [owner, hanako] },
+    { id: "c-3", type: "article", section: "news", slug: "sample-news", title: "新歓のお知らせ", summary: "", revisionNo: 2, isPublished: true, canEdit: false, hasUnpublishedChanges: false, updatedAt: T,
+      dateLabel: "2026年4月", sortDate: "2026-04-01", coverUrl: "/api/v1/public/media/mockpublicid0000000009", members: [owner] },
   ];
 
+  /** 共同編集者・制作メンバーの状態（モックの書き込みで変わる） */
+  const collabs: Record<string, { userId: string; displayName: string; avatarMediaId: string | null }[]> = { "c-1": [hanako, jiro], "c-2": [hanako], "c-3": [] };
+  const contribs: Record<string, { userId: string; displayName: string; avatarMediaId: string | null; roleLabel: string }[]> = { "c-2": [{ ...hanako, roleLabel: "撮影" }, { ...owner, roleLabel: "監督" }] };
   const contentDetail = (c: ContentListItem): ContentDetail => ({
-    id: c.id, type: c.type, section: c.section, slug: c.slug, creator: { userId: "u-owner", displayName: "見本 太郎" },
+    id: c.id, type: c.type, section: c.section, slug: c.slug, creator: owner,
     workingRevision: {
       revisionNo: c.revisionNo, title: c.title, summary: c.summary,
-      markdown: "## 展示の様子\n\n今年は**3DCG**と映像を展示しました。\n\n- 来場者アンケート\n- 次回の改善点\n",
-      metadata: { category: "活動報告" }, date: { label: "2026年11月3日", kind: "day", sortDate: "2026-11-03", sortDateIsEstimated: false },
-      editedBy: "見本 太郎", createdAt: T, coverMedia: null, contributors: [{ userId: "u-admin", displayName: "試験 花子", roleLabel: "撮影" }],
+      markdown: "## 展示の様子\n\n今年は**3DCG**と映像を展示しました。\n\n![展示の会場（既存記事の画像）](/images/contents/sample.webp)\n\n![アップロードした画像](/api/v1/public/media/mockpublicid0000000001)\n\n- 来場者アンケート\n- 次回の改善点\n",
+      metadata: { category: "活動報告" },
+      date: c.dateLabel ? { label: c.dateLabel, kind: c.dateLabel.includes("日") ? "day" : "month", sortDate: c.sortDate, sortDateIsEstimated: !c.dateLabel.includes("日") } : { label: "", kind: "unknown", sortDate: null, sortDateIsEstimated: false },
+      editedBy: "見本 太郎", createdAt: T,
+      coverMedia: c.coverUrl ? { id: "m-camera", publicUrl: "/api/v1/public/media/mockpublicid0000000001", url: "/api/v1/media/m-camera", publicId: "mockpublicid0000000001", width: 400, height: 300, mimeType: "image/webp", byteSize: 1000, purpose: "cms" } : null,
+      contributors: c.type === "project" ? (contribs[c.id] ?? []) : [],
     },
     publishedRevisionNo: c.isPublished ? Math.max(1, c.revisionNo - 1) : null,
-    collaborators: [{ userId: "u-admin", displayName: "試験 花子" }],
+    collaborators: collabs[c.id] ?? [],
     revisions: [{ revisionNo: c.revisionNo, title: c.title, editedBy: "見本 太郎", createdAt: T }],
     canManageCollaborators: c.canEdit, canPublish: c.canEdit, createdAt: T, updatedAt: T,
   });
@@ -111,7 +137,7 @@ export function seed() {
 
   const publishedHits: PublishedHit[] = [{ section: "blog", slug: "sample-blog", title: "学園祭の展示レポート", found: ["markdown"], snippet: "…撮影: 試験 花子…" }];
 
-  return { users, members, profile, items, units, loans, history, contents, contentDetail, notificationSettings, deliveries, legacyAuthors, publishedHits, now: T };
+  return { collabs, contribs, users, members, profile, categories, items, images, units, loans, history, contents, contentDetail, notificationSettings, deliveries, legacyAuthors, publishedHits, now: T };
 }
 
 /**

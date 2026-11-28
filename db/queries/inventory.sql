@@ -1,6 +1,6 @@
 -- name: CreateInventoryItem :one
-INSERT INTO inventory_items (name, description, category, location, mode, total_quantity)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO inventory_items (name, description, category, category_id, location, mode, total_quantity)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
 -- name: GetInventoryItemForUpdate :one
@@ -11,7 +11,7 @@ SELECT * FROM inventory_items WHERE id = $1;
 
 -- name: UpdateInventoryItem :one
 UPDATE inventory_items
-SET name = $2, description = $3, category = $4, location = $5, total_quantity = $6, archived_at = $7, mode = $8, updated_at = now()
+SET name = $2, description = $3, category = $4, category_id = $9, location = $5, total_quantity = $6, archived_at = $7, mode = $8, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
@@ -36,7 +36,7 @@ RETURNING *;
 SELECT count(*) FROM inventory_units WHERE item_id = $1 AND state = 'active';
 
 -- name: ListItemUnits :many
-SELECT u.id, u.asset_tag, u.serial_number, u.state, u.current_loan_id,
+SELECT u.id, u.asset_tag, u.serial_number, u.state, u.current_loan_id, l.borrower_user_id,
        l.borrowed_at AS loaned_at, COALESCE(p.display_name, '') AS borrower_display_name
 FROM inventory_units u
 LEFT JOIN inventory_loans l ON l.id = u.current_loan_id
@@ -56,27 +56,89 @@ ORDER BY l.borrowed_at, l.id;
 
 -- name: ListInventoryItems :many
 -- 一覧。残数(数量管理)・利用可能な個体数(個体管理)を導出して返す。廃止した物品は含めない。
+-- mine = 自分が借りている未返却数。並び替え: name（既定）・newest・available（借りられる数の多い順）。カーソルは件数のoffset。
 WITH base AS (
   SELECT i.*,
     (COALESCE((SELECT SUM(l.quantity) FROM inventory_loans_eff l WHERE l.item_id = i.id), 0)
      - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r JOIN inventory_loans_eff l ON l.id = r.loan_id WHERE l.item_id = i.id), 0))::bigint AS outstanding,
     (SELECT count(*) FROM inventory_units u WHERE u.item_id = i.id AND u.state = 'active')::bigint AS unit_count,
-    (SELECT count(*) FROM inventory_units u WHERE u.item_id = i.id AND u.state = 'active' AND u.current_loan_id IS NULL)::bigint AS units_available
+    (SELECT count(*) FROM inventory_units u WHERE u.item_id = i.id AND u.state = 'active' AND u.current_loan_id IS NULL)::bigint AS units_available,
+    (SELECT COALESCE(SUM(l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r WHERE r.loan_id = l.id), 0)), 0)
+       FROM inventory_loans_eff l WHERE l.item_id = i.id AND l.borrower_user_id = @user_id::uuid)::bigint AS mine
   FROM inventory_items i
   WHERE i.archived_at IS NULL
+), withavail AS (
+  SELECT *, (CASE WHEN mode = 'quantity' THEN total_quantity - outstanding ELSE units_available END)::bigint AS available FROM base
 )
-SELECT *,
-  (CASE WHEN mode = 'quantity' THEN total_quantity - outstanding ELSE units_available END)::bigint AS available
-FROM base
-WHERE ($1::text = '' OR name ILIKE '%' || $1 || '%' ESCAPE '\' OR category ILIKE '%' || $1 || '%' ESCAPE '\' OR location ILIKE '%' || $1 || '%' ESCAPE '\' OR description ILIKE '%' || $1 || '%' ESCAPE '\')
-  AND ($2::text = '' OR category = $2)
-  AND (NOT $3::bool OR (CASE WHEN mode = 'quantity' THEN total_quantity - outstanding ELSE units_available END) > 0)
-  AND (NOT $4::bool OR (name, id) > ($5::text, $6::uuid))
-ORDER BY name, id
-LIMIT $7;
+SELECT * FROM withavail
+WHERE (@q::text = '' OR name ILIKE '%' || @q || '%' ESCAPE '\' OR category ILIKE '%' || @q || '%' ESCAPE '\' OR location ILIKE '%' || @q || '%' ESCAPE '\' OR description ILIKE '%' || @q || '%' ESCAPE '\')
+  AND (@category::text = '' OR category = @category)
+  AND (@category_id::uuid IS NULL OR category_id = @category_id::uuid)
+  AND (NOT @only_available::bool OR available > 0)
+  AND (NOT @only_mine::bool OR mine > 0)
+ORDER BY (CASE WHEN @sort::text = 'available' THEN available END) DESC NULLS LAST,
+         (CASE WHEN @sort::text = 'newest' THEN created_at END) DESC NULLS LAST,
+         name, id
+OFFSET @row_offset::int LIMIT @row_limit::int;
 
 -- name: ListInventoryCategories :many
 SELECT DISTINCT category FROM inventory_items WHERE archived_at IS NULL AND category <> '' ORDER BY category;
+
+-- カテゴリ管理（UI/UX大改善。00021）
+-- name: ListCategories :many
+SELECT c.id, c.name, c.sort_order,
+       (SELECT count(*) FROM inventory_items i WHERE i.category_id = c.id AND i.archived_at IS NULL)::bigint AS item_count
+FROM inventory_categories c ORDER BY c.sort_order, c.name;
+
+-- name: GetCategory :one
+SELECT * FROM inventory_categories WHERE id = $1;
+
+-- name: GetCategoryByName :one
+SELECT * FROM inventory_categories WHERE name = $1;
+
+-- name: GetCategoryForUpdate :one
+SELECT * FROM inventory_categories WHERE id = $1 FOR UPDATE;
+
+-- name: LockCategories :exec
+-- カテゴリの追加・並び替え・削除を直列化する（表全体を共有しない小さな表なので、全行をロックする）。
+SELECT id FROM inventory_categories ORDER BY id FOR UPDATE;
+
+-- name: CreateCategory :one
+INSERT INTO inventory_categories (name, sort_order)
+VALUES ($1, COALESCE((SELECT MAX(sort_order) FROM inventory_categories), 0) + 10)
+RETURNING *;
+
+-- name: RenameCategory :one
+UPDATE inventory_categories SET name = $2 WHERE id = $1 RETURNING *;
+
+-- name: SetCategoryOrder :exec
+UPDATE inventory_categories SET sort_order = $2 WHERE id = $1;
+
+-- 物品の（旧コード向けの）カテゴリ名の列を、カテゴリの名前に同期する
+-- name: SyncItemCategoryName :exec
+UPDATE inventory_items SET category = $2 WHERE category_id = $1;
+
+-- name: CountItemsInCategory :one
+SELECT count(*)::bigint FROM inventory_items WHERE category_id = $1;
+
+-- name: MoveItemsToCategory :exec
+UPDATE inventory_items SET category_id = $2, category = $3, updated_at = now() WHERE category_id = $1;
+
+-- name: DeleteCategory :exec
+DELETE FROM inventory_categories WHERE id = $1;
+
+-- 物品の画像（複数枚）
+-- name: ListItemImages :many
+SELECT media_id FROM inventory_item_images WHERE item_id = $1 ORDER BY sort_order, media_id;
+
+-- name: ListImagesOfItems :many
+SELECT item_id, media_id FROM inventory_item_images WHERE item_id = ANY(@ids::uuid[]) ORDER BY item_id, sort_order, media_id;
+
+-- name: DeleteItemImages :exec
+DELETE FROM inventory_item_images WHERE item_id = $1;
+
+-- name: InsertItemImage :exec
+INSERT INTO inventory_item_images (item_id, media_id, sort_order) VALUES ($1, $2, $3);
 
 -- name: GetInventoryLoan :one
 SELECT * FROM inventory_loans WHERE id = $1;

@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 // /api/v1 をAPIへ中継し、ブラウザーから見て同一オリジンにする（本番のNginx構成と同じ）。
 // rewritesはビルド時に確定するため、中継先は API_INTERNAL_URL（ビルド引数）で指定する。
 const apiInternal = process.env.API_INTERNAL_URL ?? "http://api:8080";
+// 記事プレビューで、既存記事の画像（公式サイトの /images/…）を表示するための中継先（公式サイトのコンテナ）。
+const webInternal = process.env.WEB_INTERNAL_URL ?? "http://web:3000";
 
 const noStoreNoReferrer = [
   { key: "Referrer-Policy", value: "no-referrer" },
@@ -17,7 +19,10 @@ const nextConfig: NextConfig = {
   // 上限の検査・形式の検査はAPI側で行う。
   experimental: { proxyClientMaxBodySize: "12mb" },
   async rewrites() {
-    return [{ source: "/api/v1/:path*", destination: `${apiInternal}/api/v1/:path*` }];
+    return [
+      { source: "/api/v1/:path*", destination: `${apiInternal}/api/v1/:path*` },
+      { source: "/web-images/:path*", destination: `${webInternal}/images/:path*` },
+    ];
   },
   async headers() {
     return [

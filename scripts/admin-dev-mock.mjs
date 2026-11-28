@@ -42,5 +42,5 @@ process.on('SIGINT', () => stop(0));
 process.on('SIGTERM', () => stop(0));
 
 run('mock', [join(admin, 'mock/server.ts'), '--port', mockPort], { NODE_ENV: 'development' });
-run('admin', [nextBin, 'dev', '--hostname', '127.0.0.1', '--port', port], { API_INTERNAL_URL: `http://127.0.0.1:${mockPort}` });
+run('admin', [nextBin, 'dev', '--hostname', '127.0.0.1', '--port', port], { API_INTERNAL_URL: `http://127.0.0.1:${mockPort}`, WEB_INTERNAL_URL: `http://127.0.0.1:${mockPort}/web` });
 console.log(`\n管理ポータル（モック）: http://127.0.0.1:${port}/login\n`);

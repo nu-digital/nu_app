@@ -51,16 +51,22 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | `DELETE /me/profile/avatar` | – | 204 | – |
 | `PUT /inventory/items/{id}/photo` | `{mediaId}`（Adminが`purpose=inventory`でアップロードした画像） | 204 | 403、404、422 |
 | `DELETE /inventory/items/{id}/photo` | – | 204 | 403、404 |
+| `PUT /inventory/items/{id}/images`（Admin） | `{mediaIds:[…]}`（順序つきの置き換え。先頭がメイン。最大8枚。空で全部外す。指定できるのは自分が`purpose=inventory`でアップロードした画像と、その物品に既に付いている画像） | 200 `{images:[…]}` | 403、404、422 |
 | `GET /admin/contents/published-search?q=` | クエリ`q`（2〜50文字） | 200 `{items:[{section,slug,title,found:["title"|"summary"|"markdown"|"roleLabel"],snippet?}],truncated}`（公開中の版だけを大文字小文字を区別せず部分一致で探す。D08の依頼で、公開版に残る名前を確認する。検索語は監査に残さない） | 403、422 |
 | `GET /admin/legacy-authors` | – | 200 `{items:[{id,name,publicationState,confirmedAt,withdrawnAt,erased,linkedUserId,linkedDisplayName,contentCount}]}`（未確認が先頭。名前は管理者にだけ返す） | 403 |
 | `POST /admin/legacy-authors/{id}/permit` | `{note(必須・200字以内)}` | 204（本人の公開許可を確認して記録。確認者・日時を保存。紐付けは変えない） | 403、404、409 `ERASED`、422 |
 | `POST /admin/legacy-authors/{id}/withdraw` | – | 204（公開を止める。冪等） | 403、404 |
 | `PUT /admin/legacy-authors/{id}/link` | `{userId}` | 204（ユーザーIDを明示して紐付ける。表示名では紐付けない。公開可否は変えない） | 403、404、409 `ERASED`、422 |
 | `DELETE /admin/legacy-authors/{id}/link` | – | 204（紐付けを外す。公開可否は変えない） | 403、404 |
-| `GET /inventory/items` | `q`（名前・カテゴリ・保管場所・説明）, `category`, `available=true`, `limit`, `cursor` | 200 `{items:[{id,name,description,category,location,mode,totalQuantity,outstanding,unitCount,available}],nextCursor,categories}`（廃止した物品は含まない。`available`=数量管理は残数、個体管理は利用可能な個体数） | 400 |
-| `GET /inventory/items/{id}` | – | 200 物品＋`units`（管理番号・状態・貸出中なら借りた人の表示名と経過日数）＋`loans`（数量管理の貸出中。未返却数・経過日数） | 404 |
-| `POST /inventory/items`（Admin） | `{name,description?,category?,location?,mode:"quantity"\|"individual",totalQuantity?}` | 201 | 422 |
-| `PATCH /inventory/items/{id}`（Admin） | `{name?,description?,category?,location?,mode?,totalQuantity?,reason?,archived?}`。総数の変更は`reason`必須・履歴に記録 | 200 | 409 `BELOW_OUTSTANDING`（貸出中の数量を下回る総数）・`HAS_OUTSTANDING`（貸出中の廃止）・`MODE_LOCKED`（貸出履歴/個体がある物品の方式変更） |
+| `GET /inventory/items` | `q`（名前・カテゴリ・保管場所・説明）, `category`（名前）, `categoryId`, `available=true`, `mine=true`（自分が借りている物だけ）, `sort`（`name`既定・`newest`・`available`＝借りられる数の多い順）, `limit`, `cursor`（件数のoffset。不透明な値として扱う） | 200 `{items:[{id,name,description,category,categoryId,location,mode,totalQuantity,outstanding,unitCount,available,photoMediaId,borrowedByMe}],nextCursor,categories,categoryList:[{id,name,sortOrder,itemCount}]}`（廃止した物品は含まない。`available`=数量管理は残数、個体管理は利用可能な個体数。`borrowedByMe`=自分の未返却数） | 400 |
+| `GET /inventory/items/{id}` | – | 200 物品＋`images`（メディアID。先頭がメイン）＋`borrowedByMe`＋`units`（管理番号・状態・`mine`・貸出中なら借りた人の表示名と経過日数）＋`loans`（数量管理の貸出中。未返却数・経過日数） | 404 |
+| `POST /inventory/items`（Admin） | `{name,description?,categoryId?（優先）,category?（名前。旧クライアント向け。無い名前は作成される。どちらも無ければ「その他」）,location?,mode:"quantity"\|"individual",totalQuantity?}` | 201 | 422 |
+| `PATCH /inventory/items/{id}`（Admin） | `{name?,description?,categoryId?,category?,location?,mode?,totalQuantity?,reason?,archived?}`。総数の変更は`reason`必須・履歴に記録 | 200 | 409 `BELOW_OUTSTANDING`（貸出中の数量を下回る総数）・`HAS_OUTSTANDING`（貸出中の廃止）・`MODE_LOCKED`（貸出履歴/個体がある物品の方式変更） |
+| `GET /inventory/categories` | – | 200 `{items:[{id,name,sortOrder,itemCount}]}`（並び順。初期は機材・書籍・その他） | – |
+| `POST /inventory/categories`（Admin） | `{name}`（30文字以内。末尾に追加。最大50件） | 201 | 409 `NAME_TAKEN`・`TOO_MANY`、422 |
+| `PATCH /inventory/categories/{id}`（Admin） | `{name}`（物品のカテゴリ名も同期） | 200 | 404、409 `NAME_TAKEN`、422 |
+| `PUT /inventory/categories/order`（Admin） | `{ids:[…]}`（全カテゴリを並べたい順に。過不足・重複は422） | 200 `{items}` | 422 |
+| `DELETE /inventory/categories/{id}?moveTo=<ID>`（Admin） | 使用中（廃止した物品を含む）は`moveTo`が必須で、物品を移してから削除する。最後の1件は削除できない | 204 | 404、409 `IN_USE`・`LAST_CATEGORY`、422 |
 | `POST /inventory/items/{id}/units`（Admin） | `{assetTag,serialNumber?}`（個体管理のみ） | 201 | 409 `TAG_TAKEN`・`WRONG_MODE`・`ARCHIVED` |
 | `POST /inventory/loans` | 数量管理 `{itemId,quantity}`／個体管理 `{itemId,unitId}`（借りた本人はセッションのユーザー。指定項目なし） | 201 `{id,itemId,unitId,quantity,borrowedAt,remaining}` | 409 `INSUFFICIENT_STOCK`・`UNIT_UNAVAILABLE`・`ARCHIVED`、422 |
 | `POST /inventory/loans/{id}/returns` | `{quantity?}`（省略=残りをすべて。**誰でも他人の貸出を返却できる**＝代理返却。部分返却可） | 200 `{loanId,returned,outstanding}` | 409 `EXCEEDS_OUTSTANDING`（未返却数を超える）・`ALREADY_RETURNED`（二重返却）、404 |
@@ -104,6 +110,7 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 | GET | `/admin/contents/published-search` | Admin | 公開中の版に語が含まれるコンテンツを探す（D08の確認用） |
 | PUT | `/me/profile/avatar` | Member | アバターを設定 |
 | DELETE | `/me/profile/avatar` | Member | アバターを外す |
+| PUT | `/inventory/items/{id}/images` | Admin | 物品の画像を順序つきで置き換え（複数枚） |
 | PUT | `/inventory/items/{id}/photo` | Admin | 物品の写真を設定 |
 | DELETE | `/inventory/items/{id}/photo` | Admin | 物品の写真を外す |
 | POST | `/admin/legacy-authors/{id}/permit` | Admin | 投稿者名の公開許可を確認して記録 |
@@ -119,6 +126,11 @@ Base: `https://app.nu-digital.jp/api/v1`。公開サイトは内部ネットワ�
 |---|---|---|---|
 | GET | `/inventory/items` | Member | 一覧・検索・カテゴリ・利用可否 |
 | GET | `/inventory/items/{id}` | Member | 詳細、個体状況、残数、現在の貸出状況 |
+| GET | `/inventory/categories` | Member | カテゴリの一覧（並び順・使用中の物品数） |
+| POST | `/inventory/categories` | Admin | カテゴリの追加 |
+| PATCH | `/inventory/categories/{id}` | Admin | カテゴリの名称変更 |
+| PUT | `/inventory/categories/order` | Admin | カテゴリの並び替え |
+| DELETE | `/inventory/categories/{id}` | Admin | カテゴリの削除（使用中は`moveTo`で物品を移す） |
 | POST | `/inventory/items` | Admin | 物品追加（mode/総数/写真/保管場所等） |
 | PATCH | `/inventory/items/{id}` | Admin | 物品編集・数量調整（履歴保存） |
 | POST | `/inventory/items/{id}/units` | Admin | 個体登録 |

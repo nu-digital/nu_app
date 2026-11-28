@@ -2,10 +2,22 @@
 // compose-smoke.mjs から呼ばれる（起動済みのスタックに対して実行）。単体では実行しない。
 import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
+import { deflateSync } from 'node:zlib';
 import { join, resolve } from 'node:path';
 
 const require = createRequire(join(resolve('apps/admin'), 'x.js'));
 const { chromium } = require('playwright');
+
+/** 検査用の小さなPNG（単色。seedで色を変える）。画像のアップロードの確認に使う。 */
+function makePng(w, h, seed) {
+  const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = (buf) => { let c = 0xffffffff; for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const chunk = (type, data) => { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const td = Buffer.concat([Buffer.from(type), data]); const c = Buffer.alloc(4); c.writeUInt32BE(crc(td)); return Buffer.concat([len, td, c]); };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: w }, (_, x) => [(seed * 70 + x * 3) % 256, (seed * 40 + 90) % 256, 200]).flat())]);
+  const raw = Buffer.concat(Array.from({ length: h }, () => row));
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
 
 /**
  * @param {{dbExec?:(sql:string)=>void, ownerLogin:string, ownerPass:string, adminUrl:string, apiCall:Function, ownerCookie:string, ownerCsrf:string, memberLogin:string, memberPass:string, memberName:string, shotsDir?:string, check:(name:string, ok:boolean, detail?:string)=>void}} o
@@ -237,61 +249,89 @@ export async function runAdminUiE2E(o) {
       await login(page, pid, ppass);
       await page.getByRole('link', { name: /^プロフィール/ }).click();
       await page.waitForURL('**/profile');
-      await page.getByRole('heading', { level: 1, name: 'プロフィール' }).waitFor();
-      check(`[${label}] プロフィール: 初期はすべて非公開で、個人情報は本人と管理者だけの注意書きがある`, (await page.locator('select[id^="vis-"]').evaluateAll((els) => els.every((e) => e.value === 'private'))) && /本人と、権限のある管理者（Admin・Owner）だけが見られます/.test(await page.locator('.notice-inline').innerText()));
+      await page.getByRole('heading', { level: 1, name: 'アカウント設定' }).waitFor();
+      const visOf = async (n) => page.locator(`li.setting-row[data-setting="${n}"] .s-vis`).innerText();
+      const tabTo = async (n) => page.locator('.settings-tabs').getByText(n, { exact: true }).click();
+      check(`[${label}] プロフィール: 初期は自己紹介・学部・学科・学年がすべて非公開と表示される`, (await Promise.all(['自己紹介', '学部', '学科', '学年'].map(visOf))).every((t) => t.includes('非公開') && !t.includes('メンバーに公開')));
       check(`[${label}] プロフィールに横溢れがない`, (await overflowOf(page)) <= 0, `overflow=${await overflowOf(page)}`);
       const smallP = await smallOf(page);
       check(`[${label}] プロフィールの入力・ボタンの高さが44px以上`, smallP === 0, `44px未満=${smallP}`);
       if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-profile.png`), fullPage: true });
       if (label === 'narrow') { await ctx.close(); continue; }
 
-      const note = async () => page.locator('.notice').first();
-      await page.getByLabel('表示名（必須）').fill(pname);
-      await page.getByLabel('自己紹介', { exact: true }).fill(`自己紹介です(${label})`);
-      await page.getByLabel('学部', { exact: true }).fill('理工学部');
-      await page.getByLabel('学科', { exact: true }).fill('情報科学科');
-      await page.getByLabel('学年（1〜10）').fill('3');
-      await page.locator('#vis-bio').selectOption('members');
-      await page.getByRole('button', { name: '基本情報を保存する' }).click();
-      await page.locator('.notice.success').waitFor();
-      check(`[${label}] 基本情報を保存でき、完了が表示される`, /基本情報を保存しました/.test(await page.locator('.notice.success').innerText()));
-      await page.getByLabel('氏名', { exact: true }).fill(`秘密氏名${label}`);
-      await page.getByLabel('大学メール').fill('not-an-email');
-      await page.getByRole('button', { name: '個人情報を保存する' }).click();
-      // type=email のため、ブラウザーが形式エラーを伝えて送信を止める（入力は保持される）
-      check(`[${label}] 不正なメールはブラウザーの検証で止まり、入力が保持される`, (await page.getByLabel('大学メール').evaluate((el) => !el.validity.valid)) && (await page.getByLabel('氏名', { exact: true }).inputValue()) === `秘密氏名${label}`);
-      await page.getByLabel('大学メール').fill(`${label}@example.invalid`);
-      await page.getByLabel('学生証番号').fill('99X-0001');
-      await page.getByRole('button', { name: '個人情報を保存する' }).click();
-      await page.locator('.notice.success').waitFor();
-      // 外部リンク: 不正なURLはエラー、正しいURLは追加でき公開範囲を変えられる
-      await page.getByLabel('リンクの名前').fill('悪いリンク');
-      await page.getByLabel('URL', { exact: true }).fill('javascript:alert(1)');
-      await page.getByRole('button', { name: 'リンクを追加する' }).click();
+      // 変えたい項目だけ「変更」から編集する（ダイアログ。保存で完了のトースト）
+      const edit = async (row, fill) => { await page.getByRole('button', { name: `${row}を変更` }).click(); const d = page.getByRole('dialog'); await fill(d); await d.getByRole('button', { name: '保存する' }).click(); };
+      await edit('表示名', (d) => d.getByLabel('表示名（必須）').fill(pname));
+      await page.locator('.ui-toast.success').filter({ hasText: '表示名を保存しました' }).waitFor();
+      check(`[${label}] 表示名を変更でき、一覧の現在の内容に反映され、完了が表示される`, (await page.locator('li.setting-row[data-setting="表示名"] .s-value').innerText()).includes(pname));
+      await edit('自己紹介', async (d) => { await d.getByLabel('自己紹介', { exact: true }).fill(`自己紹介です(${label})`); await d.getByLabel('公開範囲').selectOption('members'); });
+      await page.locator('.ui-toast.success').filter({ hasText: '自己紹介を保存しました' }).waitFor();
+      await edit('学部', (d) => d.getByLabel('学部', { exact: true }).fill('理工学部'));
+      await page.locator('.ui-toast.success').filter({ hasText: '学部を保存しました' }).waitFor();
+      await edit('学科', (d) => d.getByLabel('学科', { exact: true }).fill('情報科学科'));
+      await page.locator('.ui-toast.success').filter({ hasText: '学科を保存しました' }).waitFor();
+      await edit('学年', (d) => d.getByLabel('学年（1〜10）').fill('3'));
+      await page.locator('.ui-toast.success').filter({ hasText: '学年を保存しました' }).waitFor();
+      check(`[${label}] 変更していない項目の公開範囲は変わらない（自己紹介だけがメンバーに公開）`, (await visOf('自己紹介')).includes('メンバーに公開') && (await visOf('学部')).includes('非公開'));
+
+      // 個人情報: 本人と管理者だけの注意書き。不正なメールはブラウザーの検証で止まり、入力は保持される
+      await tabTo('個人情報');
+      check(`[${label}] 個人情報は本人と管理者だけが見られる旨の注意書きがある`, /本人と、権限のある管理者（Admin・Owner）だけが見られます/.test(await page.locator('.notice-inline').innerText()));
+      await edit('氏名', (d) => d.getByLabel('氏名', { exact: true }).fill(`秘密氏名${label}`));
+      await page.locator('.ui-toast.success').filter({ hasText: '氏名を保存しました' }).waitFor();
+      await page.getByRole('button', { name: '大学メールを変更' }).click();
+      const md = page.getByRole('dialog');
+      await md.getByLabel('大学メール').fill('not-an-email');
+      await md.getByRole('button', { name: '保存する' }).click();
+      check(`[${label}] 不正なメールはブラウザーの検証で止まり、ダイアログが開いたまま入力が保持される`, (await md.getByLabel('大学メール').evaluate((el) => !el.validity.valid)) && (await md.getByLabel('大学メール').inputValue()) === 'not-an-email');
+      await md.getByLabel('大学メール').fill(`${label}@example.invalid`);
+      await md.getByRole('button', { name: '保存する' }).click();
+      await page.locator('.ui-toast.success').filter({ hasText: '大学メールを保存しました' }).waitFor();
+      await edit('学生証番号', (d) => d.getByLabel('学生証番号').fill('99X-0001'));
+      await page.locator('.ui-toast.success').filter({ hasText: '学生証番号を保存しました' }).waitFor();
+      check(`[${label}] 個人情報の行は、現在の内容と「非公開」が表示される`, (await page.locator('li.setting-row[data-setting="氏名"]').innerText()).includes(`秘密氏名${label}`) && (await visOf('氏名')).includes('非公開'));
+
+      // 外部リンク: 不正なURLはエラー、正しいURLは追加でき公開範囲が選べる
+      await tabTo('プロフィール');
+      const addLinkVia = async (name, url, vis) => {
+        await page.getByRole('button', { name: 'リンクを追加する' }).click();
+        const d = page.getByRole('dialog');
+        await d.getByLabel('リンクの名前（例: GitHub）').fill(name);
+        await d.getByLabel('URL', { exact: true }).fill(url);
+        if (vis) await d.getByLabel('公開範囲').selectOption(vis);
+        await d.getByRole('button', { name: '追加する' }).click();
+      };
+      await addLinkVia('悪いリンク', 'javascript:alert(1)');
       await page.locator('.notice.error').waitFor();
       check(`[${label}] javascript:のURLは登録できない`, /https:\/\/ または http:\/\/ で始まる/.test(await page.locator('.notice.error').innerText()));
-      await page.getByLabel('リンクの名前').fill('公開リンク');
-      await page.getByLabel('URL', { exact: true }).fill('https://example.invalid/portfolio');
-      await page.getByRole('button', { name: 'リンクを追加する' }).click();
-      await page.locator('li.item[data-label="公開リンク"]').waitFor();
-      await page.getByLabel('公開リンクの公開範囲').selectOption('members');
-      await page.locator('.notice.success').filter({ hasText: '公開範囲を変更しました' }).waitFor();
-      await page.getByLabel('種類（例: PC、VR機器）').fill('PC');
-      await page.getByLabel('名前', { exact: true }).fill('自作PC');
-      await page.getByLabel('詳細（任意）').fill('高性能');
+      await addLinkVia('公開リンク', 'https://example.invalid/portfolio', 'members');
+      await page.locator('li.setting-row[data-setting="公開リンク"]').waitFor();
+      check(`[${label}] リンクを追加でき、公開範囲「メンバーに公開」が表示される`, (await visOf('公開リンク')).includes('メンバーに公開'));
       await page.getByRole('button', { name: '機材を追加する' }).click();
-      await page.locator('li.item[data-name="自作PC"]').waitFor();
-      await page.getByLabel('自作PCの公開範囲').selectOption('members'); // 機材の公開範囲も初期は非公開。公開する場合は本人が選ぶ
-      await page.locator('.notice.success').filter({ hasText: '公開範囲を変更しました' }).waitFor();
-      // インターネット公開の同意は別: 同意してもメンバー内公開の設定は変わらない
+      const dd = page.getByRole('dialog');
+      await dd.getByLabel('種類（例: PC、VR機器）').fill('PC');
+      await dd.getByLabel('名前', { exact: true }).fill('自作PC');
+      await dd.getByLabel('詳細（任意）').fill('高性能');
+      await dd.getByLabel('公開範囲').selectOption('members');
+      await dd.getByRole('button', { name: '追加する' }).click();
+      await page.locator('li.setting-row[data-setting="自作PC"]').waitFor();
+      check(`[${label}] 機材を追加でき、公開範囲が表示される`, (await visOf('自作PC')).includes('メンバーに公開'));
+
+      // インターネット公開の同意は別（公開設定）。同意してもメンバー内公開の設定は変わらない
+      await tabTo('公開設定');
+      check(`[${label}] 公開設定に、どこに何が表示されるかの一覧がある`, (await page.locator('.vis-table tbody tr').count()) >= 4);
       check(`[${label}] 同意の前は「同意していません」`, /同意していません/.test(await page.locator('#consent-title ~ p').nth(1).innerText()));
       await page.getByRole('button', { name: 'インターネット公開に同意する' }).click();
-      await page.locator('.notice.success').filter({ hasText: '同意しました' }).waitFor();
-      check(`[${label}] 同意しても、メンバー内公開の設定（自己紹介=メンバーに公開、学部=非公開）は変わらない`, (await page.locator('#vis-bio').inputValue()) === 'members' && (await page.locator('#vis-faculty').inputValue()) === 'private');
+      await page.locator('.ui-toast.success').filter({ hasText: '同意しました' }).waitFor();
+      await tabTo('プロフィール');
+      check(`[${label}] 同意しても、メンバー内公開の設定（自己紹介=メンバーに公開、学部=非公開）は変わらない`, (await visOf('自己紹介')).includes('メンバーに公開') && (await visOf('学部')).includes('非公開'));
       // 再読込しても保持される
       await page.reload();
-      await page.getByLabel('表示名（必須）').waitFor();
-      check(`[${label}] 再読込しても入力が保持される`, (await page.getByLabel('表示名（必須）').inputValue()) === pname && (await page.getByLabel('氏名', { exact: true }).inputValue()) === `秘密氏名${label}` && (await page.locator('#vis-bio').inputValue()) === 'members');
+      await page.getByRole('heading', { level: 1, name: 'アカウント設定' }).waitFor();
+      await page.locator('li.setting-row[data-setting="表示名"]').waitFor();
+      check(`[${label}] 再読込しても入力が保持される`, (await page.locator('li.setting-row[data-setting="表示名"] .s-value').innerText()).includes(pname) && (await visOf('自己紹介')).includes('メンバーに公開'));
+      await tabTo('個人情報');
+      check(`[${label}] 再読込しても個人情報が保持される`, (await page.locator('li.setting-row[data-setting="氏名"]').innerText()).includes(`秘密氏名${label}`));
       if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-profile-filled.png`), fullPage: true });
       await ctx.close();
 
@@ -376,20 +416,27 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] 物品一覧に横溢れがない`, (await overflowOf(pa)) <= 0, `overflow=${await overflowOf(pa)}`);
       check(`[${label}] 物品一覧の操作対象が44px以上`, (await smallOf(pa)) === 0, `small=${await smallOf(pa)}`);
       if (o.shotsDir) await pa.screenshot({ path: join(o.shotsDir, `${label}-inventory.png`), fullPage: true });
-      await pa.getByLabel('物品を探す').fill('Pico');
-      await pa.getByRole('button', { name: '絞り込む' }).click();
+      await pa.getByRole('searchbox').fill('Pico'); // 入力が止まると自動で絞り込む
+      await pa.locator(`a.item-card[data-name="${cable}"]`).waitFor({ state: 'detached' });
       await pa.locator(`a.item-card[data-name="${pico}"]`).waitFor();
       check(`[${label}] 検索で絞り込める`, (await pa.locator(`a.item-card[data-name="${cable}"]`).count()) === 0);
-      await pa.getByLabel('物品を探す').fill('');
-      await pa.getByRole('button', { name: '絞り込む' }).click();
+      await pa.getByRole('searchbox').fill('');
+      await pa.locator(`a.item-card[data-name="${cable}"]`).waitFor();
+      // 状態の表示: 全部貸出可能のあいだは「貸出可能」。カテゴリ・「借りられる物だけ」で絞れる
+      check(`[${label}] 貸出可能な物品に「貸出可能」の札が出る`, /貸出可能/.test(await pa.locator(`a.item-card[data-name="${cable}"]`).innerText()));
+      await pa.getByRole('button', { name: '借りられる物だけ' }).click();
+      await pa.waitForTimeout(600);
+      check(`[${label}] 「借りられる物だけ」で貸出可能な物品が残る`, (await pa.locator(`a.item-card[data-name="${cable}"]`).count()) === 1);
+      await pa.getByRole('button', { name: '借りられる物だけ' }).click();
       await pa.locator(`a.item-card[data-name="${cable}"]`).waitFor();
 
       // 数量管理: 2個借りる → 残り3
       await pa.locator(`a.item-card[data-name="${cable}"]`).click();
       await pa.getByRole('heading', { level: 1, name: cable }).waitFor();
-      await pa.getByLabel('借りる数').fill('2');
-      await pa.getByRole('button', { name: '借りる', exact: true }).click();
-      await pa.locator('.notice.success').filter({ hasText: '残りは3個' }).waitFor();
+      await pa.getByLabel('借りる数', { exact: true }).fill('2');
+      await pa.getByRole('button', { name: /^2個借りる$/ }).click();
+      await pa.locator('.ui-toast.success').filter({ hasText: '残りは3個' }).waitFor();
+      check(`[${label}] 借りた物品に「一部貸出中」と「自分が借りている」が出る`, /一部貸出中/.test(await pa.locator('main').innerText()) && /自分が借りている（2個）/.test(await pa.locator('main').innerText()));
       check(`[${label}] 2個借りると残りが3になる`, /残り 3/.test(await pa.locator('.stock').innerText()));
       check(`[${label}] 詳細に横溢れがない`, (await overflowOf(pa)) <= 0, `overflow=${await overflowOf(pa)}`);
       check(`[${label}] 詳細の操作対象が44px以上`, (await smallOf(pa)) === 0, `small=${await smallOf(pa)}`);
@@ -400,22 +447,22 @@ export async function runAdminUiE2E(o) {
       const pb = await ctxB.newPage();
       await login(pb, bId, 'ui-inventory-passphrase-1');
       await pb.goto(`${adminUrl}/inventory/${ci.json.id}`);
-      await pb.getByLabel('借りる数').fill('3');
-      await pb.getByRole('button', { name: '借りる', exact: true }).click();
-      await pb.locator('.notice.success').filter({ hasText: '残りは0個' }).waitFor();
-      check(`[${label}] 残り0になると借りるボタンが出ず、案内が出る`, (await pb.getByRole('button', { name: '借りる', exact: true }).count()) === 0 && /借りられる数がありません/.test(await pb.locator('main').innerText()));
+      await pb.getByLabel('借りる数', { exact: true }).fill('3');
+      await pb.getByRole('button', { name: /^3個借りる$/ }).click();
+      await pb.locator('.ui-toast.success').filter({ hasText: '残りは0個' }).waitFor();
+      check(`[${label}] 残り0になると借りるボタンが出ず、案内が出る`, (await pb.getByRole('button', { name: /個借りる$/ }).count()) === 0 && /借りられる数がありません/.test(await pb.locator('main').innerText()));
       const aRow = pb.locator('li.item').filter({ hasText: aName });
       await aRow.waitFor();
-      await aRow.getByLabel(/返却数/).fill('1');
+      await aRow.getByLabel(`${aName}さんの分の返却数`, { exact: true }).fill('1');
       await aRow.getByRole('button', { name: '返却する' }).click();
-      await pb.locator('.notice.success').filter({ hasText: '1個返却しました' }).waitFor();
+      await pb.locator('.ui-toast.success').filter({ hasText: '1個返却しました' }).waitFor();
       check(`[${label}] 他人の貸出を代理で一部返却でき、残りが1になる`, /残り 1/.test(await pb.locator('.stock').innerText()) && /1個/.test(await pb.locator('li.item').filter({ hasText: aName }).innerText()));
 
       // 個体管理: Aが個体1を借りる。同じ個体は他の人に借りるボタンが出ない
       await pa.goto(`${adminUrl}/inventory/${pi.json.id}`);
       const unit1 = pa.locator(`li.item[data-tag="PICO-${label}-01"]`);
       await unit1.getByRole('button', { name: 'この個体を借りる' }).click();
-      await pa.locator('.notice.success').filter({ hasText: `PICO-${label}-01 を借りました` }).waitFor();
+      await pa.locator('.ui-toast.success').filter({ hasText: `PICO-${label}-01 を借りました` }).waitFor();
       await pb.goto(`${adminUrl}/inventory/${pi.json.id}`);
       const u1b = pb.locator(`li.item[data-tag="PICO-${label}-01"]`);
       await u1b.waitFor();
@@ -479,15 +526,15 @@ export async function runAdminUiE2E(o) {
       await page.waitForURL('**/admin/inventory');
       const qn = `管理ケーブル(${label})`, inn = `管理カメラ(${label})`;
       await page.getByLabel('名前（必須）').fill(qn);
-      await page.getByLabel('カテゴリ').fill('ケーブル');
+      await page.getByLabel('カテゴリ').selectOption({ label: '機材' });
       await page.getByLabel('総数').fill('4');
       await page.getByRole('button', { name: '登録する' }).click();
-      await page.locator('.notice.success').filter({ hasText: `「${qn}」を登録しました` }).waitFor();
+      await page.locator('.ui-toast.success').filter({ hasText: `「${qn}」を登録しました` }).waitFor();
       await page.getByLabel('名前（必須）').fill(inn);
       await page.getByLabel('管理方式').selectOption('individual');
       check(`[${label}] 個体管理を選ぶと総数の入力が消える`, (await page.getByLabel('総数').count()) === 0);
       await page.getByRole('button', { name: '登録する' }).click();
-      await page.locator('.notice.success').filter({ hasText: `「${inn}」を登録しました` }).waitFor();
+      await page.locator('.ui-toast.success').filter({ hasText: `「${inn}」を登録しました` }).waitFor();
       check(`[${label}] 物品の管理に横溢れがない`, (await overflowOf(page)) <= 0, `overflow=${await overflowOf(page)}`);
       check(`[${label}] 物品の管理の操作対象が44px以上`, (await smallOf(page)) === 0, `small=${await smallOf(page)}`);
       if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-inventory-admin.png`), fullPage: true });
@@ -520,11 +567,68 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] 貸出中の数より少ない総数への変更は拒否される`, /現在の総数は4個/.test(await page.locator('main').innerText()) && (await page.locator('.notice.error').innerText()).length > 10);
       await page.getByLabel('新しい総数').fill('6');
       await page.getByRole('button', { name: '総数を変更する' }).click();
-      await page.locator('.notice.success').filter({ hasText: '総数を6個に変更しました' }).waitFor();
+      await page.locator('.ui-toast.success').filter({ hasText: '総数を6個に変更しました' }).waitFor();
       await page.getByText('現在の総数は6個、貸出中は3個').waitFor({ timeout: 10000 }).catch(() => {});
       check(`[${label}] 総数を6に変更できる`, /現在の総数は6個、貸出中は3個/.test(await page.locator('main').innerText()));
       check(`[${label}] 物品の編集に横溢れがない・操作対象が44px以上`, (await overflowOf(page)) <= 0 && (await smallOf(page)) === 0, `overflow=${await overflowOf(page)} small=${await smallOf(page)}`);
       if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-inventory-admin-edit.png`), fullPage: true });
+
+      // 写真: 2枚を追加→並べ替え→保存。一覧のカードに先頭の写真が出る。1枚削除して保存し直せる
+      const png = (n) => ({ name: `t${n}.png`, mimeType: 'image/png', buffer: makePng(64, 48, n) });
+      await page.goto(`${adminUrl}/admin/inventory/${qid}`);
+      await page.getByRole('heading', { level: 1, name: qn }).waitFor();
+      await page.setInputFiles('#item-images-input', [png(1), png(2)]);
+      check(`[${label}] 追加した写真が保存前にプレビューされ、「未保存」と出る`, (await page.locator('.image-tile').count()) === 2 && (await page.locator('.tile-new').count()) === 2);
+      await page.getByRole('button', { name: '写真2を前へ' }).click();
+      await page.getByRole('button', { name: '写真を保存する' }).click();
+      await page.locator('.ui-toast.success').filter({ hasText: '写真を保存しました' }).waitFor();
+      await page.locator('.image-tile').first().locator('.tile-main').waitFor();
+      check(`[${label}] 写真を保存すると2枚が残り、先頭に「メイン」が付く`, (await page.locator('.image-tile').count()) === 2 && (await page.locator('.tile-new').count()) === 0 && (await page.locator('.tile-main').count()) === 1);
+      const smallImg = await smallOf(page);
+      check(`[${label}] 写真の編集の操作対象が44px以上・横溢れなし`, smallImg === 0 && (await overflowOf(page)) <= 0, `small=${smallImg} overflow=${await overflowOf(page)}`);
+      if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-inventory-admin-images.png`), fullPage: true });
+      await page.getByRole('button', { name: '写真2をメインにする' }).or(page.getByRole('button', { name: 'メインにする' })).first().click();
+      await page.getByRole('button', { name: '写真1を削除' }).click();
+      await page.getByRole('button', { name: '写真を保存する' }).click();
+      await page.locator('.ui-toast.success').filter({ hasText: '写真を保存しました' }).waitFor();
+      await page.waitForFunction(() => document.querySelectorAll('.image-tile').length === 1);
+      await page.goto(`${adminUrl}/inventory`);
+      const card = page.locator(`a.item-card[data-name="${qn}"]`);
+      await card.waitFor();
+      await card.locator('img').waitFor();
+      check(`[${label}] 物品一覧のカードに保存した写真が出る（画像が実際に読み込まれる）`, await card.locator('img').evaluate((img) => img.complete && img.naturalWidth > 0));
+
+      // カテゴリの管理（Admin/Owner）: 追加→名前変更→削除。一般メンバーは追加できない
+      const cn = `確認用カテゴリ(${label})`;
+      await page.goto(`${adminUrl}/admin/inventory/categories`);
+      await page.getByLabel('カテゴリ名').fill(cn);
+      await page.getByRole('button', { name: '追加する' }).click();
+      await page.locator(`li.item[data-name="${cn}"]`).waitFor();
+      await page.locator(`li.item[data-name="${cn}"]`).getByRole('button', { name: '名前を変える' }).click();
+      await page.getByLabel('新しい名前').fill(`${cn}改`);
+      await page.getByRole('dialog').getByRole('button', { name: '保存する' }).click();
+      await page.locator(`li.item[data-name="${cn}改"]`).waitFor();
+      check(`[${label}] カテゴリを追加し、名前を変えられる`, (await page.locator(`li.item[data-name="${cn}"]`).count()) === 0);
+      check(`[${label}] カテゴリの管理に横溢れがない・操作対象が44px以上`, (await overflowOf(page)) <= 0 && (await smallOf(page)) === 0, `overflow=${await overflowOf(page)} small=${await smallOf(page)}`);
+      if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-inventory-categories.png`), fullPage: true });
+      await page.locator('li.item', { hasText: '機材' }).first().getByRole('button', { name: '削除' }).click();
+      check(`[${label}] 使用中のカテゴリの削除では、移し先の選択が出る`, (await page.getByLabel('移し先のカテゴリ').count()) === 1);
+      await page.getByRole('dialog').getByRole('button', { name: 'キャンセル' }).click();
+      await page.locator(`li.item[data-name="${cn}改"]`).getByRole('button', { name: '削除' }).click();
+      await page.getByRole('dialog').getByRole('button', { name: '削除する' }).click();
+      await page.locator(`li.item[data-name="${cn}改"]`).waitFor({ state: 'detached' });
+      check(`[${label}] 未使用のカテゴリを削除できる`, (await page.locator(`li.item[data-name="${cn}改"]`).count()) === 0);
+      {
+        const mctx3 = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
+        const mp3 = await mctx3.newPage();
+        await login(mp3, mid, mpw);
+        await mp3.goto(`${adminUrl}/admin/inventory/categories`);
+        await mp3.getByLabel('カテゴリ名').fill(`権限なし(${label})`);
+        await mp3.getByRole('button', { name: '追加する' }).click();
+        await mp3.locator('.notice.error').waitFor();
+        check(`[${label}] 一般メンバーはカテゴリを追加できず、案内が出る`, /権限がありません/.test(await mp3.locator('.notice.error').innerText()));
+        await mctx3.close();
+      }
 
       // 訂正: 履歴から借り手の貸出を取り消す → 貸出中が0に戻り、元の記録と訂正が履歴に残る
       await page.goto(`${adminUrl}/inventory/history`);
@@ -683,31 +787,33 @@ export async function runAdminUiE2E(o) {
         const page = await ctx.newPage();
         await login(page, o.ownerLogin, o.ownerPass);
         await page.goto(`${adminUrl}/profile`);
-        const av = page.getByTestId('uploader-avatar');
-        await av.waitFor();
-        await av.locator('input[type=file]').setInputFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: mkPng(40, 30, [200, 60, 60]) });
-        await page.locator('.notice.success').filter({ hasText: 'アバターを設定しました' }).waitFor();
-        const img = av.locator('img.avatar');
+        await page.getByRole('button', { name: 'アイコンを変更' }).click();
+        const adlg = page.getByRole('dialog');
+        await adlg.locator('#avatar-file').setInputFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: mkPng(40, 30, [200, 60, 60]) });
+        await adlg.locator('canvas').waitFor();
+        await adlg.getByRole('button', { name: '保存する' }).click();
+        await page.locator('.ui-toast.success').filter({ hasText: 'プロフィール画像を変更しました' }).waitFor();
+        const img = page.locator('li.setting-row[data-setting="アイコン"] .ui-avatar img');
         await img.waitFor();
-        check(`[${label}] アバターを設定すると画像が表示される（WebPとして読める）`, await img.evaluate((i) => i.complete && i.naturalWidth > 0), '');
+        check(`[${label}] アイコンをトリミングして設定すると画像が表示される（WebPとして読める）`, await img.evaluate((i) => new Promise((r) => { if (i.complete) r(i.naturalWidth > 0); else i.onload = () => r(i.naturalWidth > 0); })), '');
         check(`[${label}] アバターの画面で横スクロールが出ない`, (await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0);
         if (o.shotsDir) await page.screenshot({ path: join(o.shotsDir, `${label}-avatar.png`), fullPage: true });
         await page.goto(`${adminUrl}/members`);
         await page.locator('li.user img.avatar').first().waitFor();
         check(`[${label}] メンバー一覧にアバターが出る`, (await page.locator('li.user img.avatar').count()) >= 1);
         await page.goto(`${adminUrl}/profile`);
-        await page.getByTestId('uploader-avatar').getByRole('button', { name: '外す' }).click();
-        await page.locator('.notice.success').filter({ hasText: 'アバターを外しました' }).waitFor();
-        check(`[${label}] アバターを外すと画像が消える`, (await page.getByTestId('uploader-avatar').locator('img').count()) === 0);
+        await page.getByRole('button', { name: 'アイコンを変更' }).click();
+        await page.getByRole('dialog').getByRole('button', { name: '画像を外す' }).click();
+        await page.locator('.ui-toast.success').filter({ hasText: 'プロフィール画像を外しました' }).waitFor();
+        check(`[${label}] アイコンを外すと画像が消える`, (await page.locator('li.setting-row[data-setting="アイコン"] .ui-avatar img').count()) === 0);
         // 物品の写真（管理者）
         const it = await o.apiCall('POST', '/inventory/items', { body: { name: `写真確認用(${label})`, mode: 'quantity', totalQuantity: 2 }, ...own });
         await page.goto(`${adminUrl}/admin/inventory/${it.json.id}`);
-        const up = page.getByTestId('uploader-inventory');
-        await up.waitFor();
-        await up.locator('input[type=file]').setInputFiles({ name: 'item.png', mimeType: 'image/png', buffer: mkPng(60, 40, [40, 120, 200]) });
-        await page.locator('.notice.success').filter({ hasText: '物品の写真を設定しました' }).waitFor();
+        await page.locator('#item-images-input').setInputFiles({ name: 'item.png', mimeType: 'image/png', buffer: mkPng(60, 40, [40, 120, 200]) });
+        await page.getByRole('button', { name: '写真を保存する' }).click();
+        await page.locator('.ui-toast.success').filter({ hasText: '写真を保存しました' }).waitFor();
         await page.goto(`${adminUrl}/inventory/${it.json.id}`);
-        const photo = page.locator('img.photo');
+        const photo = page.locator('.gallery-main img');
         await photo.waitFor();
         check(`[${label}] 物品の写真が詳細に表示される`, await photo.evaluate((i) => i.complete && i.naturalWidth > 0));
         await page.goto(`${adminUrl}/inventory`);
@@ -770,21 +876,21 @@ export async function runAdminUiE2E(o) {
       await wp.getByRole('heading', { level: 1, name: title }).waitFor();
       const url = wp.url();
       const cid = url.split('/').pop();
-      check(`[${label}] 下書きを作ると編集画面に移り、保存ボタンは変更があるまで押せない`, await wp.getByRole('button', { name: '保存する' }).isDisabled());
+      check(`[${label}] 下書きを作ると編集画面に移り、保存ボタンは変更があるまで押せない`, await wp.getByRole('button', { name: '保存する', exact: true }).isDisabled());
       check(`[${label}] 一般メンバーには公開ボタンが無く、公開できるのは編集者以上と案内される`, (await wp.getByRole('button', { name: /を公開する/ }).count()) === 0 && /公開できるのは編集者/.test(await wp.locator('main').innerText()));
 
       // 本文を書いて保存 → 版が増える。保存後は保存ボタンが押せない
-      const tab = async (name) => { if (width < 1100) await wp.getByRole('tab', { name }).click(); };
+      const tab = async (name) => { if (width < 1100) await wp.locator('.only-narrow').getByText(name, { exact: true }).click(); };
       await wp.getByLabel('本文（Markdown）').fill('## 見出しです\n\n本文の**強調**と、動画:\n\n<div data-youtube="ZEguS-om_Ec"></div>\n');
-      check(`[${label}] 変更があると保存ボタンが押せて、「保存していない変更」と出る`, !(await wp.getByRole('button', { name: '保存する' }).isDisabled()) && /保存していない変更があります/.test(await wp.locator('main').innerText()));
+      check(`[${label}] 変更があると保存ボタンが押せて、「保存していない変更」と出る`, !(await wp.getByRole('button', { name: '保存する', exact: true }).isDisabled()) && /保存していない変更があります/.test(await wp.locator('main').innerText()));
       await tab('プレビュー');
       await wp.locator('[data-testid="preview"] h2').filter({ hasText: '見出しです' }).waitFor();
       check(`[${label}] プレビューに見出し・強調・YouTubeの埋め込み（youtube-nocookie）が出る`, (await wp.locator('[data-testid="preview"] strong').count()) === 1 && (await wp.locator('[data-testid="preview"] iframe[src^="https://www.youtube-nocookie.com/embed/ZEguS-om_Ec"]').count()) === 1);
       if (o.shotsDir) await wp.screenshot({ path: join(o.shotsDir, `${label}-cms-preview.png`), fullPage: true });
       await tab('編集');
-      await wp.getByRole('button', { name: '保存する' }).click();
-      await wp.locator('.notice.success').filter({ hasText: '保存しました（版2）' }).waitFor();
-      check(`[${label}] 保存すると版2になり、保存ボタンが押せなくなる`, await wp.getByRole('button', { name: '保存する' }).isDisabled());
+      await wp.getByRole('button', { name: '保存する', exact: true }).click();
+      await wp.locator('.ui-toast.success').filter({ hasText: '保存しました（版2）' }).waitFor();
+      check(`[${label}] 保存すると版2になり、保存ボタンが押せなくなる`, await wp.getByRole('button', { name: '保存する', exact: true }).isDisabled());
 
       // 危険な記述は、保存前でもプレビューの段階で取り除かれ（描画時のサニタイズ）、保存はAPIが拒否する
       await wp.evaluate(() => { window.__xss = undefined; });
@@ -796,7 +902,7 @@ export async function runAdminUiE2E(o) {
       const pv = await wp.locator('[data-testid="preview"]').innerHTML();
       check(`[${label}] プレビューは、script・iframe・イベント属性・javascript:を表示の段階で取り除く（保存前の入力でも）`, !/<script|<iframe|onerror|onclick|javascript:/i.test(pv) && (await wp.evaluate(() => window.__xss)) === undefined, pv.slice(0, 160));
       await tab('編集');
-      await wp.getByRole('button', { name: '保存する' }).click();
+      await wp.getByRole('button', { name: '保存する', exact: true }).click();
       await wp.locator('.notice.error').filter({ hasText: '本文に使えない記述があります' }).waitFor();
       check(`[${label}] 危険な記述の保存はAPIが422で拒否し、入力は保持される`, (await wp.getByLabel('本文（Markdown）').inputValue()) === evil);
       await wp.getByLabel('本文（Markdown）').fill('## 見出しです\n\n本文の**強調**と、動画:\n\n<div data-youtube="ZEguS-om_Ec"></div>\n');
@@ -810,10 +916,10 @@ export async function runAdminUiE2E(o) {
       await ep.goto(`${adminUrl}/contents/${cid}`);
       await ep.getByRole('heading', { level: 1, name: title }).waitFor();
       await ep.getByLabel('タイトル（必須）').fill(`${title}・編集者が直した`);
-      await ep.getByRole('button', { name: '保存する' }).click();
-      await ep.locator('.notice.success').filter({ hasText: '保存しました（版3）' }).waitFor();
+      await ep.getByRole('button', { name: '保存する', exact: true }).click();
+      await ep.locator('.ui-toast.success').filter({ hasText: '保存しました（版3）' }).waitFor();
       await wp.getByLabel('タイトル（必須）').fill(`${title}・書き手の変更`);
-      await wp.getByRole('button', { name: '保存する' }).click();
+      await wp.getByRole('button', { name: '保存する', exact: true }).click();
       await wp.getByRole('region', { name: '保存の競合' }).waitFor();
       check(`[${label}] 他の人が先に保存していると、競合の案内と2つの選択肢が出る（保存は成立しない）`, (await wp.getByRole('button', { name: /最新を読み込む/ }).count()) === 1 && (await wp.getByRole('button', { name: /最新の上に保存し直す/ }).count()) === 1 && /編集者\(/.test(await wp.locator('.notice.error').innerText()));
       await wp.getByRole('button', { name: /最新を読み込む/ }).click();
@@ -822,28 +928,28 @@ export async function runAdminUiE2E(o) {
 
       // 公開: 編集者だけ。公開すると公開APIに出る。公開後の編集は再公開まで反映されない
       await ep.reload();
-      await ep.getByRole('button', { name: '版3を公開する' }).waitFor();
-      ep.once('dialog', (d) => d.accept());
-      await ep.getByRole('button', { name: '版3を公開する' }).click();
-      await ep.locator('.notice.success').filter({ hasText: '版3を公開しました' }).waitFor();
+      await ep.getByRole('button', { name: '版3を公開する' }).first().waitFor();
+      await ep.getByRole('button', { name: '版3を公開する' }).first().click();
+      await ep.getByRole('dialog').getByRole('button', { name: '公開する' }).click();
+      await ep.locator('.ui-toast.success').filter({ hasText: '版3を公開しました' }).waitFor();
       const pubGet = () => ectx.request.get(`${adminUrl}/api/v1/public/contents/blog/${slug}`);
       let pr = await pubGet();
       check(`[${label}] 公開すると、匿名で読める公開APIに出る`, pr.status() === 200 && (await pr.json()).title === `${title}・編集者が直した`);
       await wp.getByLabel('タイトル（必須）').fill(`${title}・公開後の編集`);
-      await wp.getByRole('button', { name: '保存する' }).click();
-      await wp.locator('.notice.success').filter({ hasText: '保存しました（版4）' }).waitFor();
+      await wp.getByRole('button', { name: '保存する', exact: true }).click();
+      await wp.locator('.ui-toast.success').filter({ hasText: '保存しました（版4）' }).waitFor();
       pr = await pubGet();
       check(`[${label}] 公開後に書き手が保存しても、再公開まで公開APIは旧版のまま`, (await pr.json()).title === `${title}・編集者が直した`);
       await wp.goto(`${adminUrl}/contents`);
-      await wp.locator(`li.item[data-slug="${slug}"]`).waitFor();
-      const liText = await wp.locator(`li.item[data-slug="${slug}"]`).innerText();
-      check(`[${label}] 一覧に「公開中」と「公開後の変更あり（未公開）」が出る`, /公開中/.test(liText) && /公開後の変更あり/.test(liText));
+      await wp.locator(`li[data-slug="${slug}"]`).waitFor();
+      const liText = await wp.locator(`li[data-slug="${slug}"]`).innerText();
+      check(`[${label}] 一覧に「公開中」と「公開後の変更あり（未公開）」が出る`, /公開中/.test(liText) && /未公開の変更あり/.test(liText));
       check(`[${label}] 記事・作品の一覧に横溢れがない・操作対象が44px以上`, (await overflowOf(wp)) <= 0 && (await smallOf(wp)) === 0, `overflow=${await overflowOf(wp)} small=${await smallOf(wp)}`);
       if (o.shotsDir) await wp.screenshot({ path: join(o.shotsDir, `${label}-cms-list.png`), fullPage: true });
       await ep.reload();
-      ep.once('dialog', (d) => d.accept());
-      await ep.getByRole('button', { name: '公開を止める' }).click();
-      await ep.locator('.notice.success').filter({ hasText: '公開を止めました' }).waitFor();
+      await ep.getByRole('button', { name: '公開を止める' }).first().click();
+      await ep.getByRole('dialog').getByRole('button', { name: '公開を止める' }).click();
+      await ep.locator('.ui-toast.success').filter({ hasText: '公開を止めました' }).waitFor();
       pr = await pubGet();
       check(`[${label}] 公開を止めると、公開APIは404になる`, pr.status() === 404);
 
@@ -857,7 +963,7 @@ export async function runAdminUiE2E(o) {
       await xp.goto(`${adminUrl}/contents`);
       await xp.getByRole('heading', { level: 1, name: '記事・作品' }).waitFor();
       await xp.waitForTimeout(300);
-      check(`[${label}] 無関係なメンバーの一覧に、他人の下書きが出ない`, (await xp.locator(`li.item[data-slug="${slug}"]`).count()) === 0);
+      check(`[${label}] 無関係なメンバーの一覧に、他人の下書きが出ない`, (await xp.locator(`li[data-slug="${slug}"]`).count()) === 0);
       await wctx.close(); await ectx.close(); await xctx.close();
     }
     // 記事・作品（CMS）その2: 画像・共同編集者・制作メンバーと公開同意による匿名化（PC・スマホ・320px）
@@ -906,7 +1012,7 @@ export async function runAdminUiE2E(o) {
       await wp.locator('.notice.error').filter({ hasText: 'JPEG・PNG・WebP' }).waitFor();
       check(`[${label}] 画像でないファイル（SVG）は、拒否の案内が出て、アップロード一覧に出ない`, (await wp.locator('[data-testid="uploads"]').count()) === 0);
       await wp.locator('#e-file').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: png(40, 30) });
-      await wp.locator('.notice.success').filter({ hasText: '画像をアップロードしました（40×30）' }).waitFor();
+      await wp.locator('.ui-toast.success').filter({ hasText: '画像をアップロードしました（40×30）' }).waitFor();
       await wp.getByRole('button', { name: '本文に挿入' }).click();
       const mdVal = await wp.getByLabel('本文（Markdown）').inputValue();
       const inlineUrl = (mdVal.match(/\(\/api\/v1\/public\/media\/([A-Za-z0-9_-]{22})\)/) ?? [])[1];
@@ -915,49 +1021,50 @@ export async function runAdminUiE2E(o) {
       await wp.locator('[data-testid="cover"] img').waitFor();
       const cover = await wp.locator('[data-testid="cover"] img').evaluate((el) => new Promise((r) => { if (el.complete) r(el.naturalWidth); else el.onload = () => r(el.naturalWidth); }));
       check(`[${label}] カバー画像が（認証つきの経路で）表示される`, cover === 40, `naturalWidth=${cover}`);
-      if (width < 1100) await wp.getByRole('tab', { name: 'プレビュー' }).click();
+      if (width < 1100) await wp.locator('.only-narrow').getByText('プレビュー', { exact: true }).click();
       await wp.locator('[data-testid="preview"] img').first().waitFor();
       const pv = await wp.locator('[data-testid="preview"] img').first().evaluate((el) => new Promise((r) => { const done = () => r({ w: el.naturalWidth, src: el.getAttribute('src') }); if (el.complete) done(); else el.onload = done; }));
       check(`[${label}] プレビューに、下書きの画像が認証つきの経路で表示される（公開URLのままでは匿名に出ない）`, pv.w === 40 && pv.src === `/api/v1/media/by-public/${inlineUrl}`, JSON.stringify(pv));
-      if (width < 1100) await wp.getByRole('tab', { name: '編集' }).click();
+      if (width < 1100) await wp.locator('.only-narrow').getByText('編集', { exact: true }).click();
       check(`[${label}] 画像の欄に横溢れがない・操作対象が44px以上`, (await overflowOf(wp)) <= 0 && (await smallOf(wp)) === 0, `overflow=${await overflowOf(wp)} small=${await smallOf(wp)}`);
       if (o.shotsDir) await wp.screenshot({ path: join(o.shotsDir, `${label}-cms-images.png`), fullPage: true });
-      await wp.getByRole('button', { name: '保存する' }).click();
-      await wp.locator('.notice.success').filter({ hasText: '保存しました' }).waitFor();
+      await wp.getByRole('button', { name: '保存する', exact: true }).click();
+      await wp.locator('.ui-toast.success').filter({ hasText: '保存しました' }).waitFor();
       await wp.reload();
       await wp.locator('[data-testid="cover"] img').waitFor();
       check(`[${label}] 保存して読み込み直しても、カバー画像と本文の画像が保たれる`, (await wp.getByLabel('本文（Markdown）').inputValue()).includes(inlineUrl));
       check(`[${label}] 公開前は、画像は匿名に配信されない`, (await anon(`/api/v1/public/media/${inlineUrl}`)).status === 404);
       await ep.goto(`${adminUrl}/contents/${aid}`);
-      await ep.getByRole('button', { name: /を公開する/ }).waitFor();
-      ep.once('dialog', (d) => d.accept());
-      await ep.getByRole('button', { name: /を公開する/ }).click();
-      await ep.locator('.notice.success').filter({ hasText: '公開しました' }).waitFor();
+      await ep.getByRole('button', { name: /を公開する/ }).first().waitFor();
+      await ep.getByRole('button', { name: /を公開する/ }).first().click();
+      await ep.getByRole('dialog').getByRole('button', { name: '公開する' }).click();
+      await ep.locator('.ui-toast.success').filter({ hasText: '公開しました' }).waitFor();
       const detail = await (await anon(`/api/v1/public/contents/blog/ui-img-${label}`)).json();
       const coverId = detail.coverUrl?.split('/').pop();
       check(`[${label}] 公開後は、本文の画像とカバー画像が匿名に配信される（公開APIにはカバーのURLだけが出る）`, (await anon(`/api/v1/public/media/${inlineUrl}`)).status === 200 && !!coverId && (await anon(detail.coverUrl)).status === 200 && !JSON.stringify(detail).includes('"id"'));
-      ep.once('dialog', (d) => d.accept());
       await ep.reload();
       await ep.getByRole('button', { name: '公開を止める' }).click();
-      await ep.locator('.notice.success').filter({ hasText: '公開を止めました' }).waitFor();
+      await ep.getByRole('dialog').getByRole('button', { name: '公開を止める' }).click();
+      await ep.locator('.ui-toast.success').filter({ hasText: '公開を止めました' }).waitFor();
       check(`[${label}] 公開を止めると、画像もすぐ匿名に配信されなくなる`, (await anon(`/api/v1/public/media/${inlineUrl}`)).status === 404);
 
       // --- 共同編集者 ---
-      await wp.getByLabel('共同編集者を追加する').fill(`共同候補(${label})`);
-      await wp.getByRole('button', { name: '探す' }).first().click();
+      await wp.getByLabel('メンバーを追加する').fill(`共同候補(${label})`);
       await wp.getByRole('button', { name: `共同候補(${label})さんを追加` }).click();
-      await wp.locator('.notice.success').filter({ hasText: '共同編集者に追加しました' }).waitFor();
-      check(`[${label}] 共同編集者を追加すると一覧に出る`, (await wp.locator('[data-testid="collaborators"] [data-person]').count()) === 1);
+      await wp.getByRole('button', { name: 'メンバーを保存する' }).click();
+      await wp.locator('.ui-toast.success').filter({ hasText: 'メンバーを保存しました' }).waitFor();
+      check(`[${label}] メンバーを追加すると一覧に出る（作者＋追加した人）`, (await wp.locator('[data-testid="members"] [data-person]').count()) === 2);
       const [kc, kp] = await newCtx(ids.k);
       await kp.goto(`${adminUrl}/contents/${aid}`);
       await kp.getByRole('heading', { level: 1, name: `画像の記事(${label})` }).waitFor();
-      check(`[${label}] 共同編集者は編集画面を開けるが、共同編集者の変更欄と公開ボタンは出ない`, (await kp.getByLabel('共同編集者を追加する').count()) === 0 && (await kp.getByRole('button', { name: /を公開する/ }).count()) === 0 && /変更できるのは作者と編集者/.test(await kp.locator('main').innerText()));
+      check(`[${label}] 共同編集者は編集画面を開けるが、共同編集者の変更欄と公開ボタンは出ない`, (await kp.getByLabel('メンバーを追加する').count()) === 0 && (await kp.getByRole('button', { name: /を公開する/ }).count()) === 0 && /追加・削除ができるのは、作者と編集者/.test(await kp.locator('main').innerText()));
       await kp.getByLabel('タイトル（必須）').fill(`画像の記事(${label})・共同編集`);
-      await kp.getByRole('button', { name: '保存する' }).click();
-      await kp.locator('.notice.success').filter({ hasText: '保存しました' }).waitFor();
+      await kp.getByRole('button', { name: '保存する', exact: true }).click();
+      await kp.locator('.ui-toast.success').filter({ hasText: '保存しました' }).waitFor();
       check(`[${label}] 共同編集者は本文を保存できる`, true);
       await wp.getByRole('button', { name: `共同候補(${label})さんを外す` }).click();
-      await wp.locator('.notice.success').filter({ hasText: '外しました' }).waitFor();
+      await wp.getByRole('button', { name: 'メンバーを保存する' }).click();
+      await wp.locator('.ui-toast.success').filter({ hasText: 'メンバーを保存しました' }).waitFor();
       await kp.reload();
       await kp.locator('.notice.error').waitFor();
       check(`[${label}] 外された共同編集者には、編集画面が開かない`, /見つからない/.test(await kp.locator('.notice.error').innerText()));
@@ -967,22 +1074,21 @@ export async function runAdminUiE2E(o) {
       const pid = await mkContent({ type: 'project', section: 'project', slug: `ui-work-${label}`, title: `作品の記事(${label})`, markdown: '作品の本文' });
       await wp.goto(`${adminUrl}/contents/${pid}`);
       await wp.getByRole('heading', { level: 1, name: `作品の記事(${label})` }).waitFor();
-      check(`[${label}] 作品の編集画面に制作メンバーの欄があり、公開同意の説明（匿名のメンバー）が出る`, /匿名のメンバー/.test(await wp.locator('#contrib-title').locator('xpath=..').innerText()) && (await wp.getByRole('button', { name: '制作メンバーを保存する' }).isDisabled()));
+      check(`[${label}] 作品の編集画面にメンバーの欄があり、公開同意の説明が出る`, /名前が出るのは、本人が「インターネットへの公開」に同意している場合だけ/.test(await wp.locator('#members-title').locator('xpath=..').innerText()) && (await wp.getByRole('button', { name: 'メンバーを保存する' }).isDisabled()));
       for (const [key, role] of [['a', '企画'], ['b', '音楽']]) {
-        await wp.getByLabel('制作メンバーを追加する').fill(ids[key].name);
-        await wp.locator('.picker').last().getByRole('button', { name: '探す' }).click();
+        await wp.getByLabel('メンバーを追加する').fill(ids[key].name);
         await wp.getByRole('button', { name: `${ids[key].name}さんを追加` }).click();
         await wp.getByLabel(`${ids[key].name}さんの役割`).fill(role);
       }
-      await wp.getByRole('button', { name: '制作メンバーを保存する' }).click();
-      await wp.locator('.notice.success').filter({ hasText: '制作メンバーを保存しました（版2）' }).waitFor();
-      check(`[${label}] 制作メンバーを保存すると新しい版（版2）になる`, (await wp.locator('[data-testid="contributors"] [data-person]').count()) === 2);
+      await wp.getByRole('button', { name: 'メンバーを保存する' }).click();
+      await wp.locator('.ui-toast.success').filter({ hasText: 'メンバーを保存しました' }).waitFor();
+      check(`[${label}] 制作メンバーを保存すると新しい版（版2）になり、作者と2人が並ぶ`, (await wp.locator('[data-testid="members"] [data-person]').count()) === 3 && /作業中の版 2/.test(await wp.locator('main').innerText()));
       if (o.shotsDir) await wp.screenshot({ path: join(o.shotsDir, `${label}-cms-contributors.png`), fullPage: true });
       await ep.goto(`${adminUrl}/contents/${pid}`);
-      await ep.getByRole('button', { name: '版2を公開する' }).waitFor();
-      ep.once('dialog', (d) => d.accept());
-      await ep.getByRole('button', { name: '版2を公開する' }).click();
-      await ep.locator('.notice.success').filter({ hasText: '版2を公開しました' }).waitFor();
+      await ep.getByRole('button', { name: '版2を公開する' }).first().waitFor();
+      await ep.getByRole('button', { name: '版2を公開する' }).first().click();
+      await ep.getByRole('dialog').getByRole('button', { name: '公開する' }).click();
+      await ep.locator('.ui-toast.success').filter({ hasText: '版2を公開しました' }).waitFor();
       const credits = async () => (await (await anon(`/api/v1/public/contents/project/ui-work-${label}`)).json()).contributors.map((c) => `${c.displayName}:${c.roleLabel}`).join(',');
       check(`[${label}] 同意していない制作メンバーは、公開サイトで「匿名のメンバー」と出る（役割は出る）`, (await credits()) === '匿名のメンバー:企画,匿名のメンバー:音楽', await credits());
       await o.apiCall('PUT', '/me/profile/public-credit-consent', { body: { granted: true }, ...asUser(ids.a) });
@@ -990,6 +1096,7 @@ export async function runAdminUiE2E(o) {
       // プロフィールの制作実績: 本人には常に、他のメンバーには同意が続く間だけ
       const [ac, ap] = await newCtx(ids.a);
       await ap.goto(`${adminUrl}/profile`);
+      await ap.locator('.settings-tabs').getByText('アカウント', { exact: true }).click();
       await ap.locator('[data-testid="works"] li').first().waitFor();
       check(`[${label}] 本人のプロフィールに、公開された作品が制作実績として出る（役割つき）`, /作品の記事/.test(await ap.locator('[data-testid="works"]').innerText()) && /企画/.test(await ap.locator('[data-testid="works"]').innerText()));
       await wp.goto(`${adminUrl}/members/${ids.a.userId}`);
@@ -1001,6 +1108,7 @@ export async function runAdminUiE2E(o) {
       await wp.getByRole('heading', { level: 1 }).waitFor();
       check(`[${label}] 同意を取り消すと、他のメンバーからは制作実績が見えなくなる（本人には見える）`, (await wp.locator('[data-testid="works"]').count()) === 0);
       await ap.reload();
+      await ap.locator('.settings-tabs').getByText('アカウント', { exact: true }).click();
       await ap.locator('[data-testid="works"] li').first().waitFor();
       check(`[${label}] 制作実績の表示に横溢れがない`, (await overflowOf(ap)) <= 0, `overflow=${await overflowOf(ap)}`);
       await ac.close(); await wc.close(); await ec.close();

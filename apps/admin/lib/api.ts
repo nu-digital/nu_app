@@ -197,25 +197,32 @@ export const deletePrivateProfile = async (id: string, reason: string, anonymize
 // ---- 物品 ----
 
 export type Item = {
-  id: string; name: string; description: string; category: string; location: string; mode: "quantity" | "individual";
+  id: string; name: string; description: string; category: string; categoryId: string | null; location: string; mode: "quantity" | "individual";
   totalQuantity: number; outstanding: number; unitCount: number; available: number; archived?: boolean; photoMediaId: string | null;
+  /** 自分が借りている未返却の数（0なら借りていない） */
+  borrowedByMe: number;
 };
-export type ItemUnit = { id: string; assetTag: string; serialNumber: string | null; state: string; loaned: { borrowerDisplayName: string; since: string; elapsedDays: number } | null };
-export type ItemLoan = { id: string; borrowerDisplayName: string; quantity: number; borrowedAt: string; elapsedDays: number };
-export type ItemDetail = Item & { units: ItemUnit[]; loans: ItemLoan[] };
+export type Category = { id: string; name: string; sortOrder: number; itemCount: number };
+export type ItemUnit = { id: string; assetTag: string; serialNumber: string | null; state: string; mine: boolean; loaned: { borrowerDisplayName: string; since: string; elapsedDays: number } | null };
+export type ItemLoan = { id: string; borrowerDisplayName: string; quantity: number; borrowedAt: string; elapsedDays: number; mine: boolean };
+export type ItemDetail = Item & { images: string[]; units: ItemUnit[]; loans: ItemLoan[] };
 export type OutstandingLoan = { id: string; itemId: string; itemName: string; assetTag: string; borrowerDisplayName: string; quantity: number; borrowedAt: string; elapsedDays: number; mine: boolean };
 export type HistoryEvent = {
   id: string; kind: "loan" | "return" | "correction"; itemId: string; itemName: string; assetTag: string; borrowerDisplayName: string; actorDisplayName: string;
   quantity: number; at: string; correctionKind?: string; targetType?: string; reason?: string;
 };
 
-export async function listItems(p: { q?: string; category?: string; available?: boolean; cursor?: string }) {
+export type ItemSort = "name" | "newest" | "available";
+export async function listItems(p: { q?: string; category?: string; categoryId?: string; available?: boolean; mine?: boolean; sort?: ItemSort; cursor?: string }) {
   const params = new URLSearchParams({ limit: "50" });
   if (p.q) params.set("q", p.q);
   if (p.category) params.set("category", p.category);
+  if (p.categoryId) params.set("categoryId", p.categoryId);
   if (p.available) params.set("available", "true");
+  if (p.mine) params.set("mine", "true");
+  if (p.sort && p.sort !== "name") params.set("sort", p.sort);
   if (p.cursor) params.set("cursor", p.cursor);
-  return ok<{ items: Item[]; nextCursor: string | null; categories: string[] }>(await call("GET", `/inventory/items?${params.toString()}`), 200);
+  return ok<{ items: Item[]; nextCursor: string | null; categories: string[]; categoryList: Category[] }>(await call("GET", `/inventory/items?${params.toString()}`), 200);
 }
 export const getItem = async (id: string) => ok<ItemDetail>(await call("GET", `/inventory/items/${id}`), 200);
 export const createLoan = async (body: { itemId: string; quantity?: number; unitId?: string }) =>
@@ -236,13 +243,23 @@ export async function listHistory(cursor?: string) {
 }
 
 // --- 物品の管理（Admin/Owner。権限はAPIが強制する）---
-export type ItemInput = { name: string; description: string; category: string; location: string };
+export type ItemInput = { name: string; description: string; categoryId: string; location: string };
 export async function createItem(b: ItemInput & { mode: "quantity" | "individual"; totalQuantity?: number }) {
   return ok<Item>(await call("POST", "/inventory/items", b), 201);
 }
 export async function updateItem(id: string, b: Partial<ItemInput> & { totalQuantity?: number; reason?: string; archived?: boolean }) {
   return ok<Item>(await call("PATCH", `/inventory/items/${id}`, b), 200);
 }
+export const listCategories = async () => ok<{ items: Category[] }>(await call("GET", "/inventory/categories"), 200);
+export const createCategory = async (name: string) => ok<Category>(await call("POST", "/inventory/categories", { name }), 201);
+export const renameCategory = async (id: string, name: string) => ok<Category>(await call("PATCH", `/inventory/categories/${id}`, { name }), 200);
+export const reorderCategories = async (ids: string[]) => ok<{ items: Category[] }>(await call("PUT", "/inventory/categories/order", { ids }), 200);
+export async function deleteCategory(id: string, moveTo?: string): Promise<void> {
+  const r = await call("DELETE", `/inventory/categories/${id}${moveTo ? `?moveTo=${encodeURIComponent(moveTo)}` : ""}`);
+  if (r.status !== 204) throw toError(r);
+}
+/** 物品の画像を順序つきで置き換える（先頭がメイン。空で全部外す）。 */
+export const setItemImages = async (itemId: string, mediaIds: string[]) => ok<{ images: string[] }>(await call("PUT", `/inventory/items/${itemId}/images`, { mediaIds }), 200);
 export async function createUnit(itemId: string, assetTag: string, serialNumber?: string) {
   return ok<ItemUnit>(await call("POST", `/inventory/items/${itemId}/units`, { assetTag, ...(serialNumber ? { serialNumber } : {}) }), 201);
 }
@@ -271,17 +288,23 @@ export async function retryDelivery(id: string): Promise<void> {
 export type ContentListItem = {
   id: string; type: "article" | "project"; section: "blog" | "news" | "project"; slug: string; title: string; summary: string;
   revisionNo: number; isPublished: boolean; canEdit: boolean; hasUnpublishedChanges: boolean; updatedAt: string;
+  /** 利用者が設定した日付の表示（空なら未設定）と、並び順の日付（YYYY-MM-DD） */
+  dateLabel: string; sortDate: string | null;
+  /** カバー画像の表示URL（編集できる人は作業版、できない人は公開版）。無ければnull */
+  coverUrl: string | null;
+  /** 関わるメンバー（作者・共同編集者・表示する版の制作メンバー） */
+  members: { userId: string; displayName: string; avatarMediaId: string | null }[];
 };
 export type ContentDate = { label: string; kind: "day" | "month" | "range" | "unknown"; sortDate: string | null; sortDateIsEstimated: boolean };
 export type MediaInfo = { id: string; publicUrl: string; url: string; publicId: string; width: number; height: number; mimeType: string; byteSize: number; purpose: string };
 export type ContentRevision = {
   revisionNo: number; title: string; summary: string; markdown: string; metadata: Record<string, string>; date: ContentDate;
-  editedBy: string; createdAt: string; coverMedia: MediaInfo | null; contributors?: { userId: string; displayName: string; roleLabel: string }[];
+  editedBy: string; createdAt: string; coverMedia: MediaInfo | null; contributors?: { userId: string; displayName: string; roleLabel: string; avatarMediaId: string | null }[];
 };
 export type ContentDetail = {
   id: string; type: "article" | "project"; section: "blog" | "news" | "project"; slug: string;
-  creator: { userId: string; displayName: string }; workingRevision: ContentRevision; publishedRevisionNo: number | null;
-  collaborators: { userId: string; displayName: string }[]; revisions?: { revisionNo: number; title: string; editedBy: string; createdAt: string }[];
+  creator: { userId: string; displayName: string; avatarMediaId: string | null }; workingRevision: ContentRevision; publishedRevisionNo: number | null;
+  collaborators: { userId: string; displayName: string; avatarMediaId: string | null }[]; revisions?: { revisionNo: number; title: string; editedBy: string; createdAt: string }[];
   canManageCollaborators: boolean; canPublish: boolean; createdAt: string; updatedAt: string;
 };
 export type RevisionInput = {
@@ -289,14 +312,16 @@ export type RevisionInput = {
   metadata: Record<string, string | null>; date: { label: string; kind: string; sortDate: string | null };
   coverMediaId?: string | null;
 };
-export async function listContents(p: { section?: string; mine?: boolean; cursor?: string }) {
+export async function listContents(p: { section?: string; mine?: boolean; q?: string; status?: "published" | "draft" | ""; cursor?: string }) {
   const params = new URLSearchParams({ limit: "50" });
   if (p.section) params.set("section", p.section);
+  if (p.q) params.set("q", p.q);
+  if (p.status) params.set("status", p.status);
   if (p.mine) params.set("mine", "true");
   if (p.cursor) params.set("cursor", p.cursor);
   return ok<{ items: ContentListItem[]; nextCursor: string | null }>(await call("GET", `/contents?${params.toString()}`), 200);
 }
-export const createContent = async (b: { type: string; section: string; slug: string; title: string; markdown: string }) =>
+export const createContent = async (b: { type: string; section: string; slug: string; title: string; markdown: string; date?: { label: string; kind: string; sortDate: string | null } }) =>
   ok<ContentDetail>(await call("POST", "/contents", b), 201);
 export const getContent = async (id: string, revision?: number) =>
   ok<ContentDetail>(await call("GET", `/contents/${id}${revision ? `?revision=${revision}` : ""}`), 200);
@@ -332,7 +357,7 @@ export async function uploadMedia(file: File, purpose: "cms" | "avatar" | "inven
 }
 
 export const putCollaborators = async (id: string, userIds: string[]) =>
-  ok<{ collaborators: { userId: string; displayName: string }[] }>(await call("PUT", `/contents/${id}/collaborators`, { userIds }), 200);
+  ok<{ collaborators: { userId: string; displayName: string; avatarMediaId: string | null }[] }>(await call("PUT", `/contents/${id}/collaborators`, { userIds }), 200);
 
 /** 制作メンバーを置き換える（新しい版ができる）。baseRevisionは編集の元にした版の番号。 */
 export async function putContributors(id: string, baseRevision: number, contributors: { userId: string; roleLabel: string }[]): Promise<ContentDetail> {
