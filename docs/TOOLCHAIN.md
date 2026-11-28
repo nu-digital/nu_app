@@ -29,6 +29,7 @@
 | 実行イメージ | `gcr.io/distroless/static-debian12:nonroot`（digest固定） | 静的バイナリのみを非rootで実行。シェル・パッケージ管理を持たず攻撃面が小さい |
 | 配信イメージ（web） | `nginxinc/nginx-unprivileged:1.30.6-alpine`（digest固定） | nginx stable 1.30系（[endoflife.date](https://endoflife.date/nginx)でサポート中）。1.30.7は同イメージ未公開のため1.30.6 |
 | Nodeイメージ | `node:22.23.5-alpine`（digest固定） | `.node-version`と同版 |
+| motion | 14.14.0（`apps/admin`。完全固定。2026-11-13公開＝導入時に2週間以上経過。第2フェーズ #194） | ポータルのモーション（ヒーローのクロスフェード・出入り・一覧の並べ替え・トースト）。React 18/19対応（peer）、`LazyMotion`＋`m`で機能を遅延読み込み（レイアウト機能は初期表示のあとで別チャンク）。`npm audit`は0件。時間・イージングは `lib/motion.ts` と `app/ui.css` の `--motion-*` で共通化（[ui-overhaul-2 §3](design/ui-overhaul-2.md)） |
 | react-markdown / remark-gfm / rehype-raw / rehype-sanitize | 10.1.0 / 4.0.1 / 7.0.0 / 6.0.0（`apps/admin`。いずれも完全固定。P3-03a） | CMSのプレビュー。react-markdown・remark-gfm・rehype-rawは既存サイト（`apps/web`）と同じ版。`rehype-sanitize`は描画時のサニタイズ（保存型XSSの防壁）のため。`npm audit`は0件 |
 | unified / remark-parse / remark-rehype / rehype-stringify | 11.0.5 / 11.0.0 / 11.1.2 / 10.0.1（`apps/admin`のdevDependency。P3-03a） | サニタイズのテスト（`node --test`）で、プレビューと同じプラグインのパイプラインをHTML文字列にするため |
 | @charcoal-ui/react / @charcoal-ui/theme / @charcoal-ui/icons / react-aria / react-stately | 6.3.0 / 6.3.0 / 6.3.0 / 3.53.1 / 3.51.0（`apps/admin`。完全固定。#178 試験導入） | 管理ポータルのUI部品とデザイントークン（pixivのデザインシステムCharcoal、Apache-2.0）。react-aria・react-statelyはCharcoal Reactのpeer。iconsは同梱のSVGを読むアイコン（外部通信なし）。正式採用は代表画面で評価してから（[charcoal.md](design/charcoal.md)） |

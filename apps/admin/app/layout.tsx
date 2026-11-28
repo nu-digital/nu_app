@@ -6,6 +6,7 @@ import "@charcoal-ui/theme/css/v2/light.css";
 import "./globals.css";
 import "./charcoal-theme.css";
 import "./ui.css";
+import MotionProvider from "@/components/MotionProvider";
 import { ToastProvider } from "@/components/ui/Toast";
 
 export const metadata: Metadata = {
@@ -19,7 +20,7 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, them
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja" className="ch-token-v2">
-      <body><ToastProvider>{children}</ToastProvider></body>
+      <body><MotionProvider><ToastProvider>{children}</ToastProvider></MotionProvider></body>
     </html>
   );
 }

@@ -79,15 +79,18 @@ export async function runAdminUiE2E(o) {
       check(`[${label}] キーボードだけでログインできる`, true);
       const h1 = await page.getByRole('heading', { level: 1 }).innerText();
       check(`[${label}] ランチャーに表示名が出る`, h1.includes(o.memberName), h1);
-      check(`[${label}] 全員共通のカードが5枚あり、すべての機能が開ける（準備中のカードは無い）`, (await page.locator('.cards li').count()) === 5 && (await page.getByText('準備中').count()) === 0);
-      const broken = await page.evaluate(() => [...document.images].filter((i) => !i.complete || i.naturalWidth === 0).map((i) => i.getAttribute('src')));
+      check(`[${label}] 全員共通のカードが5枚あり、すべての機能が開ける（準備中のカードは無い）`, (await page.locator('.tiles li').count()) === 5 && (await page.getByText('準備中').count()) === 0);
+      // メインビジュアル（公開中の作品・記事の画像、無ければ団体写真）が表示されるまで待つ。画面の外の遅延読み込みの画像は対象外
+      await page.locator('[data-testid="hero-slide"] img').first().waitFor();
+      await page.waitForFunction(() => [...document.images].filter((i) => i.loading !== 'lazy').every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 15000 }).catch(() => {});
+      const broken = await page.evaluate(() => [...document.images].filter((i) => i.loading !== 'lazy' && (!i.complete || i.naturalWidth === 0)).map((i) => i.getAttribute('src')));
       check(`[${label}] 画像（ロゴ・団体写真）がすべて読み込まれる`, broken.length === 0, broken.join(','));
       const wrapped = await page.getByRole('button', { name: 'ログアウト' }).evaluate((el) => el.getBoundingClientRect().height <= 60);
       check(`[${label}] ログアウトボタンが折り返さない`, wrapped);
       check(`[${label}] ランチャーに横溢れがない`, (await overflow()) <= 0, `overflow=${await overflow()}`);
-      const hero = await page.locator('.hero img').boundingBox();
+      const hero = await page.locator('.home-hero .hero-slide img').first().boundingBox();
       check(`[${label}] 団体写真が大きく表示される（幅いっぱい・高さ ${label === 'pc' ? '300' : '200'}px以上）`, !!hero && hero.width >= width - 1 && hero.height >= (label === 'pc' ? 300 : 200), JSON.stringify(hero));
-      const small = await page.locator('button, a.card, .toggle').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 44; }).length);
+      const small = await page.locator('button, a.tile, a.recent-card, a.shortcut, .toggle').evaluateAll((els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.height < 44; }).length);
       check(`[${label}] ボタン・リンクの高さが44px以上`, small === 0, `44px未満=${small}`);
       await shot('launcher');
 

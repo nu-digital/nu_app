@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Button from "@/components/ui/Button";
+import FeatureIcon from "@/components/ui/FeatureIcon";
+import { FEATURES } from "@/lib/features";
 
 
 /**
@@ -10,13 +12,7 @@ import Button from "@/components/ui/Button";
  * アプリの切り替え（nav）はランチャー以外の画面だけに出す。ランチャーではカードが同じ役割を持つため。
  * 全員に同じ項目を出す（権限はAPIが強制する。画面の表示・非表示では制御しない）。
  */
-const NAV = [
-  { href: "/inventory", label: "物品" },
-  { href: "/contents", label: "記事・作品" },
-  { href: "/members", label: "メンバー" },
-  { href: "/profile", label: "プロフィール" },
-  { href: "/admin/users", label: "ユーザー管理" },
-];
+const NAV = FEATURES.map((f) => ({ href: f.href, label: f.key === "profile" ? "プロフィール" : f.title, icon: f.icon }));
 
 type Props = { displayName: string; onLogout: () => void; busy: boolean; showNav?: boolean };
 
@@ -47,7 +43,7 @@ export default function AppHeader({ displayName, onLogout, busy, showNav = true 
               return (
                 <li key={n.href}>
                   <Link href={n.href} aria-current={current ? "page" : undefined}>
-                    {n.label}
+                    <FeatureIcon name={n.icon} size={16} />{n.label}
                   </Link>
                 </li>
               );

@@ -1,6 +1,7 @@
 "use client";
 
 import { previewUrlTransform } from "@/lib/markdown-preview.mjs";
+import { AnimatePresence, m } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -15,6 +16,7 @@ import { useToast } from "@/components/ui/Toast";
 import { AvatarStack } from "@/components/ui/Avatar";
 import { CardSkeleton, EmptyState } from "@/components/ui/States";
 import { deleteContent, describe, listContents, type ContentListItem } from "@/lib/api";
+import { duration, ease } from "@/lib/motion";
 
 export default function ContentsPage() {
   return <AppShell>{() => <Contents />}</AppShell>;
@@ -58,7 +60,8 @@ function Contents() {
   const [items, setItems] = useState<ContentListItem[]>([]);
   const [next, setNext] = useState<string | null>(null);
   const [text, setText] = useState("");
-  const [f, setF] = useState<Filters>(INITIAL);
+  // ホームの「すべて見る」（?type=project など）から開いたときは、最初から絞り込む
+  const [f, setF] = useState<Filters>(() => { const t = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("type") : null; return { ...INITIAL, type: t === "article" || t === "project" ? t : "" }; });
   const [loadedKey, setLoadedKey] = useState("");
   const [more, setMore] = useState(false);
   const [error, setError] = useState("");
@@ -145,6 +148,7 @@ function Contents() {
         </EmptyState>
       ) : (
         <ul className="grid content-grid">
+          <AnimatePresence mode="popLayout" initial={false}>
           {items.map((c) => {
             const body = (
               <>
@@ -157,7 +161,7 @@ function Contents() {
               </>
             );
             return (
-              <li key={c.id} data-slug={c.slug}>
+              <m.li key={c.id} data-slug={c.slug} layout="position" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: duration.base, ease: ease.out }}>
                 {c.canEdit ? (
                   <Link className="item-card" href={`/contents/${c.id}`} data-title={c.title}>{body}</Link>
                 ) : (
@@ -173,9 +177,10 @@ function Contents() {
                     ]} />
                   </div>
                 )}
-              </li>
+              </m.li>
             );
           })}
+          </AnimatePresence>
         </ul>
       )}
       <Dialog

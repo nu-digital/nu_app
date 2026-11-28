@@ -35,6 +35,7 @@
 | [DESIGN](DESIGN.md) | UI・デザインの方針 |
 | [FRONTEND](FRONTEND.md) | フロントエンドの現状、単体開発・モック・共通部品の比較と段階導入案（レビュー待ち） |
 | [design/ui-overhaul.md](design/ui-overhaul.md) | **UI/UX大改善プロジェクトの計画・仕様・進捗**（物品・記事・プロフィール・全体。実施中） |
+| [design/ui-overhaul-2.md](design/ui-overhaul-2.md) | **UI/UX第2フェーズ**（物品の返却・カテゴリ、記事の削除・編集画面、ホーム・モーション）と、**ポータル全体のデザイン原則・モーション設計** |
 | [design/](design/) | 設計メモ（履歴。各ファイル冒頭に状態を書く）: 認証・内部UI・CMS・メディア・公式サイト配信・**ぬる（`nul-agent.md`=仕様v0.1、`nul-agent-p1.md`=P1計画、`nul-admin-dashboard.md`=管理画面の設計）** |
 | [LEGACY_SITE](LEGACY_SITE.md)・[legacy-baseline/](legacy-baseline/README.md) | 既存公式サイトの調査と、移設前の比較基準（P0時点の記録） |
 
