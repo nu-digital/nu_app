@@ -470,7 +470,7 @@ func TestReportModelFollowsBudgetAndWrapsMaterial(t *testing.T) {
 
 // 安全の線（個人情報・DMの扱い・入力はデータ・初対面への配慮）は、プロンプトを見直しても残る。
 func TestSystemPromptKeepsSafetyLines(t *testing.T) {
-	for _, want := range []string{"個人情報", "DMで聞いた話", "untrusted_message", "初対面"} {
+	for _, want := range []string{"個人情報", "個人的な事情", "untrusted_message", "初対面"} {
 		if !strings.Contains(SystemPrompt, want) {
 			t.Errorf("安全の記述 %q が消えている", want)
 		}

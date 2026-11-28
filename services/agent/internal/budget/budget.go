@@ -66,6 +66,7 @@ type Config struct {
 	AnchorDay       int            // 月の始まり（クレジットの付与日。1〜28。既定1）
 	ReplyPerUserDay int            // 一人あたりの1日の返答の上限（既定20）
 	OpusPerUserDay  int            // 一人あたりの1日のOpus依頼の上限（既定3）
+	RemindPerUserDay int            // 一人あたりの1日のリマインダー作成の上限（既定10）
 	WebPerUserDay   int            // 一人あたりの1日のWeb検索の依頼の上限（既定5）
 	Location        *time.Location // 日付の基準（JST）
 }
@@ -82,6 +83,9 @@ func (c Config) withDefaults() Config {
 	}
 	if c.OpusPerUserDay <= 0 {
 		c.OpusPerUserDay = 3
+	}
+	if c.RemindPerUserDay <= 0 {
+		c.RemindPerUserDay = 10
 	}
 	if c.WebPerUserDay <= 0 {
 		c.WebPerUserDay = 5
@@ -224,7 +228,7 @@ func (t *Tracker) PreviousPeriod(ctx context.Context) (spent int64, start time.T
 // Limit は月の上限（マイクロドル）。
 func (t *Tracker) Limit() int64 { return t.cfg.LimitMicro }
 
-// AllowUser は、一人あたりの1日の上限（連打対策）。kind は "reply"・"opus"・"web"。数えてから判定する（上限を超えた回は拒否）。
+// AllowUser は、一人あたりの1日の上限（連打対策）。kind は "reply"・"opus"・"web"・"remind"。数えてから判定する（上限を超えた回は拒否）。
 func (t *Tracker) AllowUser(ctx context.Context, userID int64, kind string) (bool, error) {
 	limit := t.cfg.ReplyPerUserDay
 	switch kind {
@@ -232,6 +236,8 @@ func (t *Tracker) AllowUser(ctx context.Context, userID int64, kind string) (boo
 		limit = t.cfg.OpusPerUserDay
 	case "web":
 		limit = t.cfg.WebPerUserDay
+	case "remind":
+		limit = t.cfg.RemindPerUserDay
 	}
 	n, err := t.l.IncDaily(ctx, t.now().In(t.cfg.Location), userID, kind)
 	if err != nil {

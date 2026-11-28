@@ -1,5 +1,5 @@
 // Package responder は「いつ・どこで・だれに応えるか」の判断と、応答の実行。
-// 仕様 §3: timesは自由。ほかのチャンネルは「メンション＋メッセージ」か、ぬるの返信へのリプライのときだけ。DMは受ける。
+// 仕様 §3: timesは自由。ほかのチャンネルは「メンション＋メッセージ」か、ぬるの返信へのリプライのときだけ。DMは受けない。
 // Botには応えない（ループ防止）。停止中（stopped）は応えない。許可リストの送信（Sender）だけを使う。ログにメッセージ本文を出さない。
 package responder
 
@@ -110,7 +110,7 @@ func (r *Responder) Decide(in discord.Incoming) bool {
 		return false // 全停止
 	}
 	if m.GuildID == 0 {
-		return true // DM
+		return false // DMは応えない（第3フェーズ P0。Gateway側でも受信しない二重の防御）
 	}
 	if m.ChannelID == r.TimesChannel && (m.ThreadID == nil) {
 		return true // timesは自由（来た人と会話する）
@@ -147,7 +147,7 @@ func (r *Responder) Handle(ctx context.Context, in discord.Incoming) {
 		return
 	}
 	out, err := r.Brain.Reply(ctx, brain.Input{UserID: m.AuthorID, ChannelID: m.ChannelID, AuthorName: m.AuthorName, Where: r.where(m),
-		History: hist, Text: text, Images: imgs, IsDM: m.GuildID == 0, MessageID: m.ID, TargetID: target(m)})
+		History: hist, Text: text, Images: imgs, IsDM: false, MessageID: m.ID, TargetID: target(m)})
 	switch {
 	case errors.Is(err, brain.ErrAsleep):
 		_ = r.Send.React(ctx, target(m), m.ID, emojiAsleep)

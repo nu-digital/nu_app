@@ -67,6 +67,8 @@ type Brain struct {
 
 const (
 	maxToolRounds = 3
+	// maxToolCallsPerReply は、1回の返答で実行するツール呼び出しの総数の上限（ラウンドをまたいで数える）。
+	maxToolCallsPerReply = 6
 	maxReplyRunes = 1800
 	refusalText   = "それは答えられない。別の聞き方にして。"
 )
@@ -119,6 +121,7 @@ func (b *Brain) Reply(ctx context.Context, in Input) (Output, error) {
 		}
 	}
 
+	calls := 0
 	for round := 0; ; round++ {
 		resp, err := b.call(ctx, llm.Request{Model: llm.Sonnet, MaxTokens: 1500, Effort: "low", System: SystemPrompt, Tools: tools(), Messages: msgs, Purpose: "chat"}, in)
 		if err != nil {
@@ -142,6 +145,11 @@ func (b *Brain) Reply(ctx context.Context, in Input) (Output, error) {
 		msgs = append(msgs, resp.Assistant)
 		var results []llm.Block
 		for _, tu := range resp.ToolUses {
+			calls++
+			if calls > maxToolCallsPerReply { // 1回の返答でのツール呼び出しの総数の上限（実行しない）
+				results = append(results, llm.Block{Type: llm.ToolResult, ToolUseID: tu.ID, IsError: true, Text: "この返答でのツール呼び出しの上限。実行しない"})
+				continue
+			}
 			results = append(results, b.runTool(ctx, in, tu, &out))
 		}
 		msgs = append(msgs, llm.Message{Role: llm.User, Blocks: results})
