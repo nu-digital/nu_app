@@ -1,0 +1,58 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+/**
+ * ポータル共通のヘッダー（Charcoal風。ロゴ・アプリの切り替え・表示名・ログアウト）。
+ * アプリの切り替え（nav）はランチャー以外の画面だけに出す。ランチャーではカードが同じ役割を持つため。
+ * 全員に同じ項目を出す（権限はAPIが強制する。画面の表示・非表示では制御しない）。
+ */
+const NAV = [
+  { href: "/inventory", label: "物品" },
+  { href: "/contents", label: "記事・作品" },
+  { href: "/members", label: "メンバー" },
+  { href: "/profile", label: "プロフィール" },
+  { href: "/admin/users", label: "ユーザー管理" },
+];
+
+type Props = { displayName: string; onLogout: () => void; busy: boolean; showNav?: boolean };
+
+export default function AppHeader({ displayName, onLogout, busy, showNav = true }: Props) {
+  const pathname = usePathname() ?? "/";
+  return (
+    <header className="app-header">
+      <div className="app-header-bar">
+        <Link className="brand" href="/" aria-label="nu_digital ポータル（ランチャーへ）">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/logo.webp" alt="" width={32} height={32} />
+          <span className="brand-text">nu_digital ポータル</span>
+        </Link>
+        <div className="who">
+          <span className="name" title={displayName}>
+            {displayName}
+          </span>
+          <button className="btn secondary inline" onClick={onLogout} disabled={busy}>
+            ログアウト
+          </button>
+        </div>
+      </div>
+      {showNav && (
+        <nav className="app-nav" aria-label="アプリ">
+          <ul>
+            {NAV.map((n) => {
+              const current = pathname === n.href || pathname.startsWith(n.href + "/") || (n.href === "/admin/users" && pathname.startsWith("/admin/"));
+              return (
+                <li key={n.href}>
+                  <Link href={n.href} aria-current={current ? "page" : undefined}>
+                    {n.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      )}
+    </header>
+  );
+}

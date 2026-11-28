@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
+import AppHeader from "@/components/AppHeader";
 import {
-  createUser, deletePrivateProfile, describe, fetchMe, getPrivateProfile, issueLink, listUsers, setRole, setUserStatus,
+  createUser, deletePrivateProfile, describe, fetchMe, getPrivateProfile, issueLink, listUsers, logout, setRole, setUserStatus,
   type AdminUser, type LinkResult, type Me, type PrivateProfile,
 } from "@/lib/api";
 
@@ -32,6 +33,7 @@ export default function UsersPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [anonymize, setAnonymize] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [addOpen, setAddOpen] = useState(false); // スマホで一覧が埋もれないよう、追加フォームは折りたたんでおく
   const noticeRef = useRef<HTMLDivElement>(null);
 
@@ -111,16 +113,18 @@ export default function UsersPage() {
 
   return (
     <>
-      <header className="app-header">
-        <Link className="brand" href="/">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/logo.webp" alt="" width={36} height={36} />
-          <span className="brand-text">nu_digital ポータル</span>
-        </Link>
-        <Link className="btn secondary inline" href="/">
-          ランチャーへ
-        </Link>
-      </header>
+      <AppHeader
+        displayName={me?.user.displayName ?? ""}
+        busy={loggingOut}
+        onLogout={async () => {
+          setLoggingOut(true);
+          try {
+            await logout();
+          } finally {
+            router.replace("/login");
+          }
+        }}
+      />
       <main className="page">
         <h1>ユーザー管理</h1>
         <nav className="subnav" aria-label="管理のメニュー"><Link className="btn secondary inline" href="/admin/legacy-authors">既存記事の投稿者</Link> <Link className="btn secondary inline" href="/admin/published-search">公開版の本人情報の確認</Link></nav>
