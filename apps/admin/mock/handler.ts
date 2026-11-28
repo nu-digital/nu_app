@@ -85,7 +85,12 @@ export function createMock(opts: MockOptions = {}) {
 
     // プロフィール・メンバー
     if (p === "/me/profile" && method === "GET") return { status: 200, json: { ...db.profile, displayName: ROLE_USERS[role].displayName } };
-    if (p === "/me/profile" && method === "PATCH") { Object.assign(db.profile, b); return { status: 200, json: db.profile }; }
+    if (p === "/me/profile" && method === "PATCH") {
+      const { legalName, universityEmail, studentNumber, nearestStation, ...rest } = b;
+      Object.assign(db.profile, rest);
+      for (const [k, v] of Object.entries({ legalName, universityEmail, studentNumber, nearestStation })) if (v !== undefined) (db.profile.private as Record<string, unknown>)[k] = v === "" ? null : v;
+      return { status: 200, json: db.profile };
+    }
     if (p === "/me/profile/visibility") { Object.assign(db.profile.visibility, b); return { status: 200, json: db.profile }; }
     if (p === "/me/profile/public-credit-consent") { db.profile.publicCreditConsent = { granted: Boolean(b.granted), grantedAt: b.granted ? db.now : null, withdrawnAt: b.granted ? null : db.now }; return { status: 200, json: db.profile.publicCreditConsent }; }
     if (p.startsWith("/me/")) return { status: method === "POST" ? 201 : method === "DELETE" ? 204 : 200, json: method === "DELETE" ? undefined : {} };

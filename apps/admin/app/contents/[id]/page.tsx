@@ -299,7 +299,7 @@ function Editor() {
               // eslint-disable-next-line @next/next/no-img-element
               <img className="preview-cover" src={coverSrc} alt="カバー画像" />
             )}
-            <h1 className="preview-title">{form.title || "（タイトル未入力）"}</h1>
+            <div className="preview-title" role="presentation">{form.title || "（タイトル未入力）"}</div>
             <p className="meta">{[SECTION[doc.section], shownDate].filter(Boolean).join(" ・ ")}</p>
             <div className="preview-people">{people.slice(0, 6).map((p) => <span key={p.userId} className="preview-person"><Avatar name={p.displayName} mediaId={p.avatarMediaId} size={24} />{p.displayName}</span>)}</div>
             <MarkdownPreview markdown={form.markdown} />
