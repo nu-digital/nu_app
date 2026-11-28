@@ -12,6 +12,9 @@ test('形の比較: キーの過不足と型の違いを検出し、値の違い
   assert.deepEqual(compareShapes({ a: [] }, { a: {} }), ['$.a: モック=array 実API=object']);
   assert.deepEqual(compareShapes({ a: null }, { a: { b: 1 } }), []);
   assert.deepEqual(compareShapes({ items: [{ id: 1 }] }, { items: [{ id: 2, extra: 1 }] }), ['$.items[0].extra: 実APIにあり、モックに無い']);
+  // metadata は記事ごとに自由なキーを持つため、中のキーは比べない（オブジェクトであることだけ）
+  assert.deepEqual(compareShapes({ metadata: { category: 'x' } }, { metadata: { image: 'y' } }), []);
+  assert.deepEqual(compareShapes({ metadata: {} }, { metadata: [] }), ['$.metadata: モック=object 実API=array']);
 });
 
 test('比較対象のAPIは、モックがすべて200で応答する', async () => {
