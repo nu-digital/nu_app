@@ -213,10 +213,10 @@ try {
       for (const [k, path] of Object.entries(listOf)) { realIds[k] = await realFirst(path); mockIds[k] = mockFirst(path); }
       const diffs = [], skipped = [];
       for (const path of CONTRACT_PATHS) {
-        const key = path.match(/:(w+)/)?.[1];
+        const key = path.match(/:(\w+)/)?.[1];
         if (key && !realIds[key]) { skipped.push(path); continue; }
-        const real = await call('GET', path.replace(/:(w+)/, (_, k) => realIds[k]), { cookie: oc });
-        const m = mock('GET', '/api/v1' + path.replace(/:(w+)/, (_, k) => mockIds[k]), 'owner');
+        const real = await call('GET', path.replace(/:(\w+)/, (_, k) => realIds[k]), { cookie: oc });
+        const m = mock('GET', '/api/v1' + path.replace(/:(\w+)/, (_, k) => mockIds[k]), 'owner');
         if (real.status !== 200 || m.status !== 200) { diffs.push(`${path}: status 実API=${real.status} モック=${m.status}`); continue; }
         diffs.push(...compareShapes(m.json, real.json, OPTIONAL_KEYS, path));
       }
