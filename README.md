@@ -61,6 +61,8 @@ Go 1.27・PostgreSQL 18（pgx・goose・sqlc）／Next.js 16・React・Node 22�
 
 ## すぐ試す（ローカル）
 
+**画面を編集する人**は、Gitと指定版のNode.jsで公式サイトまたはポータルのログイン画面を起動できます。Windowsでも使える手順は [LOCAL_DEV](docs/LOCAL_DEV.md)、認証後の画面モック・共通UIの導入案は [FRONTEND](docs/FRONTEND.md) にあります。システム全体の起動は次の手順です。
+
 ```sh
 cp .env.example .env && npm run dev:up    # db・api・bot・web・adminを起動（Docker）。詳細: docs/LOCAL_DEV.md
 node scripts/check.mjs                    # 文書・設定の準備用チェック（アプリの機能テストではない）

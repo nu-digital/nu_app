@@ -32,6 +32,8 @@
 
 ## 作業の進め方
 
+この文書はCodex・Claude Code・他の開発ツールで共通とする。フロントエンドは [docs/LOCAL_DEV.md](docs/LOCAL_DEV.md) と [docs/DESIGN.md](docs/DESIGN.md) を参照し、[調査・計画](docs/FRONTEND.md) の未決定項目は実装済みと扱わない。OSや担当ツールをまたぐ引き継ぎには対象SHA・操作した画面・再現条件を残す。
+
 各タスク開始時に、(1)対象要件、(2)影響範囲、(3)DB変更、(4)API変更、(5)必要なテスト、(6)ロールバックの考え方を短くまとめる。変更後は、実行したコマンドと実測結果、未実施の検証を報告する。「テスト成功」と主張するときは必ず実行したことを示す。
 
 - GitHubは `nu-digital/nu_app`。短命ブランチ `<type>/<issue番号>-<英小文字の要約>`、コミット・Issue・PR・引き継ぎは日本語。詳細は `docs/DEVELOPMENT.md`。
