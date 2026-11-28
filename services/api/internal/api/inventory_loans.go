@@ -416,7 +416,7 @@ func (s *server) history(w http.ResponseWriter, r *http.Request) {
 		// 訂正イベントのとき: kind=correction、correctionKind=adjust/void、targetType=loan/return。actor=訂正した人。
 		CorrectionKind string `json:"correctionKind,omitempty"`
 		TargetType     string `json:"targetType,omitempty"`
-		Reason         string `json:"reason,omitempty"` // 理由は管理者にだけ返す（自由記述のため）
+		Reason         string `json:"reason,omitempty"`   // 理由は管理者にだけ返す（自由記述のため）
 		Location       string `json:"location,omitempty"` // 返却した場所（返却のイベントだけ）
 	}
 	items := make([]event, 0, len(rows))

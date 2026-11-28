@@ -45,7 +45,7 @@ type unitView struct {
 	SerialNumber *string     `json:"serialNumber"`
 	State        string      `json:"state"`
 	Loaned       *loanedView `json:"loaned"`
-	Mine         bool        `json:"mine"` // 自分が借りている個体
+	Mine         bool        `json:"mine"`             // 自分が借りている個体
 	LoanID       string      `json:"loanId,omitempty"` // 貸出中の個体の貸出ID（詳細画面から返却するため）
 }
 
