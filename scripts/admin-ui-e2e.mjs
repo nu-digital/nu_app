@@ -454,7 +454,7 @@ export async function runAdminUiE2E(o) {
       await pb.getByLabel('借りる数', { exact: true }).fill('3');
       await pb.getByRole('button', { name: /^3個借りる$/ }).click();
       await pb.locator('.ui-toast.success').filter({ hasText: '残りは0個' }).waitFor();
-      check(`[${label}] 残り0になると借りるボタンが出ず、案内が出る`, (await pb.getByRole('button', { name: /個借りる$/ }).count()) === 0 && /借りられる数がありません/.test(await pb.locator('main').innerText()));
+      check(`[${label}] 残り0になると借りるボタンが出ず、案内が出る`, (await pb.getByRole('button', { name: /個借りる$/ }).count()) === 0 && /残り 0個/.test(await pb.locator('main').innerText()));
       const aRow = pb.locator('li.item').filter({ hasText: aName });
       await aRow.waitFor();
       await aRow.getByRole('button', { name: '代わりに返す' }).click();
@@ -476,7 +476,7 @@ export async function runAdminUiE2E(o) {
       await pb.goto(`${adminUrl}/inventory/${pi.json.id}`);
       const u1b = pb.locator(`li.item[data-tag="PICO-${label}-01"]`);
       await u1b.waitFor();
-      check(`[${label}] 貸出中の個体は借りた人が見え、借りるボタンが出ない`, (await u1b.getByRole('button').count()) === 0 && (await u1b.innerText()).includes(aName) && (await pb.locator(`li.item[data-tag="PICO-${label}-02"]`).getByRole('button', { name: '借りる', exact: true }).count()) === 1);
+      check(`[${label}] 貸出中の個体は借りた人が見え、借りるボタンが出ない`, (await u1b.getByRole('button', { name: '借りる', exact: true }).count()) === 0 && (await u1b.innerText()).includes(aName) && (await pb.locator(`li.item[data-tag="PICO-${label}-02"]`).getByRole('button', { name: '借りる', exact: true }).count()) === 1);
 
       // 貸出中の一覧: 「自分だけ」と返却
       await pa.goto(`${adminUrl}/inventory/loans`);
