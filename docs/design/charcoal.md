@@ -36,3 +36,29 @@ WindowsのGit管理外に最小のApp Routerアプリを作成。Node 22.23.5、
 1. 計画確認後の試作PRで、ログイン画面のボタン1個と入力1個に適用する。既存CSSとの競合、TypeScript、SSRと操作、コントラスト、JS/CSSサイズの増分を現行と比較する。
 2. 次のPRでIcon・ModalをStorybookに登録し、別のメンバーが使用例だけで再利用できるか確認する。アイコンの読み込み元、ModalのEsc・フォーカス復帰、入力エラー通知を実ブラウザーで確認する。
 3. 合格した部品を物品一覧・ランチャーへ順に展開し、採用版をTOOLCHAINに記録する。問題が出た場合は該当部品のPR単位で戻せる。DB・API変更は不要。
+
+## 試作の結果（判断点1、#178）
+
+2026-11-28、Windows 11 / Node 22.23.5 / Claude Code。ログイン画面の「ログインID」入力と「ログイン」ボタンだけをCharcoalに置き換えた。パスワード欄（`PasswordField`）は招待・再設定と共用のため現行のまま。
+
+- **導入した依存**（完全固定）: `@charcoal-ui/react` 6.3.0、`@charcoal-ui/theme` 6.3.0、peerの `react-aria` 3.53.1・`react-stately` 3.51.0。Reactは19.2.3の単一版のまま（`npm ls` で確認）。`@charcoal-ui/icons` はreactの依存として入るが、まだ使っていない。
+- **構成**: `app/layout.tsx` で `layered.css`（`@layer charcoal`）→ `theme/css/v2/light.css` → 既存の `globals.css` → 団体の上書き `app/charcoal-theme.css` の順に読み、`<html class="ch-token-v2">`。画面は `components/ui/Button`・`components/ui/TextField` だけをimportし、`@charcoal-ui/react` を直接importしない。
+- **団体側で上書きしたもの**（`charcoal-theme.css`）: 主操作の色を団体色 `#004aad`（hover `#003580`）へ、タップ寸法を40px→44px（`--tap`）へ、フォーカス表示をポータル共通の二重リング（`--focus`）へ。Charcoal既定の淡い青のリングは白地で見えにくいため。`TextField` はCharcoal既定の `showLabel=false` だとラベルが視覚的に隠れるので、共通部品で常に表示に固定した。
+- **上書き時の注意**: 全体の `:focus-visible` が `border-radius: 4px` を付けるため、丸いボタンではフォーカス時の角丸を打ち消している。Charcoalの部品CSSはレイヤー内なので、レイヤーなしの既存CSS（`*`・`p`・`h1` 等）が常に勝つ。今回の範囲では崩れは見られなかった。
+
+| 確認 | 結果 |
+|---|---|
+| `tsc --noEmit`・`eslint .`・`npm test`（admin） | 終了0。テスト7件成功 |
+| `next build` | 終了0。19ルートを事前描画 |
+| `/login` が読むJS（事前描画HTMLの参照分） | 580,485B → 588,637B（gzip 178,441B → 181,369B、**+2.9KB**） |
+| 全画面共通のCSS | 13,020B → 98,259B（gzip 3,111B → 14,529B、**+11.4KB**）。`layered.css` に全部品のCSSが入っており、部品単位のCSSは公開されていない |
+| Edge（アプリ内ブラウザー、`next dev`・APIは停止）で操作 | ラベルと入力が関連付き（textbox「ログインID」）。Tabで ID→パスワード→表示する→ログイン の順。Enterで送信し、通信失敗の通知にフォーカスが移り入力は保持。ボタンの背景 `rgb(0,74,173)`・高さ44px、フォーカス時に二重リング。375px幅で崩れなし |
+
+**分かった課題（採否の判断材料）**
+
+1. 見た目の混在: Charcoalの入力は枠なし・薄い灰色の塗り、既存の入力は2pxの枠。1画面に両方あると不統一に見える。展開するなら `PasswordField` を `TextField` の `suffix` で作り直し、招待・再設定も同時に移す。
+2. 入力欄の境界: 灰色の塗りは白いカード上で境界が弱い（既存の枠線 `#c9d0dc` も白との比は約1.5:1で、どちらも非テキストのコントラスト3:1に届かない）。団体テーマで枠線を付けるか、塗りを濃くするかを決める。
+3. CSSの増分 +11.4KB（gzip）は内部ポータルとしては許容範囲と考えるが、使う部品が増えなくても全量を読む。
+4. ボタンの形はCharcoal標準の丸型のまま。団体の角丸（`--radius`）に寄せるかは見た目の判断として残す。
+
+次の判断点2（Icon・ModalとStorybook）に進む前に、上の1・2の方針を運用責任者が決める。
