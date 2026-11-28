@@ -1082,7 +1082,7 @@ export async function runAdminUiE2E(o) {
       }
       await wp.getByRole('button', { name: 'メンバーを保存する' }).click();
       await wp.locator('.ui-toast.success').filter({ hasText: 'メンバーを保存しました' }).waitFor();
-      check(`[${label}] 制作メンバーを保存すると新しい版（版2）になり、作者と2人が並ぶ`, (await wp.locator('[data-testid="members"] [data-person]').count()) === 3 && /版2/.test(await wp.locator('main').innerText()));
+      check(`[${label}] 制作メンバーを保存すると新しい版（版2）になり、作者と2人が並ぶ`, (await wp.locator('[data-testid="members"] [data-person]').count()) === 3 && /作業中の版 2/.test(await wp.locator('main').innerText()));
       if (o.shotsDir) await wp.screenshot({ path: join(o.shotsDir, `${label}-cms-contributors.png`), fullPage: true });
       await ep.goto(`${adminUrl}/contents/${pid}`);
       await ep.getByRole('button', { name: '版2を公開する' }).first().waitFor();
@@ -1096,6 +1096,7 @@ export async function runAdminUiE2E(o) {
       // プロフィールの制作実績: 本人には常に、他のメンバーには同意が続く間だけ
       const [ac, ap] = await newCtx(ids.a);
       await ap.goto(`${adminUrl}/profile`);
+      await ap.locator('.settings-tabs').getByText('アカウント', { exact: true }).click();
       await ap.locator('[data-testid="works"] li').first().waitFor();
       check(`[${label}] 本人のプロフィールに、公開された作品が制作実績として出る（役割つき）`, /作品の記事/.test(await ap.locator('[data-testid="works"]').innerText()) && /企画/.test(await ap.locator('[data-testid="works"]').innerText()));
       await wp.goto(`${adminUrl}/members/${ids.a.userId}`);
@@ -1107,6 +1108,7 @@ export async function runAdminUiE2E(o) {
       await wp.getByRole('heading', { level: 1 }).waitFor();
       check(`[${label}] 同意を取り消すと、他のメンバーからは制作実績が見えなくなる（本人には見える）`, (await wp.locator('[data-testid="works"]').count()) === 0);
       await ap.reload();
+      await ap.locator('.settings-tabs').getByText('アカウント', { exact: true }).click();
       await ap.locator('[data-testid="works"] li').first().waitFor();
       check(`[${label}] 制作実績の表示に横溢れがない`, (await overflowOf(ap)) <= 0, `overflow=${await overflowOf(ap)}`);
       await ac.close(); await wc.close(); await ec.close();
