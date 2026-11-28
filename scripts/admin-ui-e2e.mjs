@@ -428,10 +428,10 @@ export async function runAdminUiE2E(o) {
       await pa.locator(`a.item-card[data-name="${cable}"]`).waitFor();
       // 状態の表示: 全部貸出可能のあいだは「貸出可能」。カテゴリ・「貸出可能」で絞れる
       check(`[${label}] 貸出可能な物品に「貸出可能」の札が出る`, /貸出可能/.test(await pa.locator(`a.item-card[data-name="${cable}"]`).innerText()));
-      await pa.getByRole('button', { name: '貸出可能', exact: true }).click();
+      await pa.locator('button.chip[data-status="available"]').click();
       await pa.waitForTimeout(600);
       check(`[${label}] 「貸出可能」で貸出可能な物品が残る`, (await pa.locator(`a.item-card[data-name="${cable}"]`).count()) === 1);
-      await pa.getByRole('button', { name: '貸出可能', exact: true }).click();
+      await pa.locator('button.chip[data-status="available"]').click();
       await pa.locator(`a.item-card[data-name="${cable}"]`).waitFor();
 
       // 数量管理: 2個借りる → 残り3
@@ -511,11 +511,11 @@ export async function runAdminUiE2E(o) {
       await pa.goto(`${adminUrl}/inventory`);
       await pa.locator('.item-card').first().waitFor();
       const allCards = await pa.locator('.item-card').count();
-      await pa.getByRole('button', { name: '貸出中', exact: true }).click();
+      await pa.locator('button.chip[data-status="loaned"]').click();
       await pa.waitForFunction((n) => document.querySelectorAll('.item-card').length < n, allCards);
       const loanedNames = await pa.locator('.item-card').allInnerTexts();
       check(`[${label}] 「貸出中」で絞り込める`, loanedNames.length >= 1 && loanedNames.every((t) => /貸出中/.test(t)), JSON.stringify(loanedNames));
-      await pa.getByRole('button', { name: '貸出中', exact: true }).click();
+      await pa.locator('button.chip[data-status="loaned"]').click();
       await pa.waitForFunction((n) => document.querySelectorAll('.item-card').length === n, allCards);
       check(`[${label}] 絞り込みを解除すると全件に戻る`, (await pa.locator('.item-card').count()) === allCards);
 
