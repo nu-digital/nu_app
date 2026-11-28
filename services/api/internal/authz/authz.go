@@ -260,6 +260,7 @@ var table = []Action{
 	{"contents.list", "GET", "/contents", anyMember},
 	{"contents.create", "POST", "/contents", anyMember},
 	{"contents.get", "GET", "/contents/{id}", rule{roles: editorPlus, relations: []relation{author, collaborator}}},
+	{"contents.delete", "DELETE", "/contents/{id}", rule{roles: editorPlus, relations: []relation{author}}}, // 公開中の記事は、ハンドラーでEditor以上に限る
 	{"contents.revisions.create", "POST", "/contents/{id}/revisions", rule{roles: editorPlus, relations: []relation{author, collaborator}}},
 	{"contents.collaborators.update", "PUT", "/contents/{id}/collaborators", rule{roles: editorPlus, relations: []relation{author}}},
 	{"contents.contributors.update", "PUT", "/contents/{id}/contributors", rule{roles: editorPlus, relations: []relation{author, collaborator}}},

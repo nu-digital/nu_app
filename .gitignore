@@ -22,3 +22,6 @@ Thumbs.db
 
 # Goのビルド成果物（コミットしない）
 /services/bot/bot
+
+# 画面確認のスクリーンショット・録画（Playwright。コミットしない）
+artifacts/

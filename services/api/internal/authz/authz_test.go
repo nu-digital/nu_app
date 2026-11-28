@@ -114,6 +114,7 @@ var wantNoRelation = map[string][]string{
 	"contents.contributors.update":  editorUp,
 	"contents.publish":              editorUp,
 	"contents.unpublish":            editorUp,
+	"contents.delete":               editorUp,
 	// 他人が上げた画像
 	"media.get":           editorUp,
 	"media.get_by_public": editorUp,
@@ -159,6 +160,8 @@ func TestRelations(t *testing.T) {
 		{"contents.collaborators.update", "member", Resource{IsAuthor: true}, true},
 		{"contents.collaborators.update", "member", Resource{IsCollaborator: true}, false}, // 共同編集者は共同編集者を変更できない
 		{"contents.publish", "member", Resource{IsAuthor: true}, false},
+		{"contents.delete", "member", Resource{IsAuthor: true}, true},
+		{"contents.delete", "member", Resource{IsCollaborator: true}, false}, // 共同編集者は削除できない
 		{"contents.unpublish", "member", Resource{IsAuthor: true, IsCollaborator: true}, false},
 		{"contents.get", "member", Resource{}, false},
 		// 停止中の作者は何もできない

@@ -63,6 +63,21 @@ func (q *Queries) ActorRolesForShare(ctx context.Context, userID pgtype.UUID) ([
 	return items, nil
 }
 
+const archiveContent = `-- name: ArchiveContent :exec
+UPDATE contents SET archived_at = $2, updated_at = $2 WHERE id = $1 AND archived_at IS NULL
+`
+
+type ArchiveContentParams struct {
+	ID         pgtype.UUID
+	ArchivedAt pgtype.Timestamptz
+}
+
+// 論理削除（記事・作品の削除）。公開ポインタは残す（復旧で元に戻せる）。公開側の問い合わせは archived_at IS NULL で除く。
+func (q *Queries) ArchiveContent(ctx context.Context, arg ArchiveContentParams) error {
+	_, err := q.db.Exec(ctx, archiveContent, arg.ID, arg.ArchivedAt)
+	return err
+}
+
 const copyWorkContributors = `-- name: CopyWorkContributors :exec
 INSERT INTO work_contributors (content_id, revision_id, user_id, role_label, sort_order, added_by)
 SELECT src.content_id, $1::uuid, src.user_id, src.role_label, src.sort_order, src.added_by
@@ -600,27 +615,28 @@ CROSS JOIN LATERAL (
     SELECT ($1::boolean OR c.creator_user_id = $2
             OR EXISTS (SELECT 1 FROM content_collaborators cc WHERE cc.content_id = c.id AND cc.user_id = $2)) AS can_edit
 ) v
-WHERE (v.can_edit OR c.published_revision_id IS NOT NULL)
+WHERE c.archived_at IS NULL
+  AND (v.can_edit OR c.published_revision_id IS NOT NULL)
   AND ($3::text IS NULL OR c.section = $3::text)
   AND (NOT $4::boolean OR c.creator_user_id = $2
        OR EXISTS (SELECT 1 FROM content_collaborators cc WHERE cc.content_id = c.id AND cc.user_id = $2))
   AND ($5::text = '' OR (CASE WHEN v.can_edit THEN w.title ELSE p.title END) ILIKE '%' || $5 || '%' ESCAPE '\')
   AND ($6::text = '' OR ($6::text = 'published' AND c.published_revision_id IS NOT NULL) OR ($6::text = 'draft' AND c.published_revision_id IS NULL))
-  AND ($7::timestamptz IS NULL OR (c.updated_at, c.id) < ($7::timestamptz, $8::uuid))
-ORDER BY c.updated_at DESC, c.id DESC
-LIMIT $9
+  AND ($7::text IS NULL OR c.type = $7::text)
+ORDER BY COALESCE((CASE WHEN v.can_edit THEN w.sort_date ELSE p.sort_date END), c.updated_at::date) DESC, c.updated_at DESC, c.id DESC
+OFFSET $8::int LIMIT $9
 `
 
 type ListContentsParams struct {
-	IsEditor bool
-	UserID   pgtype.UUID
-	Section  pgtype.Text
-	Mine     bool
-	Q        string
-	Status   string
-	BeforeAt pgtype.Timestamptz
-	BeforeID pgtype.UUID
-	Lim      int32
+	IsEditor    bool
+	UserID      pgtype.UUID
+	Section     pgtype.Text
+	Mine        bool
+	Q           string
+	Status      string
+	ContentType pgtype.Text
+	RowOffset   int32
+	Lim         int32
 }
 
 type ListContentsRow struct {
@@ -648,6 +664,7 @@ type ListContentsRow struct {
 // （公開中の記事の未公開の書き換えを、他のメンバーに見せない）。
 // 一覧。編集できるものは作業版、そうでない公開中のものは**公開版の値だけ**を返す（カバー・日付・タイトルも同じ）。
 // q: タイトルの部分一致。status: ”（すべて）・published（公開中）・draft（未公開）
+// 並びは「利用者に見せる日付」の新しい順（日付が無ければ更新日）。カーソルは件数のoffset。
 func (q *Queries) ListContents(ctx context.Context, arg ListContentsParams) ([]ListContentsRow, error) {
 	rows, err := q.db.Query(ctx, listContents,
 		arg.IsEditor,
@@ -656,8 +673,8 @@ func (q *Queries) ListContents(ctx context.Context, arg ListContentsParams) ([]L
 		arg.Mine,
 		arg.Q,
 		arg.Status,
-		arg.BeforeAt,
-		arg.BeforeID,
+		arg.ContentType,
+		arg.RowOffset,
 		arg.Lim,
 	)
 	if err != nil {
@@ -980,10 +997,10 @@ SELECT c.section::text AS section, c.slug::text AS slug, r.title::text AS title,
        CASE WHEN position(lower($1::text) in lower(r.markdown)) > 0
             THEN substr(r.markdown, greatest(position(lower($1::text) in lower(r.markdown)) - 20, 1), 60) ELSE '' END::text AS snippet
 FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
-WHERE position(lower($1::text) in lower(r.title)) > 0
+WHERE c.archived_at IS NULL AND (position(lower($1::text) in lower(r.title)) > 0
    OR position(lower($1::text) in lower(r.summary)) > 0
    OR position(lower($1::text) in lower(r.markdown)) > 0
-   OR EXISTS (SELECT 1 FROM work_contributors w WHERE w.revision_id = r.id AND position(lower($1::text) in lower(w.role_label)) > 0)
+   OR EXISTS (SELECT 1 FROM work_contributors w WHERE w.revision_id = r.id AND position(lower($1::text) in lower(w.role_label)) > 0))
 ORDER BY c.section, c.slug
 LIMIT 100
 `

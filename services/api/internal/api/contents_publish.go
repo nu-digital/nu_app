@@ -65,6 +65,9 @@ func (s *server) publishContent(w http.ResponseWriter, r *http.Request) {
 			}
 			return err
 		}
+		if c.ArchivedAt.Valid { // 削除済みは存在しないのと同じ
+			return errNotFound
+		}
 		if ok, err := isEditorPlusInTx(r, q, a.Identity.UserID); err != nil {
 			return err
 		} else if !ok {
@@ -142,6 +145,9 @@ func (s *server) unpublishContent(w http.ResponseWriter, r *http.Request) {
 			}
 			return err
 		}
+		if c.ArchivedAt.Valid { // 削除済みは存在しないのと同じ
+			return errNotFound
+		}
 		if ok, err := isEditorPlusInTx(r, q, a.Identity.UserID); err != nil {
 			return err
 		} else if !ok {
@@ -201,4 +207,46 @@ func (s *server) recheckMedia(r *http.Request, q *store.Queries, work store.Cont
 		}
 	}
 	return nil
+}
+
+// deleteContent は DELETE /contents/{id}。論理削除（archived_at）。一覧・公式サイト・画像の公開配信から外れ、データ・版・画像は残る
+// （復旧は運用者がDBで archived_at を戻す。docs/RUNBOOK）。slugは予約されたまま（URLの再利用を防ぐ）。
+// 下書きだけの記事は作者かEditor以上、公開中の記事（公式サイトから消える）はEditor以上だけが削除できる。
+func (s *server) deleteContent(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.memberOrReject(w, r)
+	if !ok {
+		return
+	}
+	id, ok := parseItemID(w, r)
+	if !ok {
+		return
+	}
+	err := s.inTx(r.Context(), func(q *store.Queries, tx pgx.Tx) error {
+		c, err := s.lockContent(r, q, a, id, "contents.delete")
+		if err != nil {
+			return err
+		}
+		if c.PublishedRevisionID.Valid {
+			if ok, err := isEditorPlusInTx(r, q, a.Identity.UserID); err != nil {
+				return err
+			} else if !ok {
+				return errForbidden
+			}
+		}
+		now := pgtype.Timestamptz{Time: s.Now(), Valid: true}
+		if err := q.ArchiveContent(r.Context(), store.ArchiveContentParams{ID: c.ID, ArchivedAt: now}); err != nil {
+			return err
+		}
+		if c.PublishedRevisionID.Valid {
+			if _, err := q.InsertPublicationEvent(r.Context(), store.InsertPublicationEventParams{ContentID: c.ID, RevisionID: c.PublishedRevisionID, ActorUserID: a.Identity.UserID, EventType: "unpublish"}); err != nil {
+				return err
+			}
+		}
+		return s.auditContent(r, q, a, c.ID, "content.deleted", map[string]any{"wasPublished": c.PublishedRevisionID.Valid})
+	})
+	if err != nil {
+		s.writeTxErr(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

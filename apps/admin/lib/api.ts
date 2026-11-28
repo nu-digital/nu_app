@@ -290,7 +290,7 @@ export async function retryDelivery(id: string): Promise<void> {
 // --- CMS（記事・作品）。権限・検査はAPIが強制する ---
 export type ContentListItem = {
   id: string; type: "article" | "project"; section: "blog" | "news" | "project"; slug: string; title: string; summary: string;
-  revisionNo: number; isPublished: boolean; canEdit: boolean; hasUnpublishedChanges: boolean; updatedAt: string;
+  revisionNo: number; isPublished: boolean; canEdit: boolean; hasUnpublishedChanges: boolean; canDelete: boolean; updatedAt: string;
   /** 利用者が設定した日付の表示（空なら未設定）と、並び順の日付（YYYY-MM-DD） */
   dateLabel: string; sortDate: string | null;
   /** カバー画像の表示URL（編集できる人は作業版、できない人は公開版）。無ければnull */
@@ -308,15 +308,17 @@ export type ContentDetail = {
   id: string; type: "article" | "project"; section: "blog" | "news" | "project"; slug: string;
   creator: { userId: string; displayName: string; avatarMediaId: string | null }; workingRevision: ContentRevision; publishedRevisionNo: number | null;
   collaborators: { userId: string; displayName: string; avatarMediaId: string | null }[]; revisions?: { revisionNo: number; title: string; editedBy: string; createdAt: string }[];
-  canManageCollaborators: boolean; canPublish: boolean; createdAt: string; updatedAt: string;
+  canManageCollaborators: boolean; canPublish: boolean; /** 削除できるか（下書きは作者・Editor以上、公開中はEditor以上） */ canDelete: boolean; createdAt: string; updatedAt: string;
 };
 export type RevisionInput = {
   baseRevision: number; title: string; summary: string; markdown: string;
   metadata: Record<string, string | null>; date: { label: string; kind: string; sortDate: string | null };
   coverMediaId?: string | null;
 };
-export async function listContents(p: { section?: string; mine?: boolean; q?: string; status?: "published" | "draft" | ""; cursor?: string }) {
+/** type: 記事（article）か作品（project）。省略は混在。並びは利用者に見せる日付の新しい順。 */
+export async function listContents(p: { type?: "article" | "project" | ""; section?: string; mine?: boolean; q?: string; status?: "published" | "draft" | ""; cursor?: string }) {
   const params = new URLSearchParams({ limit: "50" });
+  if (p.type) params.set("type", p.type);
   if (p.section) params.set("section", p.section);
   if (p.q) params.set("q", p.q);
   if (p.status) params.set("status", p.status);
@@ -342,21 +344,36 @@ export function conflictRevision(e: unknown): ContentRevision | null {
   return ((err.body as { current?: ContentRevision } | undefined)?.current) ?? null;
 }
 
-/** 画像をアップロードする（生のバイト列。形式・大きさ・寸法の検査と再エンコードはAPIが行う）。 */
-export async function uploadMedia(file: File, purpose: "cms" | "avatar" | "inventory" = "cms"): Promise<MediaInfo> {
+/**
+ * 画像をアップロードする（生のバイト列。形式・大きさ・寸法の検査と、WebPへの再エンコード・縮小・EXIF除去はAPIが行う）。
+ * onProgress は送信の進み具合（0〜1）。進捗を取るためXMLHttpRequestで送る。
+ */
+export function uploadMedia(file: File, purpose: "cms" | "avatar" | "inventory" = "cms", onProgress?: (ratio: number) => void): Promise<MediaInfo> {
   const ct = file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/webp" ? file.type : "application/octet-stream";
-  const headers: Record<string, string> = { "Content-Type": ct };
-  if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
-  const res = await fetch(`/api/v1/media?purpose=${purpose}`, { method: "POST", headers, body: file, credentials: "same-origin", cache: "no-store" });
-  let json: unknown = null;
-  try {
-    json = JSON.parse(await res.text());
-  } catch {
-    json = null;
-  }
-  const ra = Number(res.headers.get("Retry-After"));
-  if (res.status !== 201) throw toError({ status: res.status, json, retryAfter: Number.isFinite(ra) && ra > 0 ? ra : undefined });
-  return json as MediaInfo;
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/api/v1/media?purpose=${purpose}`);
+    xhr.setRequestHeader("Content-Type", ct);
+    if (csrfToken) xhr.setRequestHeader("X-CSRF-Token", csrfToken);
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+    xhr.onerror = () => reject(toError({ status: 0, json: null }));
+    xhr.onload = () => {
+      let json: unknown = null;
+      try { json = JSON.parse(xhr.responseText); } catch { json = null; }
+      const ra = Number(xhr.getResponseHeader("Retry-After"));
+      if (xhr.status !== 201) { reject(toError({ status: xhr.status, json, retryAfter: Number.isFinite(ra) && ra > 0 ? ra : undefined })); return; }
+      onProgress?.(1);
+      resolve(json as MediaInfo);
+    };
+    xhr.send(file);
+  });
+}
+
+/** 記事・作品を削除する（論理削除。公式サイト・一覧から消える。復旧は運用者）。 */
+export async function deleteContent(id: string): Promise<void> {
+  const r = await call("DELETE", `/contents/${id}`);
+  if (r.status !== 204) throw toError(r);
 }
 
 export const putCollaborators = async (id: string, userIds: string[]) =>

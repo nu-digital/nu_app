@@ -98,15 +98,17 @@ CROSS JOIN LATERAL (
     SELECT (@is_editor::boolean OR c.creator_user_id = @user_id
             OR EXISTS (SELECT 1 FROM content_collaborators cc WHERE cc.content_id = c.id AND cc.user_id = @user_id)) AS can_edit
 ) v
-WHERE (v.can_edit OR c.published_revision_id IS NOT NULL)
+WHERE c.archived_at IS NULL
+  AND (v.can_edit OR c.published_revision_id IS NOT NULL)
   AND (sqlc.narg('section')::text IS NULL OR c.section = sqlc.narg('section')::text)
   AND (NOT @mine::boolean OR c.creator_user_id = @user_id
        OR EXISTS (SELECT 1 FROM content_collaborators cc WHERE cc.content_id = c.id AND cc.user_id = @user_id))
   AND (@q::text = '' OR (CASE WHEN v.can_edit THEN w.title ELSE p.title END) ILIKE '%' || @q || '%' ESCAPE '\')
   AND (@status::text = '' OR (@status::text = 'published' AND c.published_revision_id IS NOT NULL) OR (@status::text = 'draft' AND c.published_revision_id IS NULL))
-  AND (sqlc.narg('before_at')::timestamptz IS NULL OR (c.updated_at, c.id) < (sqlc.narg('before_at')::timestamptz, sqlc.narg('before_id')::uuid))
-ORDER BY c.updated_at DESC, c.id DESC
-LIMIT @lim;
+  AND (sqlc.narg('content_type')::text IS NULL OR c.type = sqlc.narg('content_type')::text)
+-- 並びは「利用者に見せる日付」の新しい順（日付が無ければ更新日）。カーソルは件数のoffset。
+ORDER BY COALESCE((CASE WHEN v.can_edit THEN w.sort_date ELSE p.sort_date END), c.updated_at::date) DESC, c.updated_at DESC, c.id DESC
+OFFSET @row_offset::int LIMIT @lim;
 
 -- 作者のアバター（詳細用）
 -- name: GetAvatarMediaID :one
@@ -132,6 +134,10 @@ SELECT p.user_id, p.display_name, p.avatar_media_id FROM profiles p WHERE p.user
 SELECT ur.role FROM user_roles ur JOIN users u ON u.id = ur.user_id
 WHERE ur.user_id = $1 AND u.status = 'active'
 FOR SHARE OF ur, u;
+
+-- 論理削除（記事・作品の削除）。公開ポインタは残す（復旧で元に戻せる）。公開側の問い合わせは archived_at IS NULL で除く。
+-- name: ArchiveContent :exec
+UPDATE contents SET archived_at = $2, updated_at = $2 WHERE id = $1 AND archived_at IS NULL;
 
 -- name: SetPublishedRevision :exec
 UPDATE contents SET published_revision_id = $2, updated_at = $3 WHERE id = $1;
@@ -201,9 +207,9 @@ SELECT c.section::text AS section, c.slug::text AS slug, r.title::text AS title,
        CASE WHEN position(lower(@q::text) in lower(r.markdown)) > 0
             THEN substr(r.markdown, greatest(position(lower(@q::text) in lower(r.markdown)) - 20, 1), 60) ELSE '' END::text AS snippet
 FROM contents c JOIN content_revisions r ON r.id = c.published_revision_id
-WHERE position(lower(@q::text) in lower(r.title)) > 0
+WHERE c.archived_at IS NULL AND (position(lower(@q::text) in lower(r.title)) > 0
    OR position(lower(@q::text) in lower(r.summary)) > 0
    OR position(lower(@q::text) in lower(r.markdown)) > 0
-   OR EXISTS (SELECT 1 FROM work_contributors w WHERE w.revision_id = r.id AND position(lower(@q::text) in lower(w.role_label)) > 0)
+   OR EXISTS (SELECT 1 FROM work_contributors w WHERE w.revision_id = r.id AND position(lower(@q::text) in lower(w.role_label)) > 0))
 ORDER BY c.section, c.slug
 LIMIT 100;

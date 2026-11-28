@@ -113,6 +113,7 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("POST /contents/{id}/revisions", s.saveRevision)
 	mux.HandleFunc("PUT /contents/{id}/collaborators", s.putCollaborators)
 	mux.HandleFunc("PUT /contents/{id}/contributors", s.putContributors)
+	mux.HandleFunc("DELETE /contents/{id}", s.deleteContent)
 	mux.HandleFunc("POST /contents/{id}/publish", s.publishContent)
 	mux.HandleFunc("POST /contents/{id}/unpublish", s.unpublishContent)
 	mux.HandleFunc("GET /public/contents", s.listPublicContents)
