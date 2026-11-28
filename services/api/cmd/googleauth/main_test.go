@@ -1,7 +1,10 @@
 package main
 
 import (
+	"io"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -39,5 +42,33 @@ func TestCheckScopesRequiresAll(t *testing.T) {
 	}
 	if checkScopes("https://www.googleapis.com/auth/drive.file") == nil {
 		t.Error("不足を検出できない")
+	}
+}
+
+func TestWriteSecretFileIsPrivateAndNeverOverwrites(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "tok.env")
+	if err := writeSecretFile(p, "A=1\n"); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Stat(p)
+	if err != nil || fi.Mode().Perm() != 0o600 {
+		t.Fatalf("権限: %v %v", fi, err)
+	}
+	if err := writeSecretFile(p, "B=2\n"); err == nil {
+		t.Error("既存のファイルを上書きできた")
+	}
+	if b, _ := os.ReadFile(p); string(b) != "A=1\n" {
+		t.Errorf("中身が変わった: %q", b)
+	}
+}
+
+func TestReadCredentialsRejectsNonTerminal(t *testing.T) {
+	f, err := os.CreateTemp(t.TempDir(), "in")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, _, err := readCredentials(f, io.Discard); err == nil {
+		t.Error("端末でない入力（ファイル・パイプ）を受け付けた")
 	}
 }
