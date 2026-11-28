@@ -18,6 +18,6 @@ export const FEATURES: Feature[] = [
 /** ショートカット（よく使う操作） */
 export const SHORTCUTS: { key: string; label: string; href: string; icon: IconName }[] = [
   { key: "write", label: "新しく書く", href: "/contents/new", icon: "24/Pencil" },
-  { key: "borrow", label: "物品を借りる", href: "/inventory", icon: "24/Archive" },
+  { key: "borrow", label: "借りる物を探す", href: "/inventory", icon: "24/Archive" },
   { key: "mine", label: "借りている物", href: "/inventory?mine=1", icon: "24/Check" },
 ];

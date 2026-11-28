@@ -254,7 +254,7 @@ export async function runAdminUiE2E(o) {
       const ctx = await browser.newContext({ viewport: { width, height }, locale: 'ja-JP', reducedMotion: 'reduce' });
       const page = await ctx.newPage();
       await login(page, pid, ppass);
-      await page.getByRole('link', { name: /^プロフィール/ }).click();
+      await page.getByRole('link', { name: /^アカウント設定/ }).click();
       await page.waitForURL('**/profile');
       await page.getByRole('heading', { level: 1, name: 'アカウント設定' }).waitFor();
       const visOf = async (n) => page.locator(`li.setting-row[data-setting="${n}"] .s-vis`).innerText();
