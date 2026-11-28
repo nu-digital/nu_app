@@ -118,6 +118,19 @@ export function seed() {
     canManageCollaborators: c.canEdit, canPublish: c.canEdit, canDelete: c.canDelete, createdAt: T, updatedAt: T,
   });
 
+  /** 公開中の記事・作品（公開APIの形。ホームのメインビジュアル・最近の公開用）。新しい順。 */
+  const pi = (type: "article" | "project", section: "blog" | "news" | "project", slug: string, title: string, label: string, sortDate: string, extra: { image?: string; cover?: string }) => ({
+    type, section, slug, title, summary: "", author: "nu_digital", metadata: extra.image ? { image: extra.image } : {}, date: { label, kind: "day", sortDate }, ...(extra.cover ? { coverUrl: extra.cover } : {}),
+  });
+  const publicItems = [
+    pi("project", "project", "night-city", "夜の街を駆ける少女と猫", "2026年11月20日", "2026-11-20", { cover: "/api/v1/public/media/mockpublicid0000000011" }),
+    pi("article", "blog", "festival-report", "学園祭の展示レポート", "2026年11月3日", "2026-11-03", { image: "/images/contents/festival.webp" }),
+    pi("project", "project", "vr-gate", "VRの入口をつくった話", "2026年10月12日", "2026-10-12", { cover: "/api/v1/public/media/mockpublicid0000000012" }),
+    pi("article", "news", "welcome", "新歓のお知らせ", "2026年4月1日", "2026-04-01", { cover: "/api/v1/public/media/mockpublicid0000000013" }),
+    pi("project", "project", "game-launcher", "展示用ゲームランチャー", "2026年3月5日", "2026-03-05", { cover: "/api/v1/public/media/mockpublicid0000000014" }),
+    pi("article", "blog", "text-only", "画像のない記事の例", "2026年2月1日", "2026-02-01", {}),
+  ];
+
   const notificationSettings: NotificationSetting[] = [
     { eventType: "inventory.loan_created", label: "物品の貸出", enabled: true, discordChannelId: "100000000000000001", updatedAt: T },
     { eventType: "inventory.loan_returned", label: "物品の返却", enabled: true, discordChannelId: "100000000000000001", updatedAt: T },
@@ -137,7 +150,7 @@ export function seed() {
 
   const publishedHits: PublishedHit[] = [{ section: "blog", slug: "sample-blog", title: "学園祭の展示レポート", found: ["markdown"], snippet: "…撮影: 試験 花子…" }];
 
-  return { collabs, contribs, users, members, profile, categories, items, images, units, loans, history, contents, contentDetail, notificationSettings, deliveries, legacyAuthors, publishedHits, now: T };
+  return { publicItems, collabs, contribs, users, members, profile, categories, items, images, units, loans, history, contents, contentDetail, notificationSettings, deliveries, legacyAuthors, publishedHits, now: T };
 }
 
 /**

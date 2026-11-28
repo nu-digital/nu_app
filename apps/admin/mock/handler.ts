@@ -32,6 +32,13 @@ export function createMock(opts: MockOptions = {}) {
       return { status: 200, contentType: "image/svg+xml", raw: `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue},70%,62%)"/><stop offset="1" stop-color="hsl(${hue + 40},70%,40%)"/></linearGradient></defs><rect width="400" height="300" fill="url(#g)"/></svg>` };
     }
 
+    // 公開API（匿名でも読める公開版）。ホームのメインビジュアル・最近の公開で使う
+    if (p === "/public/contents" && method === "GET") return { status: 200, json: { items: db.publicItems.slice(0, Number(q.get("limit") ?? 24)), nextCursor: null } };
+    if (p.startsWith("/public/media/") && method === "GET") {
+      const hue = (Number(p.slice(-2)) * 47) % 360;
+      return { status: 200, contentType: "image/svg+xml", raw: `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="700"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue},70%,60%)"/><stop offset="1" stop-color="hsl(${hue + 50},65%,32%)"/></linearGradient></defs><rect width="1600" height="700" fill="url(#g)"/></svg>` };
+    }
+
     // 公式サイトの画像（既存記事の /images/…。プレビューの中継先）。色つきの図で代用する
     if (p.startsWith("/web/images/") && method === "GET") {
       return { status: 200, contentType: "image/svg+xml", raw: `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="hsl(150,45%,60%)"/><text x="300" y="210" font-size="28" text-anchor="middle" fill="#fff">site image</text></svg>` };

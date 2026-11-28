@@ -1,4 +1,5 @@
 // APIクライアント。/api/v1 は同一オリジン（Nextが中継）。CSRFトークンはメモリに保持する（Cookieは HttpOnly で読めない）。
+import type { PublicItem } from "./home";
 
 export type Me = {
   user: { id: string; loginId: string; displayName: string; roles: string[] };
@@ -369,6 +370,9 @@ export function uploadMedia(file: File, purpose: "cms" | "avatar" | "inventory" 
     xhr.send(file);
   });
 }
+
+/** 公開中の記事・作品（匿名でも読める公開版。新しい順）。ホームのメインビジュアル・最近の公開に使う。 */
+export const listPublicContents = async (limit = 24) => ok<{ items: PublicItem[] }>(await call("GET", `/public/contents?limit=${limit}`), 200);
 
 /** 記事・作品を削除する（論理削除。公式サイト・一覧から消える。復旧は運用者）。 */
 export async function deleteContent(id: string): Promise<void> {

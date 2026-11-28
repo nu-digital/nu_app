@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, m } from "motion/react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -12,6 +13,7 @@ import Select from "@/components/ui/Select";
 import { CardSkeleton, EmptyState } from "@/components/ui/States";
 import { describe, listItems, type Category, type Item, type ItemSort } from "@/lib/api";
 import { itemStatus } from "@/lib/item-status";
+import { duration, ease } from "@/lib/motion";
 
 export default function InventoryPage() {
   return <AppShell>{(me) => <Inventory canManage={me.user.roles.includes("admin") || me.user.roles.includes("owner")} />}</AppShell>;
@@ -37,7 +39,8 @@ function Inventory({ canManage }: { canManage: boolean }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [next, setNext] = useState<string | null>(null);
   const [text, setText] = useState("");
-  const [f, setF] = useState<Filters>(INITIAL);
+  // ホームの「借りている物」のショートカット（?mine=1）から開いたときは、最初から絞り込む
+  const [f, setF] = useState<Filters>(() => ({ ...INITIAL, status: typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mine") === "1" ? "mine" : "" }));
   const [loadedKey, setLoadedKey] = useState("");
   const [more, setMore] = useState(false);
   const [error, setError] = useState("");
@@ -135,10 +138,11 @@ function Inventory({ canManage }: { canManage: boolean }) {
         </EmptyState>
       ) : (
         <ul className="grid">
+          <AnimatePresence mode="popLayout" initial={false}>
           {items.map((it) => {
             const s = itemStatus(it);
             return (
-              <li key={it.id}>
+              <m.li key={it.id} layout="position" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: duration.base, ease: ease.out }}>
                 <Link className={`item-card status-${s.key}`} href={`/inventory/${it.id}`} data-name={it.name}>
                   <div className="thumb">
                     {it.photoMediaId ? <MediaImg id={it.photoMediaId} lazy /> : <span className="thumb-empty" aria-hidden="true">{Array.from(it.name)[0]}</span>}
@@ -150,9 +154,10 @@ function Inventory({ canManage }: { canManage: boolean }) {
                     <ItemStatusBadges item={it} />
                   </div>
                 </Link>
-              </li>
+              </m.li>
             );
           })}
+          </AnimatePresence>
         </ul>
       )}
       {next && <div className="center"><Button variant="default" fullWidth={false} disabled={more} onClick={loadMore}>{more ? "読み込んでいます…" : "さらに表示"}</Button></div>}

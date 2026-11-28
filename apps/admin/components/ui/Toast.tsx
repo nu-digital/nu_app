@@ -1,6 +1,9 @@
 "use client";
 
+import { AnimatePresence, m } from "motion/react";
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+
+import { duration, ease } from "@/lib/motion";
 
 /**
  * 操作完了・失敗のトースト通知。画面の下に数秒表示して消える（aria-live で読み上げる）。
@@ -23,11 +26,22 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={push}>
       {children}
       <div className="ui-toasts" aria-live="polite">
-        {items.map((t) => (
-          <div key={t.id} className={`ui-toast ${t.kind}`} role={t.kind === "error" ? "alert" : "status"}>
-            <strong>{t.kind === "error" ? "エラー" : "完了"}</strong> {t.text}
-          </div>
-        ))}
+        <AnimatePresence initial={false}>
+          {items.map((t) => (
+            <m.div
+              key={t.id}
+              layout
+              className={`ui-toast ${t.kind}`}
+              role={t.kind === "error" ? "alert" : "status"}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: duration.base, ease: ease.out }}
+            >
+              <strong>{t.kind === "error" ? "エラー" : "完了"}</strong> {t.text}
+            </m.div>
+          ))}
+        </AnimatePresence>
       </div>
     </Ctx.Provider>
   );
