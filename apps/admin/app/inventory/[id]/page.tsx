@@ -159,6 +159,7 @@ function Detail() {
                       </div>
                       {!u.loaned && <Button fullWidth={false} type="submit" disabled={busy} onClick={() => act(async () => { await createLoan({ itemId: it.id, unitId: u.id }); return `${u.assetTag} を借りました。`; })}>借りる</Button>}
                       {u.loaned && u.mine && u.loanId && <Button variant="primary" fullWidth={false} disabled={busy} onClick={() => openReturn(u.loanId!, u.assetTag, 1, false)}>返す</Button>}
+                      {u.loaned && !u.mine && u.loanId && <Button variant="default" fullWidth={false} disabled={busy} onClick={() => openReturn(u.loanId!, `${u.assetTag}（${u.loaned!.borrowerDisplayName}さん）`, 1, true)}>代わりに返す</Button>}
                     </li>
                   ))}
                 </ul>
@@ -168,7 +169,7 @@ function Detail() {
         </div>
       </div>
 
-      {(otherLoans.length > 0 || it.units.some((u) => u.loaned && !u.mine && u.loanId)) && (
+      {otherLoans.length > 0 && (
         <section className="panel" aria-labelledby="loans-title">
           <h2 id="loans-title">ほかのメンバーが借りています</h2>
           <p className="hint">借りた人に代わって返却を登録することもできます。</p>
@@ -177,12 +178,6 @@ function Detail() {
               <li key={l.id} className="item" data-loan={l.id}>
                 <div><strong>{l.borrowerDisplayName}さん</strong> {l.quantity}個<div className="user-id">{l.elapsedDays}日目</div></div>
                 <Button variant="default" fullWidth={false} disabled={busy} onClick={() => openReturn(l.id, `${l.borrowerDisplayName}さんの${l.quantity}個`, l.quantity, true)}>代わりに返す</Button>
-              </li>
-            ))}
-            {it.units.filter((u) => u.loaned && !u.mine && u.loanId).map((u) => (
-              <li key={u.id} className="item" data-tag={u.assetTag}>
-                <div><strong>{u.assetTag}</strong> {u.loaned!.borrowerDisplayName}さん<div className="user-id">{u.loaned!.elapsedDays}日目</div></div>
-                <Button variant="default" fullWidth={false} disabled={busy} onClick={() => openReturn(u.loanId!, `${u.assetTag}（${u.loaned!.borrowerDisplayName}さん）`, 1, true)}>代わりに返す</Button>
               </li>
             ))}
           </ul>
