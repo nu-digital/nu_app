@@ -143,6 +143,12 @@ type BootstrapState struct {
 	CompletedAt pgtype.Timestamptz
 }
 
+type BudgetAllocation struct {
+	FiscalYearID pgtype.UUID
+	CategoryID   pgtype.UUID
+	AmountYen    int64
+}
+
 type Content struct {
 	ID                  pgtype.UUID
 	Type                string
@@ -196,6 +202,77 @@ type EmergencyRecoveryEvent struct {
 	TargetUserID     pgtype.UUID
 	ApproverNote     string
 	CreatedAt        pgtype.Timestamptz
+}
+
+type ExpenseCategory struct {
+	ID        pgtype.UUID
+	Name      string
+	SortOrder int32
+	CreatedAt pgtype.Timestamptz
+}
+
+type ExpenseHistory struct {
+	ID         int64
+	RequestID  pgtype.UUID
+	At         pgtype.Timestamptz
+	ActorID    pgtype.UUID
+	Action     string
+	FromStatus pgtype.Text
+	ToStatus   pgtype.Text
+	Diff       []byte
+	Note       string
+}
+
+type ExpenseRequest struct {
+	ID               pgtype.UUID
+	Seq              int64
+	FiscalYearID     pgtype.UUID
+	Kind             string
+	Status           string
+	RequesterID      pgtype.UUID
+	CategoryID       pgtype.UUID
+	PurposeKind      string
+	ProjectID        pgtype.UUID
+	Title            string
+	Vendor           string
+	Url              string
+	Quantity         int32
+	UnitPriceYen     int64
+	ShippingYen      int64
+	DiscountYen      int64
+	PlannedTotalYen  int64
+	ActualTotalYen   pgtype.Int8
+	Reason           string
+	ReceiptConfirmed bool
+	RulesAck         []byte
+	ReapprovalNeeded bool
+	SubmittedAt      pgtype.Timestamptz
+	DecidedAt        pgtype.Timestamptz
+	DecidedBy        pgtype.UUID
+	PurchasedOn      pgtype.Date
+	SettledAt        pgtype.Timestamptz
+	Version          int32
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+}
+
+type ExpenseRule struct {
+	ID          pgtype.UUID
+	Name        string
+	Description string
+	Kind        string
+	Keywords    []string
+	Active      bool
+	CreatedAt   pgtype.Timestamptz
+}
+
+type FiscalYear struct {
+	ID        pgtype.UUID
+	Label     string
+	StartsOn  pgtype.Date
+	EndsOn    pgtype.Date
+	BudgetYen int64
+	CreatedAt pgtype.Timestamptz
 }
 
 type InventoryAdjustment struct {
@@ -433,6 +510,19 @@ type ProfileLink struct {
 	Visibility string
 	CreatedAt  pgtype.Timestamptz
 	UpdatedAt  pgtype.Timestamptz
+}
+
+type Project struct {
+	ID        pgtype.UUID
+	Name      string
+	Kind      string
+	Status    string
+	ContentID pgtype.UUID
+	StartsOn  pgtype.Date
+	EndsOn    pgtype.Date
+	Note      string
+	CreatedBy pgtype.UUID
+	CreatedAt pgtype.Timestamptz
 }
 
 type PublicCreditConsent struct {

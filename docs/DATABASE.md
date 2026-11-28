@@ -1,6 +1,6 @@
 # nu_app DB設計（論理モデル）
 
-状態: **実装済み**（2026-11-28に実装に合わせて更新）。**DDLの正本は `db/migrations/`**（goose・前進のみ・00001〜00022）。この文書は、各テーブルの役割と不変条件を説明する論理モデルで、細かな型・索引・CHECKはmigrationを見る。ぬるの`agent`スキーマは§8。
+状態: **実装済み**（2026-11-28に実装に合わせて更新）。**DDLの正本は `db/migrations/`**（goose・前進のみ・00001〜00025（00023〜00024はぬる、00025は会計））。この文書は、各テーブルの役割と不変条件を説明する論理モデルで、細かな型・索引・CHECKはmigrationを見る。ぬるの`agent`スキーマは§8。
 
 ## 1. 認証・権限
 
@@ -35,6 +35,11 @@
 |---|---|---|
 | `inventory_items` | `id`, `name`, `description`, `category`（名前。`category_id`と同期する旧クライアント向けの列）, `category_id`（NULL可・FK。00021）, `location`, `cover_media_id`（先頭の画像と同期）, `mode`, `total_quantity`, `archived_at` | mode=quantity/individual。数量管理時`total_quantity >= 0` |
 | `inventory_categories` | `id`, `name`（UNIQUE・30文字以内）, `sort_order`, `is_system`（「その他」。削除・名前変更不可。00022） | 管理者が追加・名称変更・並び替え・削除（00021）。初期は機材・書籍・その他。削除すると、使っていた物品（廃止した物品を含む）は自動で「その他」へ移る。既存の文字列カテゴリはmigrationでカテゴリ行に移行し、空は「その他」 |
+| `fiscal_years`・`expense_categories`・`budget_allocations` | 年度（期間・使用可能額）／カテゴリ（初期: 物品・印刷・通信費・交通費・アセット・その他）／年度×カテゴリの予算枠（00025） | 金額は整数円。年度が変わっても過去年度を残す |
+| `projects` | 作品・イベント（kind=work/event/other、状態、公開コンテンツへの任意の参照`content_id`）。制作中・未公開・開催予定を含む軽量な枠（00025） | 支出の紐付け先 |
+| `expense_requests` | 支出申請（status 10種・目的区分・金額一式・予定額`planned_total_yen`（CHECKで数量×単価＋送料−割引と一致）・実額・領収書発行の確認・再承認フラグ・`version`）（00025） | **削除不可（トリガー）**。申請以降は件名・理由・カテゴリ・領収書発行の確認が必須（CHECK） |
+| `expense_history` | 申請の変更・状態遷移の履歴（操作者・差分・メモ）（00025） | **追記のみ（UPDATE/DELETEをトリガーで拒否）** |
+| `expense_rules` | 大学・団体の規則（confirm/ai_hint/info。管理者が追加・無効化）（00025） | 把握済みの4規則だけを初期投入。未提供の規則は推測で入れない |
 | `inventory_item_images` | `item_id`, `media_id`, `sort_order` | 物品の画像（複数。先頭がメイン。最大8枚はAPIで検査）。`media_references`の`inventory_item`/`photo`と対で更新（00021で「1所有者1画像」の制約を`profile`だけにした） |
 | `inventory_units` | `id`, `item_id`, `asset_tag`, `serial_number`, `state`, `archived_at` | 個体管理のみ。管理番号は同一物品内で一意 |
 | `inventory_loans` | `id`, `item_id`, `unit_id`, `borrower_user_id`, `quantity`, `borrowed_at` | 数量管理時 unit_id NULL。個体管理時 quantity=1 |
