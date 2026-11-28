@@ -199,6 +199,13 @@ type InventoryAdjustment struct {
 	CreatedAt      pgtype.Timestamptz
 }
 
+type InventoryCategory struct {
+	ID        pgtype.UUID
+	Name      string
+	SortOrder int32
+	CreatedAt pgtype.Timestamptz
+}
+
 type InventoryCorrectionEvent struct {
 	ID                 pgtype.UUID
 	ItemID             pgtype.UUID
@@ -225,6 +232,13 @@ type InventoryItem struct {
 	ArchivedAt    pgtype.Timestamptz
 	CreatedAt     pgtype.Timestamptz
 	UpdatedAt     pgtype.Timestamptz
+	CategoryID    pgtype.UUID
+}
+
+type InventoryItemImage struct {
+	ItemID    pgtype.UUID
+	MediaID   pgtype.UUID
+	SortOrder int32
 }
 
 type InventoryLoan struct {

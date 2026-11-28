@@ -51,6 +51,12 @@
 | `me.profile.avatar.clear` | DELETE | `/me/profile/avatar` | Member以上 |
 | `inventory.items.photo.set` | PUT | `/inventory/items/{id}/photo` | Admin / Owner |
 | `inventory.items.photo.clear` | DELETE | `/inventory/items/{id}/photo` | Admin / Owner |
+| `inventory.items.images.set` | PUT | `/inventory/items/{id}/images` | Admin / Owner |
+| `inventory.categories.list` | GET | `/inventory/categories` | Member以上 |
+| `inventory.categories.create` | POST | `/inventory/categories` | Admin / Owner |
+| `inventory.categories.reorder` | PUT | `/inventory/categories/order` | Admin / Owner |
+| `inventory.categories.update` | PATCH | `/inventory/categories/{id}` | Admin / Owner |
+| `inventory.categories.delete` | DELETE | `/inventory/categories/{id}` | Admin / Owner |
 | `admin.contents.published_search` | GET | `/admin/contents/published-search` | Admin / Owner |
 | `admin.legacy_authors.list` | GET | `/admin/legacy-authors` | Admin / Owner |
 | `admin.legacy_authors.permit` | POST | `/admin/legacy-authors/{id}/permit` | Admin / Owner |

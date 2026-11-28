@@ -31,16 +31,46 @@ func (q *Queries) CountItemUnits(ctx context.Context, itemID pgtype.UUID) (int64
 	return count, err
 }
 
+const countItemsInCategory = `-- name: CountItemsInCategory :one
+SELECT count(*)::bigint FROM inventory_items WHERE category_id = $1
+`
+
+func (q *Queries) CountItemsInCategory(ctx context.Context, categoryID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countItemsInCategory, categoryID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const createCategory = `-- name: CreateCategory :one
+INSERT INTO inventory_categories (name, sort_order)
+VALUES ($1, COALESCE((SELECT MAX(sort_order) FROM inventory_categories), 0) + 10)
+RETURNING id, name, sort_order, created_at
+`
+
+func (q *Queries) CreateCategory(ctx context.Context, name string) (InventoryCategory, error) {
+	row := q.db.QueryRow(ctx, createCategory, name)
+	var i InventoryCategory
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SortOrder,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createInventoryItem = `-- name: CreateInventoryItem :one
-INSERT INTO inventory_items (name, description, category, location, mode, total_quantity)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, name, description, category, location, cover_media_id, mode, total_quantity, archived_at, created_at, updated_at
+INSERT INTO inventory_items (name, description, category, category_id, location, mode, total_quantity)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, name, description, category, location, cover_media_id, mode, total_quantity, archived_at, created_at, updated_at, category_id
 `
 
 type CreateInventoryItemParams struct {
 	Name          string
 	Description   string
 	Category      string
+	CategoryID    pgtype.UUID
 	Location      string
 	Mode          string
 	TotalQuantity int32
@@ -51,6 +81,7 @@ func (q *Queries) CreateInventoryItem(ctx context.Context, arg CreateInventoryIt
 		arg.Name,
 		arg.Description,
 		arg.Category,
+		arg.CategoryID,
 		arg.Location,
 		arg.Mode,
 		arg.TotalQuantity,
@@ -68,6 +99,7 @@ func (q *Queries) CreateInventoryItem(ctx context.Context, arg CreateInventoryIt
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CategoryID,
 	)
 	return i, err
 }
@@ -165,6 +197,72 @@ func (q *Queries) CreateInventoryUnit(ctx context.Context, arg CreateInventoryUn
 	return i, err
 }
 
+const deleteCategory = `-- name: DeleteCategory :exec
+DELETE FROM inventory_categories WHERE id = $1
+`
+
+func (q *Queries) DeleteCategory(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteCategory, id)
+	return err
+}
+
+const deleteItemImages = `-- name: DeleteItemImages :exec
+DELETE FROM inventory_item_images WHERE item_id = $1
+`
+
+func (q *Queries) DeleteItemImages(ctx context.Context, itemID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteItemImages, itemID)
+	return err
+}
+
+const getCategory = `-- name: GetCategory :one
+SELECT id, name, sort_order, created_at FROM inventory_categories WHERE id = $1
+`
+
+func (q *Queries) GetCategory(ctx context.Context, id pgtype.UUID) (InventoryCategory, error) {
+	row := q.db.QueryRow(ctx, getCategory, id)
+	var i InventoryCategory
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SortOrder,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getCategoryByName = `-- name: GetCategoryByName :one
+SELECT id, name, sort_order, created_at FROM inventory_categories WHERE name = $1
+`
+
+func (q *Queries) GetCategoryByName(ctx context.Context, name string) (InventoryCategory, error) {
+	row := q.db.QueryRow(ctx, getCategoryByName, name)
+	var i InventoryCategory
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SortOrder,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getCategoryForUpdate = `-- name: GetCategoryForUpdate :one
+SELECT id, name, sort_order, created_at FROM inventory_categories WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) GetCategoryForUpdate(ctx context.Context, id pgtype.UUID) (InventoryCategory, error) {
+	row := q.db.QueryRow(ctx, getCategoryForUpdate, id)
+	var i InventoryCategory
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SortOrder,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getCorrectionByKey = `-- name: GetCorrectionByKey :one
 SELECT id, item_id, target_type, target_id, kind, delta_quantity, reason, actor_user_id, idempotency_key, request_fingerprint, created_at FROM inventory_correction_events WHERE idempotency_key = $1
 `
@@ -189,7 +287,7 @@ func (q *Queries) GetCorrectionByKey(ctx context.Context, idempotencyKey string)
 }
 
 const getInventoryItem = `-- name: GetInventoryItem :one
-SELECT id, name, description, category, location, cover_media_id, mode, total_quantity, archived_at, created_at, updated_at FROM inventory_items WHERE id = $1
+SELECT id, name, description, category, location, cover_media_id, mode, total_quantity, archived_at, created_at, updated_at, category_id FROM inventory_items WHERE id = $1
 `
 
 func (q *Queries) GetInventoryItem(ctx context.Context, id pgtype.UUID) (InventoryItem, error) {
@@ -207,12 +305,13 @@ func (q *Queries) GetInventoryItem(ctx context.Context, id pgtype.UUID) (Invento
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CategoryID,
 	)
 	return i, err
 }
 
 const getInventoryItemForUpdate = `-- name: GetInventoryItemForUpdate :one
-SELECT id, name, description, category, location, cover_media_id, mode, total_quantity, archived_at, created_at, updated_at FROM inventory_items WHERE id = $1 FOR UPDATE
+SELECT id, name, description, category, location, cover_media_id, mode, total_quantity, archived_at, created_at, updated_at, category_id FROM inventory_items WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) GetInventoryItemForUpdate(ctx context.Context, id pgtype.UUID) (InventoryItem, error) {
@@ -230,6 +329,7 @@ func (q *Queries) GetInventoryItemForUpdate(ctx context.Context, id pgtype.UUID)
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CategoryID,
 	)
 	return i, err
 }
@@ -404,6 +504,21 @@ func (q *Queries) InsertInventoryAdjustment(ctx context.Context, arg InsertInven
 	return err
 }
 
+const insertItemImage = `-- name: InsertItemImage :exec
+INSERT INTO inventory_item_images (item_id, media_id, sort_order) VALUES ($1, $2, $3)
+`
+
+type InsertItemImageParams struct {
+	ItemID    pgtype.UUID
+	MediaID   pgtype.UUID
+	SortOrder int32
+}
+
+func (q *Queries) InsertItemImage(ctx context.Context, arg InsertItemImageParams) error {
+	_, err := q.db.Exec(ctx, insertItemImage, arg.ItemID, arg.MediaID, arg.SortOrder)
+	return err
+}
+
 const itemLoanCount = `-- name: ItemLoanCount :one
 SELECT count(*) FROM inventory_loans WHERE item_id = $1
 `
@@ -426,6 +541,74 @@ func (q *Queries) ItemOutstanding(ctx context.Context, itemID pgtype.UUID) (int6
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const listCategories = `-- name: ListCategories :many
+SELECT c.id, c.name, c.sort_order,
+       (SELECT count(*) FROM inventory_items i WHERE i.category_id = c.id AND i.archived_at IS NULL)::bigint AS item_count
+FROM inventory_categories c ORDER BY c.sort_order, c.name
+`
+
+type ListCategoriesRow struct {
+	ID        pgtype.UUID
+	Name      string
+	SortOrder int32
+	ItemCount int64
+}
+
+// カテゴリ管理（UI/UX大改善。00021）
+func (q *Queries) ListCategories(ctx context.Context) ([]ListCategoriesRow, error) {
+	rows, err := q.db.Query(ctx, listCategories)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCategoriesRow{}
+	for rows.Next() {
+		var i ListCategoriesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.SortOrder,
+			&i.ItemCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listImagesOfItems = `-- name: ListImagesOfItems :many
+SELECT item_id, media_id FROM inventory_item_images WHERE item_id = ANY($1::uuid[]) ORDER BY item_id, sort_order, media_id
+`
+
+type ListImagesOfItemsRow struct {
+	ItemID  pgtype.UUID
+	MediaID pgtype.UUID
+}
+
+func (q *Queries) ListImagesOfItems(ctx context.Context, ids []pgtype.UUID) ([]ListImagesOfItemsRow, error) {
+	rows, err := q.db.Query(ctx, listImagesOfItems, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListImagesOfItemsRow{}
+	for rows.Next() {
+		var i ListImagesOfItemsRow
+		if err := rows.Scan(&i.ItemID, &i.MediaID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listInventoryCategories = `-- name: ListInventoryCategories :many
@@ -553,33 +736,40 @@ func (q *Queries) ListInventoryHistory(ctx context.Context, arg ListInventoryHis
 
 const listInventoryItems = `-- name: ListInventoryItems :many
 WITH base AS (
-  SELECT i.id, i.name, i.description, i.category, i.location, i.cover_media_id, i.mode, i.total_quantity, i.archived_at, i.created_at, i.updated_at,
+  SELECT i.id, i.name, i.description, i.category, i.location, i.cover_media_id, i.mode, i.total_quantity, i.archived_at, i.created_at, i.updated_at, i.category_id,
     (COALESCE((SELECT SUM(l.quantity) FROM inventory_loans_eff l WHERE l.item_id = i.id), 0)
      - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r JOIN inventory_loans_eff l ON l.id = r.loan_id WHERE l.item_id = i.id), 0))::bigint AS outstanding,
     (SELECT count(*) FROM inventory_units u WHERE u.item_id = i.id AND u.state = 'active')::bigint AS unit_count,
-    (SELECT count(*) FROM inventory_units u WHERE u.item_id = i.id AND u.state = 'active' AND u.current_loan_id IS NULL)::bigint AS units_available
+    (SELECT count(*) FROM inventory_units u WHERE u.item_id = i.id AND u.state = 'active' AND u.current_loan_id IS NULL)::bigint AS units_available,
+    (SELECT COALESCE(SUM(l.quantity - COALESCE((SELECT SUM(r.quantity) FROM inventory_returns_eff r WHERE r.loan_id = l.id), 0)), 0)
+       FROM inventory_loans_eff l WHERE l.item_id = i.id AND l.borrower_user_id = $9::uuid)::bigint AS mine
   FROM inventory_items i
   WHERE i.archived_at IS NULL
+), withavail AS (
+  SELECT id, name, description, category, location, cover_media_id, mode, total_quantity, archived_at, created_at, updated_at, category_id, outstanding, unit_count, units_available, mine, (CASE WHEN mode = 'quantity' THEN total_quantity - outstanding ELSE units_available END)::bigint AS available FROM base
 )
-SELECT id, name, description, category, location, cover_media_id, mode, total_quantity, archived_at, created_at, updated_at, outstanding, unit_count, units_available,
-  (CASE WHEN mode = 'quantity' THEN total_quantity - outstanding ELSE units_available END)::bigint AS available
-FROM base
+SELECT id, name, description, category, location, cover_media_id, mode, total_quantity, archived_at, created_at, updated_at, category_id, outstanding, unit_count, units_available, mine, available FROM withavail
 WHERE ($1::text = '' OR name ILIKE '%' || $1 || '%' ESCAPE '\' OR category ILIKE '%' || $1 || '%' ESCAPE '\' OR location ILIKE '%' || $1 || '%' ESCAPE '\' OR description ILIKE '%' || $1 || '%' ESCAPE '\')
   AND ($2::text = '' OR category = $2)
-  AND (NOT $3::bool OR (CASE WHEN mode = 'quantity' THEN total_quantity - outstanding ELSE units_available END) > 0)
-  AND (NOT $4::bool OR (name, id) > ($5::text, $6::uuid))
-ORDER BY name, id
-LIMIT $7
+  AND ($3::uuid IS NULL OR category_id = $3::uuid)
+  AND (NOT $4::bool OR available > 0)
+  AND (NOT $5::bool OR mine > 0)
+ORDER BY (CASE WHEN $6::text = 'available' THEN available END) DESC NULLS LAST,
+         (CASE WHEN $6::text = 'newest' THEN created_at END) DESC NULLS LAST,
+         name, id
+OFFSET $7::int LIMIT $8::int
 `
 
 type ListInventoryItemsParams struct {
-	Column1 string
-	Column2 string
-	Column3 bool
-	Column4 bool
-	Column5 string
-	Column6 pgtype.UUID
-	Limit   int32
+	Q             string
+	Category      string
+	CategoryID    pgtype.UUID
+	OnlyAvailable bool
+	OnlyMine      bool
+	Sort          string
+	RowOffset     int32
+	RowLimit      int32
+	UserID        pgtype.UUID
 }
 
 type ListInventoryItemsRow struct {
@@ -594,22 +784,27 @@ type ListInventoryItemsRow struct {
 	ArchivedAt     pgtype.Timestamptz
 	CreatedAt      pgtype.Timestamptz
 	UpdatedAt      pgtype.Timestamptz
+	CategoryID     pgtype.UUID
 	Outstanding    int64
 	UnitCount      int64
 	UnitsAvailable int64
+	Mine           int64
 	Available      int64
 }
 
 // 一覧。残数(数量管理)・利用可能な個体数(個体管理)を導出して返す。廃止した物品は含めない。
+// mine = 自分が借りている未返却数。並び替え: name（既定）・newest・available（借りられる数の多い順）。カーソルは件数のoffset。
 func (q *Queries) ListInventoryItems(ctx context.Context, arg ListInventoryItemsParams) ([]ListInventoryItemsRow, error) {
 	rows, err := q.db.Query(ctx, listInventoryItems,
-		arg.Column1,
-		arg.Column2,
-		arg.Column3,
-		arg.Column4,
-		arg.Column5,
-		arg.Column6,
-		arg.Limit,
+		arg.Q,
+		arg.Category,
+		arg.CategoryID,
+		arg.OnlyAvailable,
+		arg.OnlyMine,
+		arg.Sort,
+		arg.RowOffset,
+		arg.RowLimit,
+		arg.UserID,
 	)
 	if err != nil {
 		return nil, err
@@ -630,14 +825,41 @@ func (q *Queries) ListInventoryItems(ctx context.Context, arg ListInventoryItems
 			&i.ArchivedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.CategoryID,
 			&i.Outstanding,
 			&i.UnitCount,
 			&i.UnitsAvailable,
+			&i.Mine,
 			&i.Available,
 		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listItemImages = `-- name: ListItemImages :many
+SELECT media_id FROM inventory_item_images WHERE item_id = $1 ORDER BY sort_order, media_id
+`
+
+// 物品の画像（複数枚）
+func (q *Queries) ListItemImages(ctx context.Context, itemID pgtype.UUID) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, listItemImages, itemID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var media_id pgtype.UUID
+		if err := rows.Scan(&media_id); err != nil {
+			return nil, err
+		}
+		items = append(items, media_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -693,7 +915,7 @@ func (q *Queries) ListItemLoansOutstanding(ctx context.Context, itemID pgtype.UU
 }
 
 const listItemUnits = `-- name: ListItemUnits :many
-SELECT u.id, u.asset_tag, u.serial_number, u.state, u.current_loan_id,
+SELECT u.id, u.asset_tag, u.serial_number, u.state, u.current_loan_id, l.borrower_user_id,
        l.borrowed_at AS loaned_at, COALESCE(p.display_name, '') AS borrower_display_name
 FROM inventory_units u
 LEFT JOIN inventory_loans l ON l.id = u.current_loan_id
@@ -708,6 +930,7 @@ type ListItemUnitsRow struct {
 	SerialNumber        pgtype.Text
 	State               string
 	CurrentLoanID       pgtype.UUID
+	BorrowerUserID      pgtype.UUID
 	LoanedAt            pgtype.Timestamptz
 	BorrowerDisplayName string
 }
@@ -727,6 +950,7 @@ func (q *Queries) ListItemUnits(ctx context.Context, itemID pgtype.UUID) ([]List
 			&i.SerialNumber,
 			&i.State,
 			&i.CurrentLoanID,
+			&i.BorrowerUserID,
 			&i.LoanedAt,
 			&i.BorrowerDisplayName,
 		); err != nil {
@@ -833,6 +1057,66 @@ func (q *Queries) LoanOutstanding(ctx context.Context, id pgtype.UUID) (int32, e
 	return column_1, err
 }
 
+const lockCategories = `-- name: LockCategories :exec
+SELECT id FROM inventory_categories ORDER BY id FOR UPDATE
+`
+
+// カテゴリの追加・並び替え・削除を直列化する（表全体を共有しない小さな表なので、全行をロックする）。
+func (q *Queries) LockCategories(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockCategories)
+	return err
+}
+
+const moveItemsToCategory = `-- name: MoveItemsToCategory :exec
+UPDATE inventory_items SET category_id = $2, category = $3, updated_at = now() WHERE category_id = $1
+`
+
+type MoveItemsToCategoryParams struct {
+	CategoryID   pgtype.UUID
+	CategoryID_2 pgtype.UUID
+	Category     string
+}
+
+func (q *Queries) MoveItemsToCategory(ctx context.Context, arg MoveItemsToCategoryParams) error {
+	_, err := q.db.Exec(ctx, moveItemsToCategory, arg.CategoryID, arg.CategoryID_2, arg.Category)
+	return err
+}
+
+const renameCategory = `-- name: RenameCategory :one
+UPDATE inventory_categories SET name = $2 WHERE id = $1 RETURNING id, name, sort_order, created_at
+`
+
+type RenameCategoryParams struct {
+	ID   pgtype.UUID
+	Name string
+}
+
+func (q *Queries) RenameCategory(ctx context.Context, arg RenameCategoryParams) (InventoryCategory, error) {
+	row := q.db.QueryRow(ctx, renameCategory, arg.ID, arg.Name)
+	var i InventoryCategory
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SortOrder,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const setCategoryOrder = `-- name: SetCategoryOrder :exec
+UPDATE inventory_categories SET sort_order = $2 WHERE id = $1
+`
+
+type SetCategoryOrderParams struct {
+	ID        pgtype.UUID
+	SortOrder int32
+}
+
+func (q *Queries) SetCategoryOrder(ctx context.Context, arg SetCategoryOrderParams) error {
+	_, err := q.db.Exec(ctx, setCategoryOrder, arg.ID, arg.SortOrder)
+	return err
+}
+
 const setUnitLoan = `-- name: SetUnitLoan :execrows
 UPDATE inventory_units SET current_loan_id = $3 WHERE id = $1 AND item_id = $2 AND current_loan_id IS NULL AND state = 'active'
 `
@@ -852,11 +1136,26 @@ func (q *Queries) SetUnitLoan(ctx context.Context, arg SetUnitLoanParams) (int64
 	return result.RowsAffected(), nil
 }
 
+const syncItemCategoryName = `-- name: SyncItemCategoryName :exec
+UPDATE inventory_items SET category = $2 WHERE category_id = $1
+`
+
+type SyncItemCategoryNameParams struct {
+	CategoryID pgtype.UUID
+	Category   string
+}
+
+// 物品の（旧コード向けの）カテゴリ名の列を、カテゴリの名前に同期する
+func (q *Queries) SyncItemCategoryName(ctx context.Context, arg SyncItemCategoryNameParams) error {
+	_, err := q.db.Exec(ctx, syncItemCategoryName, arg.CategoryID, arg.Category)
+	return err
+}
+
 const updateInventoryItem = `-- name: UpdateInventoryItem :one
 UPDATE inventory_items
-SET name = $2, description = $3, category = $4, location = $5, total_quantity = $6, archived_at = $7, mode = $8, updated_at = now()
+SET name = $2, description = $3, category = $4, category_id = $9, location = $5, total_quantity = $6, archived_at = $7, mode = $8, updated_at = now()
 WHERE id = $1
-RETURNING id, name, description, category, location, cover_media_id, mode, total_quantity, archived_at, created_at, updated_at
+RETURNING id, name, description, category, location, cover_media_id, mode, total_quantity, archived_at, created_at, updated_at, category_id
 `
 
 type UpdateInventoryItemParams struct {
@@ -868,6 +1167,7 @@ type UpdateInventoryItemParams struct {
 	TotalQuantity int32
 	ArchivedAt    pgtype.Timestamptz
 	Mode          string
+	CategoryID    pgtype.UUID
 }
 
 func (q *Queries) UpdateInventoryItem(ctx context.Context, arg UpdateInventoryItemParams) (InventoryItem, error) {
@@ -880,6 +1180,7 @@ func (q *Queries) UpdateInventoryItem(ctx context.Context, arg UpdateInventoryIt
 		arg.TotalQuantity,
 		arg.ArchivedAt,
 		arg.Mode,
+		arg.CategoryID,
 	)
 	var i InventoryItem
 	err := row.Scan(
@@ -894,6 +1195,7 @@ func (q *Queries) UpdateInventoryItem(ctx context.Context, arg UpdateInventoryIt
 		&i.ArchivedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CategoryID,
 	)
 	return i, err
 }

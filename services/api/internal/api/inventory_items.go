@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -20,19 +21,24 @@ import (
 const maxQuantity = 100000
 
 type itemView struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	Description   string `json:"description"`
-	Category      string `json:"category"`
-	Location      string `json:"location"`
-	Mode          string `json:"mode"`
-	TotalQuantity int32  `json:"totalQuantity"` // 数量管理のときの総数（個体管理は0）
-	Outstanding   int64  `json:"outstanding"`   // 貸出中の数量
-	UnitCount     int64  `json:"unitCount"`     // 個体管理のときの有効な個体数
-	Available     int64  `json:"available"`     // 借りられる数（数量管理=残数、個体管理=利用可能な個体数）
-	Archived      bool   `json:"archived"`
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Description   string  `json:"description"`
+	Category      string  `json:"category"`   // カテゴリ名（categoryIdと同期。旧クライアント向けに残す）
+	CategoryID    *string `json:"categoryId"` // カテゴリ（inventory_categories）
+	Location      string  `json:"location"`
+	Mode          string  `json:"mode"`
+	TotalQuantity int32   `json:"totalQuantity"` // 数量管理のときの総数（個体管理は0）
+	Outstanding   int64   `json:"outstanding"`   // 貸出中の数量
+	UnitCount     int64   `json:"unitCount"`     // 個体管理のときの有効な個体数
+	Available     int64   `json:"available"`     // 借りられる数（数量管理=残数、個体管理=利用可能な個体数）
+	Archived      bool    `json:"archived"`
 	// PhotoMediaID は現在の写真。画像は GET /media/{id}（ログイン中のメンバーだけ）。
 	PhotoMediaID *string `json:"photoMediaId"`
+	// BorrowedByMe は自分が借りている未返却の数量（0なら借りていない）。
+	BorrowedByMe int64 `json:"borrowedByMe"`
+	// Images は物品の画像（メディアID。先頭がメイン）。詳細だけに入る。
+	Images []string `json:"images,omitempty"`
 }
 
 type unitView struct {
@@ -41,6 +47,7 @@ type unitView struct {
 	SerialNumber *string     `json:"serialNumber"`
 	State        string      `json:"state"`
 	Loaned       *loanedView `json:"loaned"`
+	Mine         bool        `json:"mine"` // 自分が借りている個体
 }
 
 type loanedView struct {
@@ -73,10 +80,48 @@ func itemFrom(i store.InventoryItem, outstanding, unitCount int64) itemView {
 		p := i.CoverMediaID.String()
 		v.PhotoMediaID = &p
 	}
+	if i.CategoryID.Valid {
+		c := i.CategoryID.String()
+		v.CategoryID = &c
+	}
 	if i.Mode == "quantity" {
 		v.Available = int64(i.TotalQuantity) - outstanding
 	}
 	return v
+}
+
+// defaultCategoryName は、カテゴリの指定が無いときに入れるカテゴリ（初期カテゴリの1つ）。
+const defaultCategoryName = "その他"
+
+// resolveCategory は、categoryId（優先）またはカテゴリ名から、存在するカテゴリを求める。どちらも空なら既定のカテゴリ。
+func resolveCategory(ctx context.Context, q *store.Queries, categoryID, name string) (store.InventoryCategory, error) {
+	var c store.InventoryCategory
+	var err error
+	switch {
+	case strings.TrimSpace(categoryID) != "":
+		var id pgtype.UUID
+		if e := id.Scan(strings.TrimSpace(categoryID)); e != nil || !id.Valid {
+			return c, invalid("categoryIdが不正です")
+		}
+		c, err = q.GetCategory(ctx, id)
+	case strings.TrimSpace(name) != "":
+		// 旧クライアント（カテゴリ名の文字列だけを送る）との互換: 無い名前は、管理者の操作としてカテゴリを作る
+		name = strings.TrimSpace(name)
+		if utf8.RuneCountInString(name) > 30 || strings.ContainsAny(name, "\n\r\t") {
+			return c, invalid("カテゴリは30文字以内で、改行を含めないでください")
+		}
+		c, err = q.GetCategoryByName(ctx, name)
+		if errors.Is(err, pgx.ErrNoRows) {
+			c, err = q.CreateCategory(ctx, name)
+		}
+		return c, err
+	default:
+		c, err = q.GetCategoryByName(ctx, defaultCategoryName)
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return c, invalid("カテゴリが見つかりません。カテゴリの管理画面で追加してください")
+	}
+	return c, err
 }
 
 func checkText(v, name string, min, max int) (string, error) {
@@ -101,6 +146,7 @@ func (s *server) createItem(w http.ResponseWriter, r *http.Request) {
 		Name          string `json:"name"`
 		Description   string `json:"description"`
 		Category      string `json:"category"`
+		CategoryID    string `json:"categoryId"`
 		Location      string `json:"location"`
 		Mode          string `json:"mode"`
 		TotalQuantity int    `json:"totalQuantity"`
@@ -133,7 +179,11 @@ func (s *server) createItem(w http.ResponseWriter, r *http.Request) {
 	}
 	var out itemView
 	err = s.inTx(r.Context(), func(q *store.Queries, tx pgx.Tx) error {
-		it, err := q.CreateInventoryItem(r.Context(), store.CreateInventoryItemParams{Name: name, Description: req.Description, Category: req.Category, Location: req.Location, Mode: req.Mode, TotalQuantity: int32(req.TotalQuantity)})
+		cat, err := resolveCategory(r.Context(), q, req.CategoryID, req.Category)
+		if err != nil {
+			return err
+		}
+		it, err := q.CreateInventoryItem(r.Context(), store.CreateInventoryItemParams{Name: name, Description: req.Description, Category: cat.Name, CategoryID: cat.ID, Location: req.Location, Mode: req.Mode, TotalQuantity: int32(req.TotalQuantity)})
 		if err != nil {
 			return err
 		}
@@ -165,6 +215,7 @@ func (s *server) updateItem(w http.ResponseWriter, r *http.Request) {
 		Name          optStr `json:"name"`
 		Description   optStr `json:"description"`
 		Category      optStr `json:"category"`
+		CategoryID    optStr `json:"categoryId"`
 		Location      optStr `json:"location"`
 		Mode          optStr `json:"mode"`
 		TotalQuantity *int   `json:"totalQuantity"`
@@ -183,7 +234,7 @@ func (s *server) updateItem(w http.ResponseWriter, r *http.Request) {
 			}
 			return err
 		}
-		p := store.UpdateInventoryItemParams{ID: id, Name: cur.Name, Description: cur.Description, Category: cur.Category, Location: cur.Location, TotalQuantity: cur.TotalQuantity, ArchivedAt: cur.ArchivedAt, Mode: cur.Mode}
+		p := store.UpdateInventoryItemParams{ID: id, Name: cur.Name, Description: cur.Description, Category: cur.Category, CategoryID: cur.CategoryID, Location: cur.Location, TotalQuantity: cur.TotalQuantity, ArchivedAt: cur.ArchivedAt, Mode: cur.Mode}
 		text := func(o optStr, label string, min, max int, dst *string) error {
 			if !o.Set {
 				return nil
@@ -204,8 +255,12 @@ func (s *server) updateItem(w http.ResponseWriter, r *http.Request) {
 		if err := text(req.Description, "説明", 0, 1000, &p.Description); err != nil {
 			return err
 		}
-		if err := text(req.Category, "カテゴリ", 0, 30, &p.Category); err != nil {
-			return err
+		if (req.CategoryID.Set && !req.CategoryID.Null) || (req.Category.Set && !req.Category.Null) {
+			cat, err := resolveCategory(r.Context(), q, req.CategoryID.Val, req.Category.Val)
+			if err != nil {
+				return err
+			}
+			p.Category, p.CategoryID = cat.Name, cat.ID
 		}
 		if err := text(req.Location, "保管場所", 0, 50, &p.Location); err != nil {
 			return err
@@ -351,7 +406,8 @@ func (s *server) createUnit(w http.ResponseWriter, r *http.Request) {
 
 // listItems は GET /inventory/items（検索・カテゴリ・利用可否・ページング）。
 func (s *server) listItems(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.authorize(w, r, "inventory.items.list", authz.Resource{}); !ok {
+	a, ok := s.authorize(w, r, "inventory.items.list", authz.Resource{})
+	if !ok {
 		return
 	}
 	qs := r.URL.Query()
@@ -370,14 +426,29 @@ func (s *server) listItems(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = n
 	}
-	params := store.ListInventoryItemsParams{Column1: likeEscape(search), Column2: category, Column3: qs.Get("available") == "true", Limit: int32(limit + 1)}
+	sort := qs.Get("sort")
+	switch sort {
+	case "", "name", "newest", "available":
+	default:
+		httpx.Error(w, r, http.StatusBadRequest, "INVALID_REQUEST", "sort は name・newest・available のいずれかです")
+		return
+	}
+	offset := 0
 	if c := qs.Get("cursor"); c != "" {
-		name, id, ok := decodeNameCursor(c)
-		if !ok {
+		n, err := strconv.Atoi(c)
+		if err != nil || n < 0 || n > 100000 {
 			httpx.Error(w, r, http.StatusBadRequest, "INVALID_REQUEST", "cursor が正しくありません")
 			return
 		}
-		params.Column4, params.Column5, params.Column6 = true, name, id
+		offset = n
+	}
+	params := store.ListInventoryItemsParams{Q: likeEscape(search), Category: category, OnlyAvailable: qs.Get("available") == "true", OnlyMine: qs.Get("mine") == "true",
+		Sort: sort, RowOffset: int32(offset), RowLimit: int32(limit + 1), UserID: a.Identity.UserID}
+	if v := qs.Get("categoryId"); v != "" {
+		if err := params.CategoryID.Scan(v); err != nil || !params.CategoryID.Valid {
+			httpx.Error(w, r, http.StatusBadRequest, "INVALID_REQUEST", "categoryId が正しくありません")
+			return
+		}
 	}
 	rows, err := store.New(s.Pool).ListInventoryItems(r.Context(), params)
 	if err != nil {
@@ -387,8 +458,7 @@ func (s *server) listItems(w http.ResponseWriter, r *http.Request) {
 	var next *string
 	if len(rows) > limit {
 		rows = rows[:limit]
-		last := rows[len(rows)-1]
-		c := encodeNameCursor(last.Name, last.ID)
+		c := strconv.Itoa(offset + limit)
 		next = &c
 	}
 	items := make([]itemView, 0, len(rows))
@@ -403,7 +473,11 @@ func (s *server) listItems(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, x := range rows {
 		v := itemView{PhotoMediaID: ptrOf(photos, x.ID.String()), ID: x.ID.String(), Name: x.Name, Description: x.Description, Category: x.Category, Location: x.Location, Mode: x.Mode,
-			TotalQuantity: x.TotalQuantity, Outstanding: x.Outstanding, UnitCount: x.UnitCount, Available: x.Available}
+			TotalQuantity: x.TotalQuantity, Outstanding: x.Outstanding, UnitCount: x.UnitCount, Available: x.Available, BorrowedByMe: x.Mine}
+		if x.CategoryID.Valid {
+			c := x.CategoryID.String()
+			v.CategoryID = &c
+		}
 		items = append(items, v)
 	}
 	cats, err := store.New(s.Pool).ListInventoryCategories(r.Context())
@@ -414,12 +488,19 @@ func (s *server) listItems(w http.ResponseWriter, r *http.Request) {
 	if cats == nil {
 		cats = []string{}
 	}
-	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": next, "categories": cats})
+	cv, err := s.categoryViews(r.Context(), store.New(s.Pool))
+	if err != nil {
+		s.internal(w, r)
+		return
+	}
+	// categories は旧クライアント向け（使われている名前の一覧）。categoryList が管理されたカテゴリ（並び順つき）
+	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "nextCursor": next, "categories": cats, "categoryList": cv})
 }
 
 // getItem は GET /inventory/items/{id}（個体の状況・残数・現在の貸出状況）。
 func (s *server) getItem(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.authorize(w, r, "inventory.items.get", authz.Resource{}); !ok {
+	a, ok := s.authorize(w, r, "inventory.items.get", authz.Resource{})
+	if !ok {
 		return
 	}
 	id, ok := parseItemID(w, r)
@@ -447,7 +528,7 @@ func (s *server) getItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	active := int64(0)
-	var availableUnits int64
+	var availableUnits, mineUnits int64
 	now := s.Now()
 	uv := make([]unitView, 0, len(units))
 	for _, u := range units {
@@ -458,6 +539,10 @@ func (s *server) getItem(w http.ResponseWriter, r *http.Request) {
 				availableUnits++
 			}
 		}
+		if u.CurrentLoanID.Valid && u.BorrowerUserID == a.Identity.UserID {
+			v.Mine = true
+			mineUnits++
+		}
 		if u.CurrentLoanID.Valid && u.LoanedAt.Valid {
 			v.Loaned = &loanedView{BorrowerDisplayName: u.BorrowerDisplayName, Since: u.LoanedAt.Time, ElapsedDays: elapsedDays(u.LoanedAt.Time, now)}
 		}
@@ -467,6 +552,16 @@ func (s *server) getItem(w http.ResponseWriter, r *http.Request) {
 	if it.Mode == "individual" {
 		view.Available = availableUnits
 	}
+	view.BorrowedByMe = mineUnits
+	imgs, err := q.ListItemImages(r.Context(), id)
+	if err != nil {
+		s.internal(w, r)
+		return
+	}
+	view.Images = make([]string, 0, len(imgs))
+	for _, m := range imgs {
+		view.Images = append(view.Images, m.String())
+	}
 	loans, err := q.ListItemLoansOutstanding(r.Context(), id)
 	if err != nil {
 		s.internal(w, r)
@@ -474,6 +569,9 @@ func (s *server) getItem(w http.ResponseWriter, r *http.Request) {
 	}
 	lv := make([]outstandingLoanView, 0, len(loans))
 	for _, l := range loans {
+		if l.BorrowerUserID == a.Identity.UserID {
+			view.BorrowedByMe += int64(l.Outstanding)
+		}
 		lv = append(lv, outstandingLoanView{ID: l.ID.String(), BorrowerDisplayName: l.BorrowerDisplayName, Quantity: l.Outstanding, BorrowedAt: l.BorrowedAt.Time, ElapsedDays: elapsedDays(l.BorrowedAt.Time, now)})
 	}
 	httpx.JSON(w, http.StatusOK, struct {
