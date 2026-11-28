@@ -105,9 +105,11 @@ Discord ──(Gateway/REST: discordgo)──> services/agent ──> Claude API
 - **秘密**: Botのtoken・APIキー・DBパスワードはVPSの`.env`にだけ。ログ・DB・Discord・LLMへの入力に出さない。**ログにメッセージ本文を出さない**（IDと件数だけ）。
 - 運用前に独立レビューを行い、指摘を修正した（[handoffs/163-review.md](handoffs/163-review.md)）。
 
+- **監査・異常検知**（2026-11-29）: ツール実行は`tool_audit`に記録（引数は保存しない・90日）。10分で拒否・失敗30件以上なら自動で全停止。文脈は直近10件・合計4,000文字まで。Administrator権限を維持する判断とリスクは[design/phase3-nul-safety.md §4](design/phase3-nul-safety.md)。
+
 ## 9. データ（`agent`スキーマ。DB全体は[DATABASE](DATABASE.md)）
 
-`settings`（停止状態・予算・各種の状態）・`state`（気分・テンション・ハマり）・`relationships`・`messages`・`import_progress`・`api_usage`・`daily_calls`・`reactions_daily`・`notes`・`summaries`・`diary`・`reminders`。専用ロール`nu_agent`は`agent`スキーマだけを使え、nu_app本体のテーブルは読めない。検索は`pg_trgm`（`agent`スキーマ内）。バックアップは既存のDBバックアップに含まれる（DMの内容も含まれる点に注意）。
+`settings`（停止状態・予算・各種の状態）・`state`（気分・テンション・ハマり）・`relationships`・`messages`・`import_progress`・`api_usage`・`daily_calls`・`reactions_daily`・`notes`・`summaries`・`diary`・`reminders`・`tool_audit`。専用ロール`nu_agent`は`agent`スキーマだけを使え、nu_app本体のテーブルは読めない。検索は`pg_trgm`（`agent`スキーマ内）。バックアップは既存のDBバックアップに含まれる（DMの内容も含まれる点に注意）。
 
 ## 10. 今後・未実装
 

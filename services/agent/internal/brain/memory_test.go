@@ -578,3 +578,44 @@ func TestToolCallsPerReplyAreCapped(t *testing.T) {
 		}
 	}
 }
+
+func TestCapHistoryKeepsNewestWithinLimit(t *testing.T) {
+	var h []Turn
+	for i := 0; i < 10; i++ {
+		h = append(h, Turn{AuthorName: "a", Text: strings.Repeat("あ", 1000) + string(rune('0'+i))})
+	}
+	got := capHistory(h)
+	total := 0
+	for _, x := range got {
+		n := len([]rune(x.Text))
+		if n > maxHistoryTurnRune+20 {
+			t.Errorf("1発言が長い: %d", n)
+		}
+		total += n
+	}
+	if total > maxHistoryRunes+20*len(got) || len(got) == 0 || len(got) >= len(h) {
+		t.Errorf("合計 %d・件数 %d", total, len(got))
+	}
+	if !strings.HasSuffix(h[len(h)-1].Text, "9") || got[len(got)-1].Text != truncRunes(h[len(h)-1].Text, maxHistoryTurnRune) {
+		t.Error("新しい発言が残っていない")
+	}
+	if l := truncRunes(strings.Repeat("い", 5000), maxLatestRunes); len([]rune(l)) > maxLatestRunes+20 {
+		t.Error("いまの発言が切られていない")
+	}
+}
+
+// LLMに渡すツールの許可リスト。ここに無いツール（管理者操作・シェル・DB・会計・Drive・Sheets等）を足すときは、
+// このテストと docs/design/phase3-nul-safety.md を同時に更新して、レビューを通す（足し忘れ・紛れ込みの検知）。
+func TestToolAllowlistIsPinned(t *testing.T) {
+	want := map[string]bool{"search_log": true, "digest": true, "remember": true, "recall": true, "forget": true,
+		"remind": true, "list_reminders": true, "cancel_reminder": true, "web_research": true, "think_hard": true}
+	got := tools()
+	if len(got) != len(want) {
+		t.Fatalf("ツールの数が変わった: %d", len(got))
+	}
+	for _, x := range got {
+		if !want[x.Name] {
+			t.Errorf("許可リストに無いツール: %s", x.Name)
+		}
+	}
+}

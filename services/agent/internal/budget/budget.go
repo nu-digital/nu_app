@@ -62,13 +62,13 @@ type Ledger interface {
 }
 
 type Config struct {
-	LimitMicro      int64          // 月の上限（既定 $60）
-	AnchorDay       int            // 月の始まり（クレジットの付与日。1〜28。既定1）
-	ReplyPerUserDay int            // 一人あたりの1日の返答の上限（既定20）
-	OpusPerUserDay  int            // 一人あたりの1日のOpus依頼の上限（既定3）
+	LimitMicro       int64          // 月の上限（既定 $60）
+	AnchorDay        int            // 月の始まり（クレジットの付与日。1〜28。既定1）
+	ReplyPerUserDay  int            // 一人あたりの1日の返答の上限（既定20）
+	OpusPerUserDay   int            // 一人あたりの1日のOpus依頼の上限（既定3）
 	RemindPerUserDay int            // 一人あたりの1日のリマインダー作成の上限（既定10）
-	WebPerUserDay   int            // 一人あたりの1日のWeb検索の依頼の上限（既定5）
-	Location        *time.Location // 日付の基準（JST）
+	WebPerUserDay    int            // 一人あたりの1日のWeb検索の依頼の上限（既定5）
+	Location         *time.Location // 日付の基準（JST）
 }
 
 func (c Config) withDefaults() Config {

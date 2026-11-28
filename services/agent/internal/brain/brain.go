@@ -61,16 +61,22 @@ type Brain struct {
 	State     StateStore
 	Memory    Memory    // nilなら記憶のツールは使えない
 	Reminders Reminders // nilならリマインダーのツールは使えない
+	Audit     Auditor   // nilなら監査しない（試験用）
 	Now       func() time.Time
 	Log       *slog.Logger
+}
+
+// Auditor はツール実行の監査ログ（store.Store が満たす）。失敗してもツール実行は止めない。
+type Auditor interface {
+	AuditTool(ctx context.Context, userID, channelID int64, tool string, ok bool)
 }
 
 const (
 	maxToolRounds = 3
 	// maxToolCallsPerReply は、1回の返答で実行するツール呼び出しの総数の上限（ラウンドをまたいで数える）。
 	maxToolCallsPerReply = 6
-	maxReplyRunes = 1800
-	refusalText   = "それは答えられない。別の聞き方にして。"
+	maxReplyRunes        = 1800
+	refusalText          = "それは答えられない。別の聞き方にして。"
 )
 
 var seriousRe = regexp.MustCompile(`本気(を)?出して|本気で(考えて|やって)|ガチで(考えて|やって)`)
@@ -150,7 +156,11 @@ func (b *Brain) Reply(ctx context.Context, in Input) (Output, error) {
 				results = append(results, llm.Block{Type: llm.ToolResult, ToolUseID: tu.ID, IsError: true, Text: "この返答でのツール呼び出しの上限。実行しない"})
 				continue
 			}
-			results = append(results, b.runTool(ctx, in, tu, &out))
+			res := b.runTool(ctx, in, tu, &out)
+			if b.Audit != nil { // 監査ログ（ツール名・成否・発言者だけ。引数や本文は残さない）
+				b.Audit.AuditTool(ctx, in.UserID, in.ChannelID, tu.Name, !res.IsError)
+			}
+			results = append(results, res)
 		}
 		msgs = append(msgs, llm.Message{Role: llm.User, Blocks: results})
 	}
@@ -262,19 +272,52 @@ func tools() []llm.Tool {
 // userBlocks は、直近の会話と最新の依頼を1つのユーザーメッセージにする。本文はすべて「データ」として <untrusted_message> で囲む。
 func userBlocks(in Input) []llm.Block {
 	var b strings.Builder
-	if len(in.History) > 0 {
+	if hist := capHistory(in.History); len(hist) > 0 {
 		b.WriteString("【直近の会話（古い順）】\n")
-		for _, t := range in.History {
+		for _, t := range hist {
 			b.WriteString(untrusted(t.AuthorName, t.Text))
 			b.WriteString("\n")
 		}
 	}
-	fmt.Fprintf(&b, "【いま話しかけてきた人の最新のメッセージ】\n%s", untrusted(in.AuthorName, in.Text))
+	fmt.Fprintf(&b, "【いま話しかけてきた人の最新のメッセージ】\n%s", untrusted(in.AuthorName, truncRunes(in.Text, maxLatestRunes)))
 	blocks := []llm.Block{{Type: llm.Text, Text: b.String()}}
 	for _, img := range in.Images {
 		blocks = append(blocks, llm.Block{Type: llm.Image, MediaType: "image/jpeg", Data: img})
 	}
 	return blocks
+}
+
+// 文脈の大きさの上限（トークンの代わりに文字数で近似。日本語は1文字≒1〜2トークン）。長い貼り付けでAPI料金を使い切られないための上限。
+const (
+	maxHistoryRunes    = 4000 // 直近の会話の合計
+	maxHistoryTurnRune = 600  // 1発言あたり
+	maxLatestRunes     = 3000 // いまの発言
+)
+
+func truncRunes(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n]) + "…(長いので省略)"
+	}
+	return s
+}
+
+// capHistory は、新しい発言を優先して、合計の文字数が上限に収まるぶんだけ残す（古い順を保つ）。
+func capHistory(h []Turn) []Turn {
+	total := 0
+	start := len(h)
+	for i := len(h) - 1; i >= 0; i-- {
+		n := len([]rune(truncRunes(h[i].Text, maxHistoryTurnRune)))
+		if total+n > maxHistoryRunes {
+			break
+		}
+		total += n
+		start = i
+	}
+	out := make([]Turn, 0, len(h)-start)
+	for _, t := range h[start:] {
+		out = append(out, Turn{AuthorName: t.AuthorName, Text: truncRunes(t.Text, maxHistoryTurnRune)})
+	}
+	return out
 }
 
 var tagRe = regexp.MustCompile(`(?i)<(/?)untrusted_message`)

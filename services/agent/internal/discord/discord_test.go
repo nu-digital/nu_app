@@ -372,7 +372,7 @@ func TestGatewayDropsDMAndForeignGuild(t *testing.T) {
 	g := &Gateway{guildID: "1"}
 	author := &discordgo.User{ID: "3", Username: "u"}
 	for name, m := range map[string]*discordgo.Message{
-		"DM":         {ID: "1", ChannelID: "2", Author: author},
+		"DM":    {ID: "1", ChannelID: "2", Author: author},
 		"別サーバー": {ID: "1", ChannelID: "2", GuildID: "9", Author: author},
 	} {
 		if _, ok := g.convert(m); ok {
